@@ -46,9 +46,6 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   workspaces Workspace[]
-  bots          Bot[]
-  conversations Conversation[]
-  leads         Lead[]
   auditLogs  AuditLog[]
 
   @@index([createdAt])
