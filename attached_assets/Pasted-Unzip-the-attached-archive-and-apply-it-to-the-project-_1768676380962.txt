@@ -1,0 +1,55 @@
+Unzip the attached archive and apply it to the project, preserving paths. It contains exactly one new file:
+	•	src/app/api/public/leads/recent/route.ts
+
+Requirements:
+	•	Do not touch schema/migrations.
+	•	ASCII quotes only (no smart quotes).
+	•	Endpoint: GET /api/public/leads/recent
+	•	Query params:
+	•	botPublicKey (required UUID)
+	•	limit (optional 1–100, default 25)
+	•	cursor (optional ISO timestamp; must be valid date, else 400)
+	•	status (optional one of NEW|OPEN|WON|LOST, else 400)
+	•	Security ordering must be: validate inputs → fetch bot → require ACTIVE → enforce allowlist → query leads.
+	•	Response must not expose internal IDs. Only public IDs + safe fields.
+	•	Pagination: return nextCursor as ISO string when more results exist.
+
+After applying, run:
+	1.	pnpm lint
+	2.	pnpm typecheck
+
+Then run these curl tests (port 5000, Host header set):
+
+A) Missing botPublicKey => 400
+curl -i "http://localhost:5000/api/public/leads/recent" -H "Host: example.com"
+
+B) Invalid botPublicKey => 400
+curl -i "http://localhost:5000/api/public/leads/recent?botPublicKey=not-a-uuid" -H "Host: example.com"
+
+C) Bot not found => 404
+curl -i "http://localhost:5000/api/public/leads/recent?botPublicKey=00000000-0000-0000-0000-000000000000" -H "Host: example.com"
+
+D) Valid bot => 200
+curl -i "http://localhost:5000/api/public/leads/recent?botPublicKey=<VALID_BOT_KEY>" -H "Host: example.com"
+
+E) limit=0 => 400
+curl -i "http://localhost:5000/api/public/leads/recent?botPublicKey=<VALID_BOT_KEY>&limit=0" -H "Host: example.com"
+
+F) limit=999 => 400
+curl -i "http://localhost:5000/api/public/leads/recent?botPublicKey=<VALID_BOT_KEY>&limit=999" -H "Host: example.com"
+
+G) invalid status => 400
+curl -i "http://localhost:5000/api/public/leads/recent?botPublicKey=<VALID_BOT_KEY>&status=INVALID" -H "Host: example.com"
+
+H) cursor invalid => 400
+curl -i "http://localhost:5000/api/public/leads/recent?botPublicKey=<VALID_BOT_KEY>&cursor=not-a-date" -H "Host: example.com"
+
+I) Pagination (limit=5 then cursor=)
+curl -i "http://localhost:5000/api/public/leads/recent?botPublicKey=<VALID_BOT_KEY>&limit=5" -H "Host: example.com"
+Then:
+curl -i "http://localhost:5000/api/public/leads/recent?botPublicKey=<VALID_BOT_KEY>&limit=5&cursor=<nextCursor>" -H "Host: example.com"
+
+J) POST => 405
+curl -i -X POST "http://localhost:5000/api/public/leads/recent?botPublicKey=<VALID_BOT_KEY>" -H "Host: example.com"
+
+Paste back lint/typecheck + curl outputs A–J.
