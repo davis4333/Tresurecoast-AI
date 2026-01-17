@@ -1,0 +1,93 @@
+You are implementing STEP 12: Lead Status Update Endpoint.
+
+Context:
+- Step 11 already exists in the repo and uses Lead status enum values:
+  NEW | CONTACTED | BOOKED | CLOSED
+- Keep consistent with that enum everywhere.
+
+Goal:
+Add exactly 1 new file:
+src/app/api/public/leads/status/route.ts
+
+If a zip was uploaded with this prompt:
+1) Extract it at repo root (workspace):
+   unzip -o step12_replit_bundle.zip -d .
+
+If unzip isn’t available or zip extraction fails:
+2) Create the file manually at:
+   src/app/api/public/leads/status/route.ts
+   and paste the exact code from the prompt I provided previously for Step 12 (the corrected version using updateMany + strict body typing).
+
+Hard requirements:
+- runtime = "nodejs"
+- Validate UUIDs for botPublicKey + leadPublicId
+- Validate status ∈ NEW|CONTACTED|BOOKED|CLOSED
+- Security ordering: bot exists -> ACTIVE -> allowlist enforced -> update lead
+- Domain allowlist must be enforced (same approach as previous endpoints, with allowlistDomains filtering to non-empty strings)
+- No internal DB ids exposed
+- PATCH is the only allowed method for update; all other methods return 405 (Method not allowed)
+- Use updateMany({ where: { publicId, botId }, data: { status } }) and if updated.count === 0 => 404 Lead not found
+
+After file is in place:
+A) Run:
+   pnpm lint
+   pnpm typecheck
+
+B) Start server (Replit runs on port 5000). If needed:
+   pnpm dev
+   (or use workflow Run)
+
+C) Run curl QA (replace placeholders):
+1) Missing botPublicKey => 400
+curl -i -X PATCH "http://localhost:5000/api/public/leads/status" \
+  -H "Host: example.com" -H "Content-Type: application/json" \
+  -d '{"leadPublicId":"550e8400-e29b-41d4-a716-446655440000","status":"CONTACTED"}'
+
+2) Invalid botPublicKey => 400
+curl -i -X PATCH "http://localhost:5000/api/public/leads/status" \
+  -H "Host: example.com" -H "Content-Type: application/json" \
+  -d '{"botPublicKey":"not-a-uuid","leadPublicId":"550e8400-e29b-41d4-a716-446655440000","status":"CONTACTED"}'
+
+3) Missing leadPublicId => 400
+curl -i -X PATCH "http://localhost:5000/api/public/leads/status" \
+  -H "Host: example.com" -H "Content-Type: application/json" \
+  -d '{"botPublicKey":"<VALID_BOT_KEY>","status":"CONTACTED"}'
+
+4) Invalid leadPublicId => 400
+curl -i -X PATCH "http://localhost:5000/api/public/leads/status" \
+  -H "Host: example.com" -H "Content-Type: application/json" \
+  -d '{"botPublicKey":"<VALID_BOT_KEY>","leadPublicId":"not-a-uuid","status":"CONTACTED"}'
+
+5) Missing status => 400
+curl -i -X PATCH "http://localhost:5000/api/public/leads/status" \
+  -H "Host: example.com" -H "Content-Type: application/json" \
+  -d '{"botPublicKey":"<VALID_BOT_KEY>","leadPublicId":"<VALID_LEAD_PUBLIC_ID>"}'
+
+6) Invalid status => 400
+curl -i -X PATCH "http://localhost:5000/api/public/leads/status" \
+  -H "Host: example.com" -H "Content-Type: application/json" \
+  -d '{"botPublicKey":"<VALID_BOT_KEY>","leadPublicId":"<VALID_LEAD_PUBLIC_ID>","status":"INVALID"}'
+
+7) Bot not found => 404
+curl -i -X PATCH "http://localhost:5000/api/public/leads/status" \
+  -H "Host: example.com" -H "Content-Type: application/json" \
+  -d '{"botPublicKey":"00000000-0000-0000-0000-000000000000","leadPublicId":"<VALID_LEAD_PUBLIC_ID>","status":"CONTACTED"}'
+
+8) Lead not found => 404
+curl -i -X PATCH "http://localhost:5000/api/public/leads/status" \
+  -H "Host: example.com" -H "Content-Type: application/json" \
+  -d '{"botPublicKey":"<VALID_BOT_KEY>","leadPublicId":"00000000-0000-0000-0000-000000000000","status":"CONTACTED"}'
+
+9) Happy path => 200 {ok:true}
+curl -i -X PATCH "http://localhost:5000/api/public/leads/status" \
+  -H "Host: example.com" -H "Content-Type: application/json" \
+  -d '{"botPublicKey":"<VALID_BOT_KEY>","leadPublicId":"<VALID_LEAD_PUBLIC_ID>","status":"CONTACTED"}'
+
+10) GET => 405
+curl -i -X GET "http://localhost:5000/api/public/leads/status" -H "Host: example.com"
+
+D) Reply back with:
+- lint output
+- typecheck output
+- curl outputs for tests 1, 6, 8, 9, 10
+- confirm file path exists and matches requirements
