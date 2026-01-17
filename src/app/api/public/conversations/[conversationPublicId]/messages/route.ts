@@ -47,6 +47,10 @@ function methodNotAllowed() {
   );
 }
 
+export async function OPTIONS() {
+  return methodNotAllowed();
+}
+
 export async function GET(
   req: Request,
   { params }: { params: { conversationPublicId: string } }
