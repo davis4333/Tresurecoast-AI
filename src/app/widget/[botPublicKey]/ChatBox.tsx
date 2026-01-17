@@ -22,6 +22,13 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const storageKey = `tca_conversation_${botPublicKey}`;
 
+  const [showLeadForm, setShowLeadForm] = useState(false);
+  const [leadName, setLeadName] = useState("");
+  const [leadEmail, setLeadEmail] = useState("");
+  const [leadPhone, setLeadPhone] = useState("");
+  const [isSubmittingLead, setIsSubmittingLead] = useState(false);
+  const [leadError, setLeadError] = useState<string | null>(null);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
@@ -70,7 +77,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
 
   const handleSend = async () => {
     const trimmed = message.trim();
-    if (!trimmed || isSending) return;
+    if (!trimmed || isSending || showLeadForm) return;
 
     setIsSending(true);
     setError(null);
@@ -114,6 +121,10 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
           if (wasNewConversation) {
             fetchHistory(data.conversationPublicId);
           }
+
+          if (data.leadCaptureRequested === true) {
+            setShowLeadForm(true);
+          }
         } else {
           setError("Invalid response from server");
         }
@@ -126,6 +137,62 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
       setIsSending(false);
     }
   };
+
+  const handleLeadSubmit = async () => {
+    const trimmedName = leadName.trim();
+    const trimmedEmail = leadEmail.trim();
+    const trimmedPhone = leadPhone.trim();
+
+    if (!trimmedName && !trimmedEmail && !trimmedPhone) {
+      setLeadError("Please provide at least one contact field");
+      return;
+    }
+
+    setIsSubmittingLead(true);
+    setLeadError(null);
+
+    try {
+      const convId = localStorage.getItem(storageKey);
+
+      const res = await fetch("/api/public/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          botPublicKey,
+          conversationPublicId: convId,
+          name: trimmedName || undefined,
+          email: trimmedEmail || undefined,
+          phone: trimmedPhone || undefined
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.ok) {
+        setShowLeadForm(false);
+        setLeadName("");
+        setLeadEmail("");
+        setLeadPhone("");
+
+        if (convId) {
+          fetchHistory(convId);
+        }
+      } else {
+        setLeadError(data.error || "Failed to submit");
+      }
+    } catch {
+      setLeadError("Failed to submit");
+    } finally {
+      setIsSubmittingLead(false);
+    }
+  };
+
+  const handleCancelLead = () => {
+    setShowLeadForm(false);
+    setLeadError(null);
+  };
+
+  const isInputDisabled = isSending || isLoadingHistory || showLeadForm || isSubmittingLead;
 
   return (
     <div className="space-y-4">
@@ -160,6 +227,61 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
         </div>
       )}
 
+      {showLeadForm && (
+        <div className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
+          <p className="text-sm text-white/80">Leave your contact info:</p>
+
+          <input
+            type="text"
+            value={leadName}
+            onChange={(e) => setLeadName(e.target.value)}
+            placeholder="Name"
+            disabled={isSubmittingLead}
+            className="w-full rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
+          />
+
+          <input
+            type="email"
+            value={leadEmail}
+            onChange={(e) => setLeadEmail(e.target.value)}
+            placeholder="Email"
+            disabled={isSubmittingLead}
+            className="w-full rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
+          />
+
+          <input
+            type="tel"
+            value={leadPhone}
+            onChange={(e) => setLeadPhone(e.target.value)}
+            placeholder="Phone"
+            disabled={isSubmittingLead}
+            className="w-full rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
+          />
+
+          {leadError && (
+            <p className="text-sm text-red-400">{leadError}</p>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleLeadSubmit}
+              disabled={isSubmittingLead}
+              className="flex-1 rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
+            >
+              {isSubmittingLead ? "Submitting..." : "Submit"}
+            </button>
+
+            <button
+              onClick={handleCancelLead}
+              disabled={isSubmittingLead}
+              className="rounded-md border border-white/20 px-4 py-2 text-sm text-white/80 hover:bg-white/5 disabled:opacity-50"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2">
         <input
           type="text"
@@ -167,12 +289,12 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           placeholder="Type a message..."
-          disabled={isSending || isLoadingHistory}
+          disabled={isInputDisabled}
           className="flex-1 rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
         />
         <button
           onClick={handleSend}
-          disabled={isSending || isLoadingHistory || !message.trim()}
+          disabled={isInputDisabled || !message.trim()}
           className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
         >
           {isSending ? "..." : "Send"}
