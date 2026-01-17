@@ -63,7 +63,7 @@ export async function POST(req: Request) {
       if (existingSeed) {
         const match = existingSeed.summary.match(/\[SEED_V1 orgId=(\d+) wsId=(\d+) botId=(\d+)\]/);
 
-        if (match) {
+        if (match && match[1] && match[2] && match[3]) {
           const orgId = parseInt(match[1], 10);
           const wsId = parseInt(match[2], 10);
           const botId = parseInt(match[3], 10);
