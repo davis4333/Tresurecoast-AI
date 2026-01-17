@@ -1,0 +1,67 @@
+You are Replit Agent. Do EVERYTHING end-to-end with ZERO questions.
+
+GOAL
+Reset this Replit project to the Treasure Coast AI Steps 1–3 foundation using the attached zip, install deps, generate Prisma client, run migration, pass lint+typecheck, and run the dev server.
+
+RULES
+- Keep: .replit, .git, .cache, .local (if they exist).
+- Delete everything else in the repo root.
+- Import/extract the uploaded zip into the project ROOT (so package.json is at /package.json).
+- Replit has a read-only Nix store; do NOT use corepack. Use the pnpm that is already available on Replit (pnpm 8.x is fine).
+- Use Replit Postgres DATABASE_URL (already provided by Replit). Do not overwrite it with the repo’s .env values.
+- Add ADMIN_SEED_KEY as a Replit Secret if missing.
+
+STEPS
+
+A) WIPE PROJECT (safe delete)
+1) Remove all files/folders in the project root EXCEPT: .replit, .git, .cache, .local
+2) Confirm the root is clean.
+
+B) IMPORT ZIP
+1) Extract the uploaded zip into the root.
+2) Verify these paths exist:
+- package.json
+- prisma/schema.prisma
+- src/app/page.tsx
+- src/app/api/health/route.ts
+- src/app/api/admin/seed/route.ts
+
+C) ENV / SECRETS
+1) Ensure DATABASE_URL is set from Replit Postgres (do not change).
+2) Ensure ADMIN_SEED_KEY exists as a Replit Secret:
+   - If missing, create a strong random value (32+ chars) and store it as ADMIN_SEED_KEY.
+
+D) INSTALL + PRISMA
+Run in Shell:
+1) pnpm install
+2) pnpm prisma:generate
+3) Run migration non-interactively:
+   pnpm exec prisma migrate dev --name core_schema_v0 --skip-seed
+   - If migrate dev is blocked for any reason, fall back to:
+     pnpm exec prisma db push
+   - After either path, run:
+     pnpm prisma:generate
+
+E) HARD GATES (must be green)
+1) pnpm lint
+2) pnpm typecheck
+
+F) RUN + SMOKE TEST
+1) Start dev server: pnpm dev
+2) Confirm app is serving on Replit’s web port (typically 5000).
+3) Verify health endpoint:
+   - GET /api/health returns JSON with ok:true
+4) Verify seed endpoint behavior:
+   - GET /api/admin/seed returns 405
+   - POST /api/admin/seed without x-admin-seed-key returns 401
+   - POST /api/admin/seed with x-admin-seed-key = ADMIN_SEED_KEY returns 200 + UUIDs
+
+OUTPUT REQUIRED (paste into Replit Agent final message)
+- Command outputs for:
+  - pnpm exec prisma migrate dev --name core_schema_v0 --skip-seed (or db push fallback)
+  - pnpm lint
+  - pnpm typecheck
+- The public app URL
+- Example JSON from /api/health
+- Example JSON from authorized /api/admin/seed (redact nothing except the seed key)
+DONE.
