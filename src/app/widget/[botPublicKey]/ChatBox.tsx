@@ -282,6 +282,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           placeholder="Type a message..."
           disabled={isSending || isLoadingHistory || showLeadForm || isSubmittingLead}
+          data-testid="chat-input"
           className="flex-1 rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
         />
         <button
@@ -293,6 +294,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
             isSubmittingLead ||
             !message.trim()
           }
+          data-testid="chat-send"
           className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
         >
           {isSending ? "..." : "Send"}

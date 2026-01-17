@@ -1,0 +1,60 @@
+You are implementing STEP 15: E2E Revenue Loop Tests using Playwright.
+
+Context:
+- App runs on port 5000.
+- Public endpoints already exist and are working:
+  - POST /api/public/chat
+  - POST /api/public/leads
+  - GET /api/public/leads/recent
+  - PATCH /api/public/leads/status
+  - GET /api/public/leads/[leadPublicId]
+  - GET /api/public/conversations/[conversationPublicId]/messages
+- Lead status enum in this repo is: NEW | CONTACTED | BOOKED | CLOSED (IMPORTANT)
+
+Goal:
+Add Playwright E2E tests that validate the full revenue loop:
+chat → lead capture → recent leads → status update → lead detail → messages endpoint
+Plus a minimal widget UI smoke test.
+
+Apply the attached zip contents:
+1) ADD NEW FILE: playwright.config.ts (exactly as provided in zip)
+2) ADD NEW FILE: tests/e2e/revenue-loop.spec.ts (exactly as provided in zip)
+
+Then make these repo changes:
+
+3) package.json
+- Add to devDependencies:
+  "@playwright/test": "^1.48.0"
+- Add script:
+  "test:e2e": "playwright test"
+
+4) src/app/widget/[botPublicKey]/ChatBox.tsx
+- Add data-testid attributes to the bottom chat input + send button.
+Find the input + button in the bottom composer section and update to:
+  - input: add data-testid="chat-input"
+  - button: add data-testid="chat-send"
+Do not change behavior besides adding these attributes.
+
+Install + setup:
+- pnpm add -D @playwright/test
+- npx playwright install chromium
+
+QA gates (must be clean):
+- pnpm lint
+- pnpm typecheck
+- pnpm test:e2e
+
+Expected:
+- 2 tests pass:
+  1) “complete revenue flow: chat → lead → status update → fetch”
+  2) “widget UI smoke test”
+- Tests must NOT hardcode UUIDs; they must fetch an ACTIVE bot from DB in beforeAll.
+- All API calls must include Host: example.com header (allowlist may be empty, but keep header consistent).
+- Validate UUID formatting, ISO timestamps, ordering of conversation messages oldest→newest, and roles only user/assistant.
+
+Deliverables:
+- Commit-ready changes with the new files + small modifications above.
+- Paste final outputs of:
+  pnpm lint
+  pnpm typecheck
+  pnpm test:e2e
