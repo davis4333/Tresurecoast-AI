@@ -1,16 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isValidUUID } from "@/lib/public/uuid";
+import { checkRateLimit } from "@/lib/public/rateLimit";
+import { LeadRequestSchema } from "@/lib/public/zodSchemas";
 
 export const runtime = "nodejs";
-
-type LeadRequest = {
-  botPublicKey: string;
-  conversationPublicId: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-};
 
 function isHostAllowed(
   allowlist: string[],
@@ -48,15 +41,19 @@ function isHostAllowed(
   return false;
 }
 
-export async function GET() {
+function methodNotAllowed() {
   return NextResponse.json(
     { ok: false, error: "Method not allowed" },
     { status: 405 }
   );
 }
 
+export async function GET() {
+  return methodNotAllowed();
+}
+
 export async function POST(req: Request) {
-  let body: Partial<LeadRequest>;
+  let body: unknown;
 
   try {
     body = await req.json();
@@ -67,39 +64,30 @@ export async function POST(req: Request) {
     );
   }
 
-  const { botPublicKey, conversationPublicId, name, email, phone } = body;
-
-  if (!isValidUUID(botPublicKey)) {
+  const parsed = LeadRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0];
     return NextResponse.json(
-      { ok: false, error: "Invalid bot key" },
+      { ok: false, error: firstError?.message || "Invalid request" },
       { status: 400 }
     );
   }
 
-  if (!isValidUUID(conversationPublicId)) {
+  const { botPublicKey, conversationPublicId, name, email, phone } = parsed.data;
+
+  const rateLimitCheck = await checkRateLimit(req, "leads", botPublicKey);
+  if (!rateLimitCheck.allowed) {
     return NextResponse.json(
-      { ok: false, error: "Invalid conversation id" },
-      { status: 400 }
+      { ok: false, error: rateLimitCheck.error || "Rate limit exceeded" },
+      { status: 429 }
     );
   }
 
-  const trimmedName = name?.trim();
-  const trimmedEmail = email?.trim();
-  const trimmedPhone = phone?.trim();
-
-  const validName = !!trimmedName && trimmedName.length >= 1 && trimmedName.length <= 100;
-  const validEmail = !!trimmedEmail && trimmedEmail.length >= 1 && trimmedEmail.includes("@");
-  const validPhone = !!trimmedPhone && trimmedPhone.length >= 1 && trimmedPhone.length <= 20;
-
-  if (!validName && !validEmail && !validPhone) {
-    return NextResponse.json(
-      { ok: false, error: "At least one contact field required" },
-      { status: 400 }
-    );
-  }
+  const validName = typeof name === "string" && name.length >= 1 && name.length <= 100;
+  const validEmail = typeof email === "string" && email.length >= 1 && email.includes("@");
+  const validPhone = typeof phone === "string" && phone.length >= 1 && phone.length <= 20;
 
   try {
-    // 1) Fetch bot (existence + ACTIVE + allowlist)
     const bot = await prisma.bot.findUnique({
       where: { publicKey: botPublicKey },
       select: {
@@ -123,22 +111,27 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2) Enforce domain allowlist
-    const allowlistDomains = bot.allowlist.map((a) => a.domain);
+    const allowlistDomains = bot.allowlist
+      .map((a) => a.domain)
+      .filter((d): d is string => typeof d === "string" && d.trim().length > 0);
+
     const origin = req.headers.get("origin");
     const host = req.headers.get("host");
 
     if (!isHostAllowed(allowlistDomains, origin, host)) {
-      console.error("[DOMAIN FORBIDDEN]", botPublicKey, host || origin || "unknown");
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+      console.error(
+        "[DOMAIN FORBIDDEN]",
+        botPublicKey,
+        host || origin || "unknown"
+      );
+      return NextResponse.json(
+        { ok: false, error: "Forbidden" },
+        { status: 403 }
+      );
     }
 
-    // 3) Fetch conversation (must belong to bot)
     const conversation = await prisma.conversation.findFirst({
-      where: {
-        publicId: conversationPublicId,
-        botId: bot.id
-      },
+      where: { publicId: conversationPublicId, botId: bot.id },
       select: {
         id: true,
         organizationId: true,
@@ -154,7 +147,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 4) Deduplicate lead per conversation
     const existingLead = await prisma.lead.findFirst({
       where: { conversationId: conversation.id },
       select: { publicId: true }
@@ -164,22 +156,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, leadPublicId: existingLead.publicId });
     }
 
-    // 5) Create lead
     const lead = await prisma.lead.create({
       data: {
         organizationId: conversation.organizationId,
         workspaceId: conversation.workspaceId,
         botId: conversation.botId,
         conversationId: conversation.id,
-        name: validName ? trimmedName : null,
-        email: validEmail ? trimmedEmail : null,
-        phone: validPhone ? trimmedPhone : null,
+        name: validName ? name : null,
+        email: validEmail ? email : null,
+        phone: validPhone ? phone : null,
         status: "NEW"
       },
       select: { publicId: true }
     });
 
-    // 6) Confirmation message only for new lead
     await prisma.message.create({
       data: {
         conversationId: conversation.id,
@@ -196,4 +186,17 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
+}
+
+export async function PUT() {
+  return methodNotAllowed();
+}
+export async function PATCH() {
+  return methodNotAllowed();
+}
+export async function DELETE() {
+  return methodNotAllowed();
+}
+export async function OPTIONS() {
+  return methodNotAllowed();
 }

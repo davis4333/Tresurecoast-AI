@@ -1,89 +1,114 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isValidUUID } from "@/lib/public/uuid";
+import { checkRateLimit } from "@/lib/public/rateLimit";
+import { LeadStatusPatchSchema } from "@/lib/public/zodSchemas";
 
 export const runtime = "nodejs";
 
-const ALLOWED_STATUSES = ["NEW", "CONTACTED", "BOOKED", "CLOSED"] as const;
-type AllowedStatus = (typeof ALLOWED_STATUSES)[number];
-
 function isHostAllowed(
   allowlist: string[],
+  origin: string | null,
   host: string | null
 ): boolean {
-  const filtered = allowlist
-    .map((d) => d.trim().toLowerCase())
-    .filter((d) => d.length > 0);
-  if (filtered.length === 0) return true;
-  if (!host) return false;
-  const normalizedHost = host.toLowerCase();
-  return filtered.some(
-    (d) => normalizedHost === d || normalizedHost.endsWith(`.${d}`)
+  if (allowlist.length === 0) return true;
+
+  let hostname: string | null = null;
+
+  if (origin) {
+    try {
+      hostname = new URL(origin).hostname;
+    } catch {
+      // ignore invalid origin
+    }
+  }
+
+  if (!hostname && host) {
+    hostname = host.split(":")[0] || null;
+  }
+
+  if (!hostname) return false;
+
+  hostname = hostname.toLowerCase();
+
+  for (const allowed of allowlist) {
+    const normalizedAllowed = allowed.trim().toLowerCase();
+    if (!normalizedAllowed) continue;
+
+    if (hostname === normalizedAllowed) return true;
+    if (hostname.endsWith("." + normalizedAllowed)) return true;
+  }
+
+  return false;
+}
+
+function methodNotAllowed() {
+  return NextResponse.json(
+    { ok: false, error: "Method not allowed" },
+    { status: 405 }
   );
 }
 
-interface PatchBody {
-  botPublicKey?: unknown;
-  leadPublicId?: unknown;
-  status?: unknown;
+function invalidStatus() {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: "Invalid status. Must be NEW, CONTACTED, BOOKED, or CLOSED"
+    },
+    { status: 400 }
+  );
 }
 
-export async function PATCH(request: NextRequest): Promise<NextResponse> {
+export async function PATCH(req: Request) {
+  let body: unknown;
+
   try {
-    const host = request.headers.get("host")?.split(":")[0] || null;
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Invalid JSON body" },
+      { status: 400 }
+    );
+  }
 
-    let body: PatchBody;
-    try {
-      body = (await request.json()) as PatchBody;
-    } catch {
-      return NextResponse.json(
-        { ok: false, error: "Invalid JSON body" },
-        { status: 400 }
-      );
-    }
+  const parsed = LeadStatusPatchSchema.safeParse(body);
+  if (!parsed.success) {
+    const messages = parsed.error.issues.map((e) => e.message);
 
-    const { botPublicKey, leadPublicId, status } = body;
-
-    if (
-      typeof botPublicKey !== "string" ||
-      !botPublicKey ||
-      !isValidUUID(botPublicKey)
-    ) {
+    if (messages.includes("Invalid bot key")) {
       return NextResponse.json(
         { ok: false, error: "Invalid bot key" },
         { status: 400 }
       );
     }
 
-    if (
-      typeof leadPublicId !== "string" ||
-      !leadPublicId ||
-      !isValidUUID(leadPublicId)
-    ) {
+    if (messages.includes("Invalid lead id")) {
       return NextResponse.json(
         { ok: false, error: "Invalid lead id" },
         { status: 400 }
       );
     }
 
-    if (
-      typeof status !== "string" ||
-      !status ||
-      !ALLOWED_STATUSES.includes(status as AllowedStatus)
-    ) {
-      return NextResponse.json(
-        { ok: false, error: "Invalid status. Must be NEW, CONTACTED, BOOKED, or CLOSED" },
-        { status: 400 }
-      );
-    }
+    return invalidStatus();
+  }
 
+  const { botPublicKey, leadPublicId, status } = parsed.data;
+
+  const rl = await checkRateLimit(req, "leads_status", botPublicKey);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, error: rl.error || "Rate limit exceeded" },
+      { status: 429 }
+    );
+  }
+
+  try {
     const bot = await prisma.bot.findUnique({
       where: { publicKey: botPublicKey },
       select: {
         id: true,
         status: true,
-        allowlist: { select: { domain: true } },
-      },
+        allowlist: { select: { domain: true } }
+      }
     });
 
     if (!bot) {
@@ -95,18 +120,26 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
     if (bot.status !== "ACTIVE") {
       return NextResponse.json(
-        { ok: false, error: "Bot is not active" },
-        { status: 403 }
+        { ok: false, error: "Bot not active" },
+        { status: 404 }
       );
     }
 
     const allowlistDomains = bot.allowlist
       .map((a) => a.domain)
-      .filter((d): d is string => typeof d === "string" && d.length > 0);
+      .filter((d): d is string => typeof d === "string" && d.trim().length > 0);
 
-    if (!isHostAllowed(allowlistDomains, host)) {
+    const origin = req.headers.get("origin");
+    const host = req.headers.get("host");
+
+    if (!isHostAllowed(allowlistDomains, origin, host)) {
+      console.error(
+        "[DOMAIN FORBIDDEN]",
+        botPublicKey,
+        host || origin || "unknown"
+      );
       return NextResponse.json(
-        { ok: false, error: "Origin not allowed" },
+        { ok: false, error: "Forbidden" },
         { status: 403 }
       );
     }
@@ -114,11 +147,11 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     const updated = await prisma.lead.updateMany({
       where: {
         publicId: leadPublicId,
-        botId: bot.id,
+        botId: bot.id
       },
       data: {
-        status: status as AllowedStatus,
-      },
+        status
+      }
     });
 
     if (updated.count === 0) {
@@ -128,9 +161,9 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    return NextResponse.json({ ok: true }, { status: 200 });
-  } catch (err) {
-    console.error("[LEAD STATUS UPDATE ERROR]", err);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("[LEAD STATUS UPDATE ERROR]", error);
     return NextResponse.json(
       { ok: false, error: "Internal error" },
       { status: 500 }
@@ -138,30 +171,18 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   }
 }
 
-export async function GET(): Promise<NextResponse> {
-  return NextResponse.json(
-    { ok: false, error: "Method not allowed" },
-    { status: 405 }
-  );
+export async function GET() {
+  return methodNotAllowed();
 }
-
-export async function POST(): Promise<NextResponse> {
-  return NextResponse.json(
-    { ok: false, error: "Method not allowed" },
-    { status: 405 }
-  );
+export async function POST() {
+  return methodNotAllowed();
 }
-
-export async function PUT(): Promise<NextResponse> {
-  return NextResponse.json(
-    { ok: false, error: "Method not allowed" },
-    { status: 405 }
-  );
+export async function PUT() {
+  return methodNotAllowed();
 }
-
-export async function DELETE(): Promise<NextResponse> {
-  return NextResponse.json(
-    { ok: false, error: "Method not allowed" },
-    { status: 405 }
-  );
+export async function DELETE() {
+  return methodNotAllowed();
+}
+export async function OPTIONS() {
+  return methodNotAllowed();
 }
