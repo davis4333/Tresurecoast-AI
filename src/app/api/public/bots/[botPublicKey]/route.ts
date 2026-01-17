@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isValidUUID } from "@/lib/public/uuid";
 
 export const runtime = "nodejs";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(
   _request: Request,
@@ -11,7 +10,8 @@ export async function GET(
 ) {
   const botPublicKey = params?.botPublicKey;
 
-  if (!botPublicKey || typeof botPublicKey !== "string" || !UUID_REGEX.test(botPublicKey)) {
+  // Validate key presence + format (must be UUID)
+  if (!isValidUUID(botPublicKey)) {
     return NextResponse.json({ ok: false, error: "Invalid bot key" }, { status: 400 });
   }
 
@@ -27,29 +27,29 @@ export async function GET(
         organization: {
           select: {
             publicId: true,
-            name: true
-          }
+            name: true,
+          },
         },
         workspace: {
           select: {
             publicId: true,
-            name: true
-          }
+            name: true,
+          },
         },
         links: {
           select: {
             type: true,
             label: true,
-            url: true
+            url: true,
           },
-          orderBy: { createdAt: "asc" }
+          orderBy: { createdAt: "asc" },
         },
         allowlist: {
           select: {
-            domain: true
-          }
-        }
-      }
+            domain: true,
+          },
+        },
+      },
     });
 
     if (!bot) {
@@ -72,8 +72,8 @@ export async function GET(
         workspacePublicId: bot.workspace.publicId,
         workspaceName: bot.workspace.name,
         links: bot.links,
-        domainAllowlist: bot.allowlist.map((a) => a.domain)
-      }
+        domainAllowlist: bot.allowlist.map((a) => a.domain),
+      },
     });
   } catch (error) {
     console.error("[PUBLIC BOT FETCH ERROR]", error);

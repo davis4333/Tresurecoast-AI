@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ChatBox } from "./ChatBox";
 
 export const metadata: Metadata = {
   title: "Treasure Coast AI Widget",
@@ -97,6 +98,8 @@ export default async function WidgetPage({ params }: { params: { botPublicKey: s
             ))}
           </div>
         )}
+
+        <ChatBox botPublicKey={bot.botPublicKey} />
 
         <p className="font-mono text-xs text-white/40">{bot.botPublicKey}</p>
       </div>

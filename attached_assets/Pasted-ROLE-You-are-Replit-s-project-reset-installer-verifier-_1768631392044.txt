@@ -1,0 +1,86 @@
+ROLE: You are Replit’s project reset + installer + verifier for a Next.js 14 + Prisma + Postgres app.
+
+GOAL:
+- Wipe the project (keep Replit system files), import the attached ZIP, install dependencies, generate Prisma client, ensure DB is synced, run gates, start dev server, and run the Step 5 endpoint checks.
+
+INPUT:
+- I will upload: treasure-coast-ai_steps1-5.zip
+
+STRICT RULES:
+- Do NOT invent outputs. Run commands and show real output.
+- If anything fails, STOP and paste the exact error + the file/line if available.
+
+A) WIPE PROJECT (SAFE CLEAN)
+1) Delete everything in the workspace EXCEPT: .replit, .git, .cache, .local
+2) Confirm root is empty except those.
+
+B) IMPORT ZIP
+1) Upload and extract treasure-coast-ai_steps1-5.zip into the project root.
+2) After extraction, the repo root folder is: treasure-coast-ai/
+3) Move the contents of treasure-coast-ai/ up to the project root (so package.json is at project root).
+4) Delete the now-empty treasure-coast-ai/ folder.
+5) Verify key paths exist:
+   - prisma/schema.prisma
+   - src/app/api/public/chat/route.ts
+   - src/app/api/public/bots/[botPublicKey]/route.ts
+   - src/app/widget/[botPublicKey]/ChatBox.tsx
+
+C) ENV / SECRETS (REQUIRED)
+1) Ensure DATABASE_URL is set (use Replit Postgres DATABASE_URL).
+2) Set ADMIN_SEED_KEY to a long random string (Replit Secret).
+3) Set NEXT_PUBLIC_APP_URL for server-side fetch:
+   - Set it to: http://127.0.0.1:${PORT}
+   - If PORT is not set, default to http://127.0.0.1:3000
+(Do NOT hardcode a public Replit URL unless localhost fails.)
+
+D) INSTALL + PRISMA
+Run in Shell:
+1) pnpm -v  (confirm pnpm works; if corepack fails, use the available pnpm Replit provides)
+2) pnpm install
+3) pnpm prisma:generate
+
+DATABASE SYNC:
+- Preferred (if interactive migrate is supported): pnpm exec prisma migrate dev --name core_schema_v0 --skip-seed
+- If Replit is non-interactive and migrate dev blocks, use: pnpm exec prisma db push
+(Choose the one that works; show which you chose and why.)
+
+E) GATES
+Run:
+- pnpm lint
+- pnpm typecheck
+Both must exit 0.
+
+F) START SERVER
+Run:
+- pnpm dev
+Confirm it’s reachable on the Replit web URL.
+
+G) STEP 5 PROOF TESTS (RUN AND SHOW OUTPUTS)
+1) Health:
+   GET /api/health -> 200 JSON ok:true
+
+2) Seed (if you need a bot key; only works if ADMIN_SEED_KEY set):
+   POST /api/admin/seed with header x-admin-seed-key: ADMIN_SEED_KEY
+   Save botPublicKey from response.
+
+3) Public bot config:
+   GET /api/public/bots/invalid-key-123 -> 400
+   GET /api/public/bots/00000000-0000-0000-0000-000000000000 -> 404
+   GET /api/public/bots/{botPublicKey} -> 200
+
+4) Public chat:
+   GET /api/public/chat -> 405
+   POST /api/public/chat with invalid conversationPublicId (not-a-uuid) -> 400
+   POST /api/public/chat with {botPublicKey, message:"hello"} -> 200 with conversationPublicId
+   POST /api/public/chat with same conversationPublicId and message:"how much?" -> 200 AND same conversationPublicId
+   POST /api/public/chat with conversationPublicId:"" -> 400
+
+5) Widget manual:
+   Open /widget/{botPublicKey}
+   Send “hello” then “how much?”
+   Confirm reply bubble updates and no console errors.
+
+STOP when all tests pass and report:
+- commands run + outputs
+- final Replit URL
+- botPublicKey used for tests
