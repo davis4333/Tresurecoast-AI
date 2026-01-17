@@ -1,0 +1,41 @@
+ROLE: You are my strict QA + Release Engineer for Treasure Coast AI. We are finishing STEP 8 (Lead Capture in Chat Flow). Do NOT change schema, migrations, or any files outside the 3 Step 8 files. Do NOT add dependencies.
+
+GOAL: Apply the Step 8 zip changes to the current repo, verify they match EXACTLY, run validation + curl QA, then COMMIT + PUSH.
+
+INPUT: I uploaded a zip containing ONLY these 3 files:
+1) src/app/api/public/chat/route.ts
+2) src/app/api/public/leads/route.ts
+3) src/app/widget/[botPublicKey]/ChatBox.tsx
+
+TASKS (DO ALL IN ORDER):
+1) Unzip the uploaded zip and ensure the 3 files overwrite the repo versions at the exact paths above.
+2) Verify each file contains ONLY ASCII quotes (") (no smart quotes), and no markdown fences/backticks inside code.
+3) Confirm constraints:
+   - No schema/migrations touched
+   - No other routes/files touched
+   - Domain allowlist enforcement is present (same pattern as Step 7: origin/host -> hostname, allow exact + subdomain, trims allowlist entries)
+4) Run:
+   - pnpm lint
+   - pnpm typecheck
+   Fix ONLY within the 3 files if something fails.
+5) Run this curl QA matrix and paste outputs:
+   - Chat fallback => leadCaptureRequested true (message contains "?")
+   - Lead create success (at least one of name/email/phone)
+   - Lead create missing all contact fields => 400 "At least one contact field required"
+   - GET /api/public/leads => 405 "Method not allowed"
+   - Invalid conversation => 404 "Conversation not found"
+   - Dedupe lead create => returns same leadPublicId (no duplicate lead, no duplicate confirmation)
+   - Chat fallback after lead exists => leadCaptureRequested false
+   NOTE: Use Host header example.com for allowed domain tests, and forbidden.com for forbidden tests if allowlist is set.
+6) After tests pass: commit + push.
+   - git status
+   - git add ONLY the 3 Step 8 files
+   - git commit -m "feat(step8): lead capture on fallback + public leads endpoint"
+   - git push
+7) Reply with:
+   - Confirmation that ONLY the 3 files changed
+   - lint/typecheck output summaries
+   - curl outputs
+   - git log -1 and git status (must be clean)
+
+ABSOLUTE RULE: If anything fails, fix it and rerun until it passes, but DO NOT touch files outside the 3 Step 8 files.
