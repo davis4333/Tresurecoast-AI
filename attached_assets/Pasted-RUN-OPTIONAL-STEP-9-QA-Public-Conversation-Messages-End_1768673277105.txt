@@ -1,0 +1,84 @@
+RUN OPTIONAL STEP 9 QA (Public Conversation Messages Endpoint)
+
+Goal:
+Validate OPTIONAL hardening for:
+- Non-GET methods return 405 (OPTIONS/POST/PUT/PATCH/DELETE)
+- Domain allowlist enforcement works (Host/origin mismatch => 403)
+- Validation works (bad UUIDs => 400)
+- Not found works (missing conversation => 404)
+- Response is capped and ordered (<=200, oldest->newest)
+
+Assumptions:
+- App is running on port 5000.
+- You will substitute:
+  BOT_KEY = 07692d89-7820-4f39-81a3-b6a9f28f4443 (or your current active bot publicKey)
+  CONV_ID = ed504661-7783-49cd-bab0-8e0f3f98b68f (or your known valid conversationPublicId)
+- Your bot allowlist includes example.com (if it doesn’t, the “allowed” Host test will 403, which is still useful).
+
+Please run these commands in the Replit Shell and paste back ALL outputs.
+
+1) Confirm server reachable
+curl -i http://localhost:5000/ | head -n 15
+
+2) Baseline happy-path GET (allowed host)
+curl -i "http://localhost:5000/api/public/conversations/CONV_ID/messages?botPublicKey=BOT_KEY" \
+  -H "Host: example.com"
+
+3) Non-GET methods must be 405
+curl -i -X OPTIONS "http://localhost:5000/api/public/conversations/CONV_ID/messages?botPublicKey=BOT_KEY" \
+  -H "Host: example.com"
+
+curl -i -X POST "http://localhost:5000/api/public/conversations/CONV_ID/messages?botPublicKey=BOT_KEY" \
+  -H "Host: example.com"
+
+curl -i -X PUT "http://localhost:5000/api/public/conversations/CONV_ID/messages?botPublicKey=BOT_KEY" \
+  -H "Host: example.com"
+
+curl -i -X PATCH "http://localhost:5000/api/public/conversations/CONV_ID/messages?botPublicKey=BOT_KEY" \
+  -H "Host: example.com"
+
+curl -i -X DELETE "http://localhost:5000/api/public/conversations/CONV_ID/messages?botPublicKey=BOT_KEY" \
+  -H "Host: example.com"
+
+Expected:
+- If OPTIONS is implemented: 405 with { ok:false, error:"Method not allowed" }
+- If OPTIONS is NOT implemented: Next may return 204/200; report the exact output.
+
+4) Bot key validation (bad bot key => 400)
+curl -i "http://localhost:5000/api/public/conversations/CONV_ID/messages?botPublicKey=not-a-uuid" \
+  -H "Host: example.com"
+
+5) Conversation id validation (bad conversation id => 400)
+curl -i "http://localhost:5000/api/public/conversations/not-a-uuid/messages?botPublicKey=BOT_KEY" \
+  -H "Host: example.com"
+
+6) Conversation not found (valid uuid but not in DB => 404)
+curl -i "http://localhost:5000/api/public/conversations/00000000-0000-4000-8000-000000000000/messages?botPublicKey=BOT_KEY" \
+  -H "Host: example.com"
+
+7) Allowlist enforcement (Host mismatch should be 403)
+curl -i "http://localhost:5000/api/public/conversations/CONV_ID/messages?botPublicKey=BOT_KEY" \
+  -H "Host: evil.com"
+
+8) Optional: Origin-based allowlist check (simulate browser origin)
+curl -i "http://localhost:5000/api/public/conversations/CONV_ID/messages?botPublicKey=BOT_KEY" \
+  -H "Origin: https://example.com" \
+  -H "Host: example.com"
+
+curl -i "http://localhost:5000/api/public/conversations/CONV_ID/messages?botPublicKey=BOT_KEY" \
+  -H "Origin: https://evil.com" \
+  -H "Host: evil.com"
+
+9) Cap check (should never exceed 200)
+curl -s "http://localhost:5000/api/public/conversations/CONV_ID/messages?botPublicKey=BOT_KEY" \
+  -H "Host: example.com" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);console.log('ok=',j.ok,'count=',j.messages?.length);}catch(e){console.log('parse_fail');}});"
+
+Definition of Done:
+- Happy GET returns 200 with ok:true and messages array
+- Bad UUIDs => 400
+- Missing conversation => 404
+- Allowlist mismatch => 403
+- Non-GET methods => 405 (OPTIONS acceptable either 405 or framework-default; just report)
+- Count <= 200
+
+Paste the full output for each curl command back here.
