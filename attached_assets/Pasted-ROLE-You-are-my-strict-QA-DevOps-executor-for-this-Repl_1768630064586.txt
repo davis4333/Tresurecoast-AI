@@ -1,0 +1,80 @@
+ROLE: You are my strict QA + DevOps executor for this Replit project. No guessing. No extra features. Follow EXACTLY.
+
+GOAL:
+1) Wipe the project (keep Replit internals)
+2) Import my zip contents into the correct paths
+3) Install deps with pnpm (corepack may fail on Replit)
+4) Ensure env vars are set (DATABASE_URL from Replit Postgres, plus ADMIN_SEED_KEY and NEXT_PUBLIC_APP_URL)
+5) Generate Prisma client
+6) Apply schema using Prisma (prefer migrate dev; fallback to db push only if migrate cannot run non-interactively)
+7) Run gates: lint + typecheck
+8) Start dev server and run endpoint checks
+
+PROJECT RESET (SAFE WIPE):
+- Delete EVERYTHING in the repo root except: .replit, .git, .cache, .local (if they exist).
+- Confirm directory is clean after wipe.
+
+IMPORT ZIP:
+- Upload/extract the zip I provide into the repo root.
+- Verify these key paths exist after extract:
+  - package.json
+  - prisma/schema.prisma
+  - src/app/api/health/route.ts
+  - src/app/api/admin/seed/route.ts
+  - src/app/api/public/bots/[botPublicKey]/route.ts
+  - src/app/widget/[botPublicKey]/page.tsx
+  - src/lib/prisma.ts
+  - docker/db/init.sql
+
+NODE + PNPM:
+- Use Replit’s Node (v20+ is fine).
+- If corepack fails due to read-only Nix store, DO NOT fight it; use the available pnpm version.
+- Run: pnpm install
+
+ENV VARS (DO THIS BEFORE PRISMA):
+- DATABASE_URL: use the Replit Postgres DATABASE_URL already provided by Replit (do not overwrite with localhost).
+- Set ADMIN_SEED_KEY in Replit Secrets to a long random string.
+- Set NEXT_PUBLIC_APP_URL in Replit Secrets to this project’s public URL (the https://…replit.dev URL, no trailing slash).
+
+PRISMA:
+- Run: pnpm prisma:generate
+- Attempt migrations first:
+  - Run: pnpm exec prisma migrate dev --name core_schema_v0 --skip-seed
+- If migrate dev cannot run due to non-interactive constraints, fall back:
+  - Run: pnpm exec prisma db push
+- Then confirm Prisma client exists and Prisma commands succeeded.
+
+GATES (MUST PASS):
+- Run: pnpm lint
+- Run: pnpm typecheck
+Both must exit code 0.
+
+RUN SERVER:
+- Run: pnpm dev
+
+PROOF TESTS (PRINT OUTPUTS):
+1) Health:
+   - GET /api/health should return 200 JSON with ok:true
+2) Seed:
+   - GET /api/admin/seed should return 405
+   - POST /api/admin/seed with NO header should return 401
+   - POST /api/admin/seed with header x-admin-seed-key: <ADMIN_SEED_KEY> should return 200 and return orgPublicId, workspacePublicId, botPublicKey
+3) Public bot config (Step 4):
+   - GET /api/public/bots/invalid-key-123 => 400 { ok:false, error:"Invalid bot key" }
+   - GET /api/public/bots/00000000-0000-0000-0000-000000000000 => 404 { ok:false, error:"Bot not found" }
+   - GET /api/public/bots/<VALID_BOT_PUBLIC_KEY_FROM_SEED> => 200 { ok:true, bot:{...} } with NO internal numeric IDs
+4) Widget (Step 4):
+   - Visit /widget/<VALID_BOT_PUBLIC_KEY> in browser => renders name/org + bubble + link buttons
+   - Visit /widget/bad-key-format => shows Bot Not Available (no crash)
+   - Browser console must show 0 errors
+
+OUTPUT REQUIREMENT:
+- Paste back the terminal outputs for:
+  - pnpm exec prisma migrate dev --name core_schema_v0 --skip-seed (or the db push fallback output)
+  - pnpm lint
+  - pnpm typecheck
+- Paste the JSON responses (or curl output) for the Step 4 API tests above.
+
+STOP:
+- Do NOT start any “Step 5+” work.
+- If ANY command fails, stop immediately and paste the error verbatim.

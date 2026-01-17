@@ -62,7 +62,7 @@ model Workspace {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   bots          Bot[]
   leads         Lead[]
   conversations Conversation[]
@@ -78,22 +78,22 @@ model Bot {
   organizationId Int
   workspaceId    Int
 
-  name           String
-  status         BotStatus @default(ACTIVE)
+  name         String
+  status       BotStatus @default(ACTIVE)
 
-  greeting       String?
-  fallbackText   String?
+  greeting     String?
+  fallbackText String?
 
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  links          BotLink[]
-  allowlist      BotDomainAllowlist[]
-  leads          Lead[]
-  conversations  Conversation[]
+  links         BotLink[]
+  allowlist     BotDomainAllowlist[]
+  leads         Lead[]
+  conversations Conversation[]
 
   @@index([organizationId])
   @@index([workspaceId])
@@ -109,7 +109,7 @@ model BotLink {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
-  bot       Bot        @relation(fields: [botId], references: [id], onDelete: Cascade)
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@index([botId])
   @@index([type])
@@ -121,7 +121,7 @@ model BotDomainAllowlist {
   domain    String
   createdAt DateTime @default(now())
 
-  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@unique([botId, domain])
   @@index([botId])
@@ -134,15 +134,15 @@ model Conversation {
   workspaceId    Int
   botId          Int
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  bot            Bot          @relation(fields: [botId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  bot          Bot          @relation(fields: [botId], references: [id], onDelete: Cascade)
 
-  messages       Message[]
-  leads          Lead[]
+  messages Message[]
+  leads    Lead[]
 
   @@index([organizationId])
   @@index([workspaceId])
@@ -154,38 +154,38 @@ model Message {
   id             Int      @id @default(autoincrement())
   conversationId Int
 
-  role           String
-  content        String
-  createdAt      DateTime @default(now())
+  role      String
+  content   String
+  createdAt DateTime @default(now())
 
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
   @@index([createdAt])
 }
 
 model Lead {
-  id             Int       @id @default(autoincrement())
-  publicId       String    @unique @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+  id             Int      @id @default(autoincrement())
+  publicId       String   @unique @db.Uuid @default(dbgenerated("gen_random_uuid()"))
   organizationId Int
   workspaceId    Int
   botId          Int
   conversationId Int?
 
-  status         LeadStatus @default(NEW)
+  status LeadStatus @default(NEW)
 
-  name           String?
-  email          String?
-  phone          String?
-  answers        Json?
+  name    String?
+  email   String?
+  phone   String?
+  answers Json?
 
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  bot            Bot          @relation(fields: [botId], references: [id], onDelete: Cascade)
-  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  bot          Bot           @relation(fields: [botId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([workspaceId])
@@ -199,14 +199,15 @@ model AuditLog {
   organizationId Int
   workspaceId    Int?
 
-  action         AuditAction
-  summary        String
-  actorId        String?
+  action  AuditAction
+  summary String
 
-  createdAt      DateTime   @default(now())
+  actorId String?
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workspace      Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([workspaceId])

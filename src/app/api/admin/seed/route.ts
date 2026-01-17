@@ -29,7 +29,10 @@ export async function POST(req: Request) {
   }
 
   if (!headerKey || headerKey !== envKey) {
-    return NextResponse.json({ ok: false, error: "Unauthorized seed attempt." }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized seed attempt." },
+      { status: 401 }
+    );
   }
 
   const forceCreate = req.headers.get("x-seed-force") === "true";
@@ -104,7 +107,9 @@ export async function POST(req: Request) {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const org = await tx.organization.create({ data: { name: orgName } });
+      const org = await tx.organization.create({
+        data: { name: orgName }
+      });
 
       const ws = await tx.workspace.create({
         data: {
@@ -153,6 +158,9 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("[SEED ERROR]", error);
 
-    return NextResponse.json({ ok: false, error: "Internal error creating seed data." }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "Internal error creating seed data." },
+      { status: 500 }
+    );
   }
 }

@@ -38,3 +38,8 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[userenv]
+
+[userenv.shared]
+NEXT_PUBLIC_APP_URL = "https://d09764b3-5763-48f2-9299-bd4823dae3db-00-50ecyv3jbxn.spock.replit.dev"
