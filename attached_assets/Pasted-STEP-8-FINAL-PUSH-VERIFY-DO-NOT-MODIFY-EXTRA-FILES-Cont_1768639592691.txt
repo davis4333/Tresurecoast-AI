@@ -1,0 +1,51 @@
+STEP 8 — FINAL PUSH + VERIFY (DO NOT MODIFY EXTRA FILES)
+
+Context:
+We are implementing Step 8 lead capture for the public widget chat flow.
+
+STRICT RULES:
+- Only these 3 files may be changed:
+  1) src/app/api/public/chat/route.ts
+  2) src/app/api/public/leads/route.ts (NEW endpoint)
+  3) src/app/widget/[botPublicKey]/ChatBox.tsx
+- Do NOT touch schema/migrations or any other routes or the widget page.tsx.
+- No new dependencies.
+
+What Step 8 must do:
+1) POST /api/public/chat:
+   - If message contains "?" then use bot.fallbackText (or default)
+   - Return leadCaptureRequested: true ONLY if fallback was used AND no lead exists yet for that conversation
+   - Keep all existing behavior unchanged otherwise
+
+2) POST /api/public/leads (NEW):
+   - Validate botPublicKey + conversationPublicId are UUIDs
+   - Require at least one of name/email/phone (basic validation)
+   - Enforce domain allowlist (same logic as chat)
+   - Verify bot exists and is ACTIVE
+   - Verify conversation belongs to bot
+   - Deduplicate: if a lead already exists for conversation, return existing leadPublicId (no new message)
+   - If new lead created, create assistant confirmation message in the conversation
+   - Response: { ok: true, leadPublicId } with NO internal IDs
+   - GET /api/public/leads must return 405
+
+3) Widget ChatBox:
+   - Show inline lead form when chat returns leadCaptureRequested: true
+   - Lead form requires at least one field
+   - Submit POST /api/public/leads
+   - Disable chat input while lead form is open or while submitting lead
+   - On success, hide form and refresh history (no console errors)
+
+NOW DO THIS:
+- Confirm these files are present and correctly applied (no smart quotes, no markdown fences).
+- Run:
+  pnpm lint
+  pnpm typecheck
+- Provide outputs.
+- Then provide curl test outputs for:
+  - chat fallback => leadCaptureRequested true
+  - leads create => ok true
+  - leads missing fields => 400
+  - leads GET => 405
+  - invalid conversation => 404
+  - dedupe => returns same leadPublicId
+  - chat fallback after lead exists => leadCaptureRequested false
