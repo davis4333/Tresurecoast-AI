@@ -19,15 +19,15 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const storageKey = `tca_conversation_${botPublicKey}`;
-
   const [showLeadForm, setShowLeadForm] = useState(false);
+  const [leadSubmitted, setLeadSubmitted] = useState(false);
   const [leadName, setLeadName] = useState("");
   const [leadEmail, setLeadEmail] = useState("");
   const [leadPhone, setLeadPhone] = useState("");
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
   const [leadError, setLeadError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const storageKey = `tca_conversation_${botPublicKey}`;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -40,9 +40,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
 
       try {
         const res = await fetch(
-          `/api/public/conversations/${encodeURIComponent(convId)}/messages?botPublicKey=${encodeURIComponent(
-            botPublicKey
-          )}`
+          `/api/public/conversations/${encodeURIComponent(convId)}/messages?botPublicKey=${encodeURIComponent(botPublicKey)}`
         );
 
         const data = await res.json();
@@ -77,7 +75,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
 
   const handleSend = async () => {
     const trimmed = message.trim();
-    if (!trimmed || isSending || showLeadForm) return;
+    if (!trimmed || isSending) return;
 
     setIsSending(true);
     setError(null);
@@ -106,7 +104,10 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
       const data = await res.json();
 
       if (data.ok) {
-        if (typeof data.conversationPublicId === "string" && typeof data.assistant?.content === "string") {
+        if (
+          typeof data.conversationPublicId === "string" &&
+          typeof data.assistant?.content === "string"
+        ) {
           const wasNewConversation = !storedConvId;
 
           localStorage.setItem(storageKey, data.conversationPublicId);
@@ -118,12 +119,12 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
           };
           setMessages((prev) => [...prev, assistantMessage]);
 
-          if (wasNewConversation) {
-            fetchHistory(data.conversationPublicId);
+          if (data.leadCaptureRequested === true && !leadSubmitted) {
+            setShowLeadForm(true);
           }
 
-          if (data.leadCaptureRequested === true) {
-            setShowLeadForm(true);
+          if (wasNewConversation) {
+            fetchHistory(data.conversationPublicId);
           }
         } else {
           setError("Invalid response from server");
@@ -144,7 +145,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
     const trimmedPhone = leadPhone.trim();
 
     if (!trimmedName && !trimmedEmail && !trimmedPhone) {
-      setLeadError("Please provide at least one contact field");
+      setLeadError("Please provide at least one contact method");
       return;
     }
 
@@ -152,14 +153,18 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
     setLeadError(null);
 
     try {
-      const convId = localStorage.getItem(storageKey);
+      const storedConvId = localStorage.getItem(storageKey);
+
+      if (!storedConvId) {
+        throw new Error("No active conversation");
+      }
 
       const res = await fetch("/api/public/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           botPublicKey,
-          conversationPublicId: convId,
+          conversationPublicId: storedConvId,
           name: trimmedName || undefined,
           email: trimmedEmail || undefined,
           phone: trimmedPhone || undefined
@@ -170,29 +175,26 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
 
       if (data.ok) {
         setShowLeadForm(false);
+        setLeadSubmitted(true);
         setLeadName("");
         setLeadEmail("");
         setLeadPhone("");
-
-        if (convId) {
-          fetchHistory(convId);
-        }
+        fetchHistory(storedConvId);
       } else {
-        setLeadError(data.error || "Failed to submit");
+        setLeadError(data.error || "Failed to submit contact information");
       }
-    } catch {
-      setLeadError("Failed to submit");
+    } catch (err) {
+      setLeadError(
+        err instanceof Error
+          ? err.message
+          : "Failed to submit contact information"
+      );
     } finally {
       setIsSubmittingLead(false);
     }
   };
 
-  const handleCancelLead = () => {
-    setShowLeadForm(false);
-    setLeadError(null);
-  };
-
-  const isInputDisabled = isSending || isLoadingHistory || showLeadForm || isSubmittingLead;
+  const leadHasAny = !!leadName.trim() || !!leadEmail.trim() || !!leadPhone.trim();
 
   return (
     <div className="space-y-4">
@@ -205,7 +207,10 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
       {!isLoadingHistory && messages.length > 0 && (
         <div className="max-h-96 space-y-3 overflow-y-auto rounded-lg border border-white/10 bg-white/5 p-4">
           {messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              key={idx}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            >
               <div
                 className={`max-w-[80%] rounded-lg px-4 py-2 ${
                   msg.role === "user"
@@ -221,64 +226,51 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
         </div>
       )}
 
-      {error && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
-          <p className="text-sm text-red-400">{error}</p>
-        </div>
-      )}
-
       {showLeadForm && (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
-          <p className="text-sm text-white/80">Leave your contact info:</p>
-
-          <input
-            type="text"
-            value={leadName}
-            onChange={(e) => setLeadName(e.target.value)}
-            placeholder="Name"
-            disabled={isSubmittingLead}
-            className="w-full rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
-          />
-
-          <input
-            type="email"
-            value={leadEmail}
-            onChange={(e) => setLeadEmail(e.target.value)}
-            placeholder="Email"
-            disabled={isSubmittingLead}
-            className="w-full rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
-          />
-
-          <input
-            type="tel"
-            value={leadPhone}
-            onChange={(e) => setLeadPhone(e.target.value)}
-            placeholder="Phone"
-            disabled={isSubmittingLead}
-            className="w-full rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
-          />
-
-          {leadError && (
-            <p className="text-sm text-red-400">{leadError}</p>
-          )}
-
-          <div className="flex gap-2">
+        <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+          <p className="mb-3 text-sm text-white/90">
+            Please share your contact information:
+          </p>
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={leadName}
+              onChange={(e) => setLeadName(e.target.value)}
+              placeholder="Name"
+              disabled={isSubmittingLead}
+              className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
+            />
+            <input
+              type="email"
+              value={leadEmail}
+              onChange={(e) => setLeadEmail(e.target.value)}
+              placeholder="Email"
+              disabled={isSubmittingLead}
+              className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
+            />
+            <input
+              type="tel"
+              value={leadPhone}
+              onChange={(e) => setLeadPhone(e.target.value)}
+              placeholder="Phone"
+              disabled={isSubmittingLead}
+              className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
+            />
+            {leadError && <p className="text-sm text-red-400">{leadError}</p>}
             <button
               onClick={handleLeadSubmit}
-              disabled={isSubmittingLead}
-              className="flex-1 rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
+              disabled={isSubmittingLead || !leadHasAny}
+              className="w-full rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
             >
               {isSubmittingLead ? "Submitting..." : "Submit"}
             </button>
-
-            <button
-              onClick={handleCancelLead}
-              disabled={isSubmittingLead}
-              className="rounded-md border border-white/20 px-4 py-2 text-sm text-white/80 hover:bg-white/5 disabled:opacity-50"
-            >
-              Skip
-            </button>
           </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
+          <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
 
@@ -289,12 +281,18 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           placeholder="Type a message..."
-          disabled={isInputDisabled}
+          disabled={isSending || isLoadingHistory || showLeadForm || isSubmittingLead}
           className="flex-1 rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
         />
         <button
           onClick={handleSend}
-          disabled={isInputDisabled || !message.trim()}
+          disabled={
+            isSending ||
+            isLoadingHistory ||
+            showLeadForm ||
+            isSubmittingLead ||
+            !message.trim()
+          }
           className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
         >
           {isSending ? "..." : "Send"}
