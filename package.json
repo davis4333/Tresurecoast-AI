@@ -27,9 +27,7 @@
   "dependencies": {
     "@playwright/test": "^1.57.0",
     "@prisma/client": "^5.11.0",
-    "iron-session": "^8.0.4",
     "next": "^14.2.0",
-    "openid-client": "^6.8.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "zod": "^4.3.5"

@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
-import { requireAdmin } from "@/lib/admin/requireAdmin";
+import { requireAdmin, handleAdminError, AdminUnauthorizedError } from "@/lib/admin/requireAdmin";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   try {
     requireAdmin(req);
-  } catch (res) {
-    if (res instanceof NextResponse) return res;
-    return NextResponse.json({ ok: false, error: "Internal error" }, { status: 500 });
+  } catch (error) {
+    if (error instanceof AdminUnauthorizedError) {
+      return error.response;
+    }
+    return handleAdminError(error);
   }
 
   const url = new URL(req.url);
