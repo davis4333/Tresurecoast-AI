@@ -171,7 +171,7 @@ export default function InsightsPage() {
               <h2 className="text-xl font-semibold mb-4 text-[var(--color-text-primary)]">Suggested Improvements</h2>
               <div className="space-y-4">
                 {insights.suggestions.map((s, idx) => (
-                  <div key={idx} className="border-l-4 border-blue-500 pl-4 py-2" data-testid={`suggestion-${idx}`}>
+                  <div key={idx} className="p-4 rounded-md bg-[var(--color-surface-hover)] border border-[var(--color-border)]" data-testid={`suggestion-${idx}`}>
                     <div className="font-semibold text-[var(--color-text-primary)]">{s.title}</div>
                     <div className="text-sm text-[var(--color-text-secondary)] mt-1">{s.reason}</div>
                     <div className="flex flex-wrap gap-2 mt-2">

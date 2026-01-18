@@ -1,35 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { InsightsQuerySchema } from "@/lib/admin/insightsSchemas";
 import { detectTopic } from "@/lib/public/topicDetect";
+import { requireClerkAdmin, handleClerkError, ClerkMisconfiguredError, ClerkUnauthorizedError } from "@/lib/admin/requireClerkAdmin";
 import { ZodError } from "zod";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-function clerkConfigured(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
-  );
-}
-
 export async function GET(req: NextRequest) {
   try {
-    if (!clerkConfigured()) {
-      return NextResponse.json(
-        { ok: false, error: "server_misconfigured" },
-        { status: 503 }
-      );
-    }
-
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json(
-        { ok: false, error: "unauthorized" },
-        { status: 401 }
-      );
-    }
+    await requireClerkAdmin();
 
     const sp = req.nextUrl.searchParams;
     const query = InsightsQuerySchema.parse({
@@ -166,6 +147,9 @@ export async function GET(req: NextRequest) {
       suggestions,
     });
   } catch (err) {
+    if (err instanceof ClerkMisconfiguredError || err instanceof ClerkUnauthorizedError) {
+      return handleClerkError(err);
+    }
     if (err instanceof ZodError) {
       return NextResponse.json(
         { ok: false, error: "validation_error", details: err.issues },
