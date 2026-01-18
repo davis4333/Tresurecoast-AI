@@ -1,14 +1,8 @@
-export type Topic =
-  | "SERVICES"
-  | "PRICING"
-  | "HOURS"
-  | "LOCATION"
-  | "CONTACT"
-  | "BOOKING"
-  | "PAYMENT"
-  | "OTHER";
+import type { Topic, TopicResult } from "@/lib/truth/types";
 
-const TOPIC_PATTERNS: Record<Topic, RegExp[]> = {
+export type { Topic, TopicResult };
+
+const TOPIC_PATTERNS: Record<Exclude<Topic, "GENERAL">, RegExp[]> = {
   SERVICES: [
     /\bservices?\b/i,
     /\bwhat do you (do|offer)\b/i,
@@ -36,7 +30,6 @@ const TOPIC_PATTERNS: Record<Topic, RegExp[]> = {
     /\bclose[ds]?\b/i,
     /\bwhen.*open\b/i,
     /\bwhat time\b/i,
-    /\bschedule\b/i,
     /\bavailab(le|ility)\b/i,
     /\btoday\b/i,
     /\btomorrow\b/i,
@@ -81,16 +74,49 @@ const TOPIC_PATTERNS: Record<Topic, RegExp[]> = {
     /\bvenmo\b/i,
     /\bzelle\b/i,
   ],
-  OTHER: [],
+  POLICIES: [
+    /\bpolic(y|ies)\b/i,
+    /\bcancel(lation)?\b/i,
+    /\brefund\b/i,
+    /\breschedule\b/i,
+    /\blate\b/i,
+    /\bno[- ]show\b/i,
+    /\brules?\b/i,
+    /\bterms\b/i,
+    /\bconditions\b/i,
+  ],
 };
+
+function hasAny(text: string, patterns: RegExp[]): string[] {
+  const matched: string[] = [];
+  for (const p of patterns) {
+    const match = text.match(p);
+    if (match) {
+      matched.push(match[0]);
+    }
+  }
+  return matched;
+}
+
+export function detectTopic(message: string): TopicResult {
+  const normalized = message.toLowerCase().trim();
+
+  for (const [topic, patterns] of Object.entries(TOPIC_PATTERNS)) {
+    const matched = hasAny(normalized, patterns);
+    if (matched.length > 0) {
+      const confidence = Math.min(0.5 + matched.length * 0.15, 0.95);
+      return { topic: topic as Topic, confidence, matched };
+    }
+  }
+
+  return { topic: "GENERAL", confidence: 0.4, matched: [] };
+}
 
 export function detectTopics(message: string): Topic[] {
   const detected: Topic[] = [];
   const normalized = message.toLowerCase().trim();
 
   for (const [topic, patterns] of Object.entries(TOPIC_PATTERNS)) {
-    if (topic === "OTHER") continue;
-
     for (const pattern of patterns) {
       if (pattern.test(normalized)) {
         detected.push(topic as Topic);
@@ -100,7 +126,7 @@ export function detectTopics(message: string): Topic[] {
   }
 
   if (detected.length === 0) {
-    detected.push("OTHER");
+    detected.push("GENERAL");
   }
 
   return detected;

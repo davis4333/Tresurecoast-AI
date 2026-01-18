@@ -42,7 +42,7 @@ test.describe("Revenue Loop E2E", () => {
     expect(chatData.conversationPublicId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     );
-    expect(chatData.leadCaptureRequested).toBe(true);
+    expect(chatData.requiresLeadCapture).toBe(true);
 
     const conversationPublicId = chatData.conversationPublicId;
 

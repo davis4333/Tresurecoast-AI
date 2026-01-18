@@ -1,4 +1,5 @@
-import { detectTopics, hasHighIntent, type Topic } from "@/lib/public/topicDetect";
+import { detectTopic, hasHighIntent } from "@/lib/public/topicDetect";
+import type { TruthResult, TruthIntent, Topic, SuggestedAction } from "./types";
 
 export interface BotService {
   name: string;
@@ -35,15 +36,6 @@ export interface TruthEngineInput {
     services: unknown;
     links: BotLinkData[];
   };
-}
-
-export interface TruthEngineOutput {
-  reply: string;
-  leadCaptureRequested: boolean;
-  externalRedirectUrl: string | null;
-  sourcedFrom: string[];
-  missingData: boolean;
-  missingDataTopics: string[];
 }
 
 function parseServices(raw: unknown): BotService[] {
@@ -97,173 +89,219 @@ function findLink(links: BotLinkData[], type: "BOOKING" | "PAYMENT"): BotLinkDat
   return links.find((l) => l.type === type) ?? null;
 }
 
-export function runTruthEngine(input: TruthEngineInput): TruthEngineOutput {
+function formatContactInfo(bot: TruthEngineInput["bot"]): string {
+  const parts: string[] = [];
+  if (bot.businessPhone) parts.push(`Phone: ${bot.businessPhone}`);
+  if (bot.businessEmail) parts.push(`Email: ${bot.businessEmail}`);
+  return parts.join(" | ");
+}
+
+export function runTruthEngine(input: TruthEngineInput): TruthResult {
   const { userMessage, bot } = input;
-  const topics = detectTopics(userMessage);
+  const topicResult = detectTopic(userMessage);
+  const topic = topicResult.topic;
   const services = parseServices(bot.services);
   const hours = parseHours(bot.hours);
 
   const sourcedFrom: string[] = [];
-  const missingDataTopics: string[] = [];
+  const missingFields: string[] = [];
+  const suggestedActions: SuggestedAction[] = [];
   let reply = "";
-  let externalRedirectUrl: string | null = null;
-  let missingData = false;
+  let intent: TruthIntent = "ANSWERED_FROM_PROFILE";
+  let confidence = topicResult.confidence;
+  let requiresLeadCapture = false;
 
-  for (const topic of topics) {
-    switch (topic) {
-      case "SERVICES": {
-        if (services.length > 0) {
-          const formatted = formatServices(services);
-          if (formatted) {
-            reply = `Here are the services we offer:\n${formatted}`;
-            sourcedFrom.push("services");
-          } else {
-            missingData = true;
-            missingDataTopics.push("SERVICES");
-          }
-        } else {
-          missingData = true;
-          missingDataTopics.push("SERVICES");
-        }
-        break;
-      }
-
-      case "PRICING": {
-        const withPrices = services.filter((s) => s.priceRange && s.active !== false);
-        if (withPrices.length > 0) {
-          const lines = withPrices.map((s) => `- ${s.name}: ${s.priceRange}`);
-          reply = `Here's our pricing:\n${lines.join("\n")}`;
+  switch (topic) {
+    case "SERVICES": {
+      if (services.length > 0) {
+        const formatted = formatServices(services);
+        if (formatted) {
+          reply = `Here are the services we offer:\n${formatted}`;
           sourcedFrom.push("services");
+          intent = "ANSWERED_FROM_PROFILE";
         } else {
-          missingData = true;
-          missingDataTopics.push("PRICING");
+          missingFields.push("services");
         }
-        break;
+      } else {
+        missingFields.push("services");
       }
-
-      case "HOURS": {
-        if (hours) {
-          const today = getDayName();
-          const dayMatch = userMessage.toLowerCase().match(
-            /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/
-          );
-          const targetDay = dayMatch ? dayMatch[0].slice(0, 3) : today;
-          const formatted = formatHoursForDay(hours, targetDay);
-          if (formatted) {
-            reply = formatted;
-            sourcedFrom.push("hours");
-          } else {
-            const allHours = Object.entries(hours)
-              .map(([d, h]) => {
-                if (h.closed) return `${d}: Closed`;
-                if (h.open && h.close) return `${d}: ${h.open} - ${h.close}`;
-                return null;
-              })
-              .filter(Boolean);
-            if (allHours.length > 0) {
-              reply = `Our hours:\n${allHours.join("\n")}`;
-              sourcedFrom.push("hours");
-            } else {
-              missingData = true;
-              missingDataTopics.push("HOURS");
-            }
-          }
-        } else {
-          missingData = true;
-          missingDataTopics.push("HOURS");
-        }
-        break;
-      }
-
-      case "LOCATION": {
-        if (bot.businessAddress) {
-          reply = `We're located at: ${bot.businessAddress}`;
-          sourcedFrom.push("businessAddress");
-        } else {
-          missingData = true;
-          missingDataTopics.push("LOCATION");
-        }
-        break;
-      }
-
-      case "CONTACT": {
-        const parts: string[] = [];
-        if (bot.businessPhone) {
-          parts.push(`Phone: ${bot.businessPhone}`);
-          sourcedFrom.push("businessPhone");
-        }
-        if (bot.businessEmail) {
-          parts.push(`Email: ${bot.businessEmail}`);
-          sourcedFrom.push("businessEmail");
-        }
-        if (parts.length > 0) {
-          reply = `You can reach us at:\n${parts.join("\n")}`;
-        } else {
-          missingData = true;
-          missingDataTopics.push("CONTACT");
-        }
-        break;
-      }
-
-      case "BOOKING": {
-        const bookingLink = findLink(bot.links, "BOOKING");
-        if (bookingLink) {
-          reply = `Here's the booking link: ${bookingLink.url}`;
-          externalRedirectUrl = bookingLink.url;
-          sourcedFrom.push("links:BOOKING");
-        } else {
-          missingData = true;
-          missingDataTopics.push("BOOKING");
-        }
-        break;
-      }
-
-      case "PAYMENT": {
-        const paymentLink = findLink(bot.links, "PAYMENT");
-        if (paymentLink) {
-          reply = `Here's the payment link: ${paymentLink.url}`;
-          externalRedirectUrl = paymentLink.url;
-          sourcedFrom.push("links:PAYMENT");
-        } else {
-          missingData = true;
-          missingDataTopics.push("PAYMENT");
-        }
-        break;
-      }
-
-      case "OTHER":
-      default: {
-        break;
-      }
+      break;
     }
 
-    if (reply) break;
+    case "PRICING": {
+      const withPrices = services.filter((s) => s.priceRange && s.active !== false);
+      if (withPrices.length > 0) {
+        const lines = withPrices.map((s) => `- ${s.name}: ${s.priceRange}`);
+        reply = `Here's our pricing:\n${lines.join("\n")}`;
+        sourcedFrom.push("services");
+        intent = "ANSWERED_FROM_PROFILE";
+      } else {
+        missingFields.push("pricing");
+      }
+      break;
+    }
+
+    case "HOURS": {
+      if (hours) {
+        const today = getDayName();
+        const dayMatch = userMessage.toLowerCase().match(
+          /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/
+        );
+        const targetDay = dayMatch ? dayMatch[0].slice(0, 3) : today;
+        const formatted = formatHoursForDay(hours, targetDay);
+        if (formatted) {
+          reply = formatted;
+          sourcedFrom.push("hours");
+          intent = "ANSWERED_FROM_PROFILE";
+        } else {
+          const allHours = Object.entries(hours)
+            .map(([d, h]) => {
+              if (h.closed) return `${d}: Closed`;
+              if (h.open && h.close) return `${d}: ${h.open} - ${h.close}`;
+              return null;
+            })
+            .filter(Boolean);
+          if (allHours.length > 0) {
+            reply = `Our hours:\n${allHours.join("\n")}`;
+            sourcedFrom.push("hours");
+            intent = "ANSWERED_FROM_PROFILE";
+          } else {
+            missingFields.push("hours");
+          }
+        }
+      } else {
+        missingFields.push("hours");
+      }
+      break;
+    }
+
+    case "LOCATION": {
+      if (bot.businessAddress) {
+        reply = `We're located at: ${bot.businessAddress}`;
+        sourcedFrom.push("businessAddress");
+        intent = "ANSWERED_FROM_PROFILE";
+      } else {
+        missingFields.push("businessAddress");
+      }
+      break;
+    }
+
+    case "CONTACT": {
+      const contactInfo = formatContactInfo(bot);
+      if (contactInfo) {
+        reply = `You can reach us at:\n${contactInfo}`;
+        if (bot.businessPhone) sourcedFrom.push("businessPhone");
+        if (bot.businessEmail) sourcedFrom.push("businessEmail");
+        intent = "ANSWERED_FROM_PROFILE";
+        suggestedActions.push({
+          type: "CONTACT",
+          label: "Contact the team",
+        });
+      } else {
+        missingFields.push("contact");
+      }
+      break;
+    }
+
+    case "BOOKING": {
+      const bookingLink = findLink(bot.links, "BOOKING");
+      if (bookingLink) {
+        reply = `You can book here: ${bookingLink.url}\n\nIf you'd like, I can also take your details and have the team confirm availability.`;
+        sourcedFrom.push("links[BOOKING]");
+        intent = "BOOK_OR_PAY_REDIRECT";
+        suggestedActions.push({
+          type: "BOOK",
+          url: bookingLink.url,
+          label: bookingLink.label || "Book Now",
+        });
+        requiresLeadCapture = true;
+      } else {
+        missingFields.push("links[BOOKING]");
+        requiresLeadCapture = true;
+        const contactInfo = formatContactInfo(bot);
+        reply = `I don't have a booking link in my system yet.${contactInfo ? `\n\n${contactInfo}` : ""}\n\nIf you want, leave your name + best contact and what you're trying to book — the team will follow up.`;
+        intent = "MISSING_DATA";
+        if (contactInfo) {
+          suggestedActions.push({
+            type: "CONTACT",
+            label: "Contact the team",
+          });
+        }
+      }
+      break;
+    }
+
+    case "PAYMENT": {
+      const paymentLink = findLink(bot.links, "PAYMENT");
+      if (paymentLink) {
+        reply = `You can pay here: ${paymentLink.url}\n\nIf you want, tell me what service you're paying for and I'll pass it to the team.`;
+        sourcedFrom.push("links[PAYMENT]");
+        intent = "BOOK_OR_PAY_REDIRECT";
+        suggestedActions.push({
+          type: "PAY",
+          url: paymentLink.url,
+          label: paymentLink.label || "Pay Now",
+        });
+        requiresLeadCapture = true;
+      } else {
+        missingFields.push("links[PAYMENT]");
+        requiresLeadCapture = true;
+        const contactInfo = formatContactInfo(bot);
+        reply = `I don't have a payment link in my system yet.${contactInfo ? `\n\n${contactInfo}` : ""}\n\nLeave your name + contact info and what you're paying for — the team will follow up.`;
+        intent = "MISSING_DATA";
+        if (contactInfo) {
+          suggestedActions.push({
+            type: "CONTACT",
+            label: "Contact the team",
+          });
+        }
+      }
+      break;
+    }
+
+    case "POLICIES": {
+      missingFields.push("policies");
+      break;
+    }
+
+    case "GENERAL":
+    default: {
+      break;
+    }
   }
 
-  if (!reply && !missingData) {
-    missingData = true;
-    missingDataTopics.push("OTHER");
-  }
-
-  if (missingData && !reply) {
-    const contactInfo: string[] = [];
-    if (bot.businessPhone) contactInfo.push(`phone: ${bot.businessPhone}`);
-    if (bot.businessEmail) contactInfo.push(`email: ${bot.businessEmail}`);
-
-    if (contactInfo.length > 0) {
+  if (!reply && missingFields.length > 0) {
+    intent = "MISSING_DATA";
+    const contactInfo = formatContactInfo(bot);
+    if (contactInfo) {
       reply =
         bot.fallbackText ||
-        `I don't have that information in my system. Please contact us at ${contactInfo.join(" or ")}.`;
-      sourcedFrom.push(...(bot.businessPhone ? ["businessPhone"] : []));
-      sourcedFrom.push(...(bot.businessEmail ? ["businessEmail"] : []));
+        `I don't have that information in my system. Please contact us at ${contactInfo}.`;
+      if (bot.businessPhone) sourcedFrom.push("businessPhone");
+      if (bot.businessEmail) sourcedFrom.push("businessEmail");
+      suggestedActions.push({
+        type: "CONTACT",
+        label: "Contact the team",
+      });
     } else {
       reply =
         bot.fallbackText ||
-        "I don't have that information in my system right now. Would you like to leave your contact info so someone can follow up?";
+        "I'm not 100% sure from the info I have. Want to leave your name and number so the team can follow up?";
+    }
+
+    if (hasHighIntent(userMessage)) {
+      requiresLeadCapture = true;
+      intent = "LEAD_CAPTURE";
     }
   }
 
-  const leadCaptureRequested = missingData && hasHighIntent(userMessage);
+  if (!reply) {
+    reply =
+      bot.fallbackText ||
+      "I'm not 100% sure from the info I have. Want to leave your name and number so the team can follow up?";
+    intent = "MISSING_DATA";
+    missingFields.push("general");
+  }
 
   if (reply.length > 500) {
     reply = reply.slice(0, 497) + "...";
@@ -271,10 +309,12 @@ export function runTruthEngine(input: TruthEngineInput): TruthEngineOutput {
 
   return {
     reply,
-    leadCaptureRequested,
-    externalRedirectUrl,
+    intent,
+    confidence,
     sourcedFrom: [...new Set(sourcedFrom)],
-    missingData,
-    missingDataTopics: [...new Set(missingDataTopics)],
+    requiresLeadCapture,
+    missingFields: [...new Set(missingFields)],
+    topic,
+    suggestedActions: suggestedActions.length > 0 ? suggestedActions : undefined,
   };
 }

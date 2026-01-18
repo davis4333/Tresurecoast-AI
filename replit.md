@@ -57,11 +57,14 @@ Preferred communication style: Simple, everyday language.
 
 ### Truth Engine Architecture
 - **Location**: `src/lib/truth/truthEngine.ts`
+- **Types**: `src/lib/truth/types.ts` - Zod schemas for Topic, TruthIntent, TruthResult, SuggestedAction
 - **Purpose**: Answers user questions using ONLY verified business data from the bot's configuration
 - **Data Sources**: Bot.services, Bot.hours, Bot.businessPhone/Email/Address, BotLink
-- **Topic Detection**: `src/lib/public/topicDetect.ts` categorizes queries into 8 topics (SERVICES, PRICING, HOURS, LOCATION, CONTACT, BOOKING, PAYMENT, OTHER)
+- **Topic Detection**: `src/lib/public/topicDetect.ts` categorizes queries into 9 topics (SERVICES, PRICING, HOURS, LOCATION, CONTACT, BOOKING, PAYMENT, POLICIES, GENERAL)
+- **TruthResult Shape**: `{ reply, intent, confidence, sourcedFrom[], requiresLeadCapture, missingFields[], topic, suggestedActions[] }`
+- **Intent Types**: ANSWERED_FROM_PROFILE, MISSING_DATA, BOOK_OR_PAY_REDIRECT, LEAD_CAPTURE
 - **Lead Capture**: Triggers on high-intent queries (booking, pricing) when data is missing
-- **Analytics**: MissingDataEvent logs track which topics users ask about when bot lacks data
+- **Analytics**: DataEvent model logs track TOPIC_DETECTED, TRUTH_RESPONSE, MISSING_DATA, LEAD_CAPTURE_TRIGGERED, REDIRECT_CLICK events
 
 ### Key Design Decisions
 

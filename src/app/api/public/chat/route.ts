@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/public/rateLimit";
 import { ChatRequestSchema } from "@/lib/public/zodSchemas";
 import { runTruthEngine, type BotLinkData } from "@/lib/truth/truthEngine";
+import { detectTopic } from "@/lib/public/topicDetect";
 
 export const runtime = "nodejs";
 
@@ -171,6 +172,8 @@ export async function POST(req: Request) {
       },
     });
 
+    const topicResult = detectTopic(message);
+
     const truthResult = runTruthEngine({
       userMessage: message,
       bot: {
@@ -194,45 +197,108 @@ export async function POST(req: Request) {
       },
     });
 
-    if (truthResult.missingData && truthResult.missingDataTopics.length > 0) {
-      try {
-        await prisma.missingDataEvent.create({
-          data: {
-            organizationId: bot.organizationId,
-            workspaceId: bot.workspaceId,
-            botId: bot.id,
-            conversationId: conversation.id,
-            topics: truthResult.missingDataTopics,
+    const eventBase = {
+      organizationId: bot.organizationId,
+      workspaceId: bot.workspaceId,
+      botId: bot.id,
+      conversationId: conversation.id,
+    };
+
+    try {
+      await prisma.dataEvent.create({
+        data: {
+          ...eventBase,
+          type: "TOPIC_DETECTED",
+          topic: topicResult.topic,
+          payload: {
+            confidence: topicResult.confidence,
+            matched: topicResult.matched,
             userMessage: message,
           },
+        },
+      });
+
+      await prisma.dataEvent.create({
+        data: {
+          ...eventBase,
+          type: "TRUTH_RESPONSE",
+          topic: truthResult.topic,
+          payload: {
+            intent: truthResult.intent,
+            confidence: truthResult.confidence,
+            sourcedFrom: truthResult.sourcedFrom,
+            requiresLeadCapture: truthResult.requiresLeadCapture,
+            missingFields: truthResult.missingFields,
+            suggestedActions: truthResult.suggestedActions,
+          },
+        },
+      });
+
+      if (truthResult.missingFields.length > 0) {
+        await prisma.dataEvent.create({
+          data: {
+            ...eventBase,
+            type: "MISSING_DATA",
+            topic: truthResult.topic,
+            payload: {
+              missingFields: truthResult.missingFields,
+              userMessage: message,
+            },
+          },
         });
-      } catch (logError) {
-        console.error("[MISSING DATA LOG ERROR]", logError);
       }
+
+      if (truthResult.requiresLeadCapture) {
+        await prisma.dataEvent.create({
+          data: {
+            ...eventBase,
+            type: "LEAD_CAPTURE_TRIGGERED",
+            topic: truthResult.topic,
+            payload: {
+              intent: truthResult.intent,
+              missingFields: truthResult.missingFields,
+            },
+          },
+        });
+      }
+    } catch (logError) {
+      console.error("[DATA EVENT LOG ERROR]", logError);
     }
 
-    let leadCaptureRequested = truthResult.leadCaptureRequested;
+    let requiresLeadCapture = truthResult.requiresLeadCapture;
 
-    if (leadCaptureRequested) {
+    if (requiresLeadCapture) {
       const existingLead = await prisma.lead.findFirst({
         where: { conversationId: conversation.id },
         select: { id: true },
       });
 
       if (existingLead) {
-        leadCaptureRequested = false;
+        requiresLeadCapture = false;
+      }
+    }
+
+    const suggestedActions = truthResult.suggestedActions;
+    let externalRedirectUrl: string | null = null;
+    if (suggestedActions && suggestedActions.length > 0) {
+      const firstWithUrl = suggestedActions.find((a) => a.url);
+      if (firstWithUrl?.url) {
+        externalRedirectUrl = firstWithUrl.url;
       }
     }
 
     return NextResponse.json({
       ok: true,
       conversationPublicId: conversation.publicId,
-      message: truthResult.reply,
-      leadCaptureRequested,
-      externalRedirectUrl: truthResult.externalRedirectUrl,
+      reply: truthResult.reply,
+      intent: truthResult.intent,
+      confidence: truthResult.confidence,
       sourcedFrom: truthResult.sourcedFrom,
-      missingData: truthResult.missingData,
-      missingDataTopics: truthResult.missingDataTopics,
+      requiresLeadCapture,
+      missingFields: truthResult.missingFields,
+      topic: truthResult.topic,
+      suggestedActions: truthResult.suggestedActions,
+      externalRedirectUrl,
     });
   } catch (error) {
     console.error("[CHAT ERROR]", error);
