@@ -30,11 +30,6 @@ async function getOrganizationForUser(userId: string | null) {
   if (isDevBypass()) {
     const org = await prisma.organization.findFirst({
       orderBy: { id: "asc" },
-      select: {
-        id: true,
-        customDomain: true,
-        domainVerificationToken: true,
-      },
     });
     return org ? { organization: org, role: "AGENCY_OWNER" as const } : null;
   }
@@ -43,11 +38,6 @@ async function getOrganizationForUser(userId: string | null) {
 
   const org = await prisma.organization.findFirst({
     orderBy: { id: "asc" },
-    select: {
-      id: true,
-      customDomain: true,
-      domainVerificationToken: true,
-    },
   });
 
   return org ? { organization: org, role: "AGENCY_OWNER" as const } : null;
