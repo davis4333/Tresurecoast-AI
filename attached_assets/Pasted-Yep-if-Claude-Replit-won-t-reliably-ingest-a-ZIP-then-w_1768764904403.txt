@@ -1,0 +1,128 @@
+Yep — if Claude/Replit won’t reliably ingest a ZIP, then we stop fighting ZIPs and ship Step 25 as plain text, file-by-file (or as a single Shell script that writes all files). That’s the most reliable path.
+
+Below are two ways to apply Step 25 without any ZIP decoding.
+
+⸻
+
+Option 1 (Best): One Shell script that creates/patches everything
+
+In Replit, open Shell at repo root and run this. It will:
+	•	create the new files
+	•	add the CSS var
+	•	add the org branding API route + validator
+	•	add the settings page
+	•	remind you what to change in the two “modified” files (because auto-patching safely is hard without your exact current code)
+
+Paste the whole thing as-is:
+
+set -euo pipefail
+
+echo "== Step 25: create new files =="
+
+mkdir -p src/lib/validators
+mkdir -p src/app/api/org/branding
+mkdir -p src/app/\(dashboard\)/dashboard/settings/branding
+
+# 1) NEW: src/lib/validators/branding.ts
+cat > src/lib/validators/branding.ts <<'EOF'
+import { z } from "zod";
+
+// Strict hex color validation (#RRGGBB)
+const hexColorRegex = /^#[0-9A-Fa-f]{6}$/;
+
+// Domain validation (domain only, no protocol)
+const domainRegex =
+  /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/i;
+
+export const BrandingSchema = z.object({
+  whiteLabelEnabled: z.boolean(),
+  brandCompanyName: z.string().max(80).nullable().or(z.literal("")),
+  brandLogoUrl: z.string().url().nullable().or(z.literal("")),
+  brandPrimaryColor: z
+    .string()
+    .regex(hexColorRegex, "Must be a valid hex color (#RRGGBB)")
+    .nullable()
+    .or(z.literal("")),
+  customDomain: z
+    .string()
+    .regex(domainRegex, "Must be a valid domain (e.g., example.com)")
+    .nullable()
+    .or(z.literal("")),
+  showPoweredBy: z.boolean().optional(),
+});
+
+export type BrandingInput = z.infer<typeof BrandingSchema>;
+
+export const BrandingResponseSchema = z.object({
+  ok: z.literal(true),
+  branding: BrandingSchema,
+});
+
+export type BrandingResponse = z.infer<typeof BrandingResponseSchema>;
+EOF
+
+# 2) NEW: src/app/api/org/branding/route.ts
+mkdir -p src/app/api/org/branding
+cat > src/app/api/org/branding/route.ts <<'EOF'
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { prisma } from "@/lib/db";
+import { BrandingSchema } from "@/lib/validators/branding";
+import { logger } from "@/lib/logger";
+import { AppError, createErrorResponse } from "@/lib/errors";
+import { ZodError } from "zod";
+
+export const dynamic = "force-dynamic";
+
+// GET /api/org/branding - Get current org branding (any org member)
+export async function GET(_req: NextRequest) {
+  const requestId = crypto.randomUUID();
+
+  try {
+    const { userId } = await auth();
+    if (!userId) throw new AppError("unauthorized", "Authentication required", 401);
+
+    const membership = await prisma.organizationMember.findFirst({
+      where: { clerkUserId: userId },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            whiteLabelEnabled: true,
+            brandCompanyName: true,
+            brandLogoUrl: true,
+            brandPrimaryColor: true,
+            customDomain: true,
+            showPoweredBy: true,
+          },
+        },
+      },
+    });
+
+    if (!membership) throw new AppError("not_found", "Organization not found", 404);
+
+    const branding = {
+      whiteLabelEnabled: membership.organization.whiteLabelEnabled,
+      brandCompanyName: membership.organization.brandCompanyName,
+      brandLogoUrl: membership.organization.brandLogoUrl,
+      brandPrimaryColor: membership.organization.brandPrimaryColor,
+      customDomain: membership.organization.customDomain,
+      showPoweredBy: membership.organization.showPoweredBy,
+    };
+
+    logger.info({ requestId, userId, organizationId: membership.organizationId }, "Branding retrieved");
+
+    return NextResponse.json({ ok: true, branding });
+  } catch (error) {
+    if (error instanceof AppError) return createErrorResponse(error, requestId);
+    logger.error({ requestId, error }, "Failed to retrieve branding");
+    return createErrorResponse(new AppError("internal_error", "Failed to retrieve branding", 500), requestId);
+  }
+}
+
+// PUT /api/org/branding - Update org branding (AGENCY_OWNER/AGENCY_ADMIN only)
+export async function PUT(req: NextRequest) {
+  const requestId = crypto.randomUUID();
+
+  try {
+   
