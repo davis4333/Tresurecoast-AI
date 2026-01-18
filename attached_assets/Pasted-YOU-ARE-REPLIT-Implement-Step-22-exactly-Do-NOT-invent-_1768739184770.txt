@@ -1,0 +1,145 @@
+YOU ARE REPLIT.
+Implement Step 22 exactly. Do NOT invent new architecture or add features not listed.
+Work only in this repo. Keep changes minimal, production-safe, and fully tested.
+After coding, run all QA gates and paste outputs.
+
+GOAL
+Replace the current chat heuristics with a strict Truth Engine that:
+- Answers ONLY from verified business data stored in the Bot record (services/hours/contact/links) + BotLink table.
+- If user asks something not present in DB, the bot must say it doesn’t have that information and route into lead capture OR provide business contact info.
+- Always return sourcedFrom[] listing which fields were used to answer (internal only, returned in API response).
+- Log “missing-data intent” so the agency dashboard can see what customers ask that isn’t in the profile.
+
+SCOPE (DO NOT EXPAND)
+- Only modify public chat behavior and add logging.
+- Do NOT add new UI pages in this step.
+- Do NOT change pricing/widget UI styling.
+- Keep endpoints stable: /api/public/chat must still work and existing E2E tests must still pass.
+
+FILES TO CREATE / MODIFY
+
+(1) CREATE: src/lib/truth/truthEngine.ts
+Implement Truth Engine v1 as a pure function + helpers.
+
+(2) MODIFY: src/app/api/public/chat/route.ts
+Replace heuristic response generation with Truth Engine result.
+Return response fields:
+{
+  ok: true,
+  conversationPublicId,
+  message: string,
+  leadCaptureRequested: boolean,
+  externalRedirectUrl?: string | null,
+  sourcedFrom: string[],
+  missingData: boolean,
+  missingDataTopics: string[]
+}
+
+(3) MODIFY: prisma/schema.prisma
+Add a model to log missing-data events:
+- MissingDataEvent (scoped to org/workspace/bot + conversation)
+- Store: topic, userMessage, createdAt
+Run a migration.
+
+(4) CREATE: src/lib/public/topicDetect.ts
+A tiny deterministic topic detector to classify user questions into topics:
+SERVICES, PRICING, HOURS, LOCATION, CONTACT, BOOKING, PAYMENT, OTHER
+
+(5) OPTIONAL (only if needed): src/lib/public/formatters.ts
+Format service lists, hours, contact info, and links for responses.
+
+TRUTH ENGINE RULES (NON-NEGOTIABLE)
+
+Inputs:
+- userMessage: string
+- bot: must include: name, greeting, fallbackText, businessPhone, businessEmail, businessAddress, hours (Json), services (Json), links (BotLink[])
+- conversationHistory: last N messages (optional)
+
+Outputs:
+- reply: string
+- leadCaptureRequested: boolean
+- externalRedirectUrl: string | null
+- sourcedFrom: string[] (example: ["services", "hours", "links:BOOKING"])
+- missingData: boolean
+- missingDataTopics: string[] (example: ["PRICING", "HOURS"])
+
+Hard rules:
+1) NEVER hallucinate. If data is missing, say you don't have it in the system.
+2) If user asks to book/pay and matching link exists, return a redirect URL (open in new tab on widget side later; for now just return URL in API response and keep text “Here’s the booking link”).
+3) If service list exists and user asks “what services” or similar, list services from DB.
+4) If hours exist and user asks “are you open”, answer based on hours JSON only.
+5) If phone/email/address exist and user asks contact/location, answer with those only.
+6) If pricing is asked and services have price ranges, respond with those; if no pricing present -> missingData.
+7) Always include sourcedFrom. If missingData=true, sourcedFrom can be [].
+
+Missing-data logging:
+- If missingData=true, create MissingDataEvent row with:
+  organizationId, workspaceId, botId, conversationId, topic(s), userMessage
+- Must NOT break chat flow if insert fails (log error, proceed).
+
+Booking/payment links:
+- Use BotLink table types: BOOKING and PAYMENT.
+- If multiple exist, choose first active (or just first).
+- If none exist and user asks booking/payment -> missingData -> trigger lead capture.
+
+Lead capture decision:
+- If missingData and the user shows intent (“price”, “book”, “schedule”, “appointment”, “pay”) then leadCaptureRequested=true.
+- Otherwise if missingData but low intent, ask a clarifying question or provide contact info if available.
+
+Schema for hours/services (keep tolerant):
+- services Json should support array of:
+  { name: string, description?: string, priceRange?: string, durationMins?: number, active?: boolean }
+- hours Json should support object keyed by weekday:
+  { mon: { open: "09:00", close: "17:00", closed?: boolean }, ... }
+Do NOT enforce hard validation in DB; handle defensively.
+
+API behavior:
+- /api/public/chat must still create Conversation + Message rows as before.
+- It must now use Truth Engine reply + fields and return them.
+
+TESTS
+
+(1) Add unit tests (Vitest) if the repo already has unit tests configured.
+If no unit test framework exists, skip unit tests but add targeted logic tests inside existing test structure.
+
+At minimum:
+- When services exist and user asks “what services” -> reply includes services list, missingData=false, sourcedFrom includes "services"
+- When booking link exists and user asks “book” -> externalRedirectUrl returned, sourcedFrom includes "links:BOOKING"
+- When pricing asked but no price info -> missingData=true, leadCaptureRequested=true, MissingDataEvent created
+
+(2) Update Playwright E2E ONLY if needed.
+Prefer to keep existing E2E tests unchanged and passing.
+
+COMMANDS TO RUN (IN ORDER)
+pnpm lint
+pnpm typecheck
+pnpm test:e2e
+pnpm build
+
+Also run (if migration added):
+pnpm db:migrate
+pnpm db:migrate-verify
+
+MANUAL QA (CLICK-BY-CLICK)
+1) Open widget route for demo bot publicKey
+2) Ask: “What services do you offer?”
+   - Expect services list from DB OR missing-data response if empty
+3) Ask: “What time do you close today?”
+   - Must answer from hours or say not in system
+4) Ask: “How do I book?”
+   - If booking link exists -> returns link, otherwise lead capture
+5) Check DB (Prisma Studio if available) for MissingDataEvent rows when missingData triggered
+
+DEFINITION OF DONE
+- Truth Engine implemented and used by /api/public/chat
+- No hallucinated responses
+- sourcedFrom[] always present in response
+- MissingDataEvent persists for missing data
+- All QA gates pass (lint, typecheck, e2e, build)
+- No console errors in widget
+
+STOP after completion and output:
+A) list of files changed + why
+B) QA outputs
+C) Any edge cases you handled
+D) GO/NO-GO

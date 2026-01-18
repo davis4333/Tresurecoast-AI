@@ -220,3 +220,22 @@ model AuditLog {
   @@index([workspaceId])
   @@index([createdAt])
 }
+
+model MissingDataEvent {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  workspaceId    Int
+  botId          Int
+  conversationId Int
+
+  topics      String[]
+  userMessage String
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([workspaceId])
+  @@index([botId])
+  @@index([conversationId])
+  @@index([createdAt])
+}
