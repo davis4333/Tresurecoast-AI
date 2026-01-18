@@ -1,0 +1,171 @@
+TITLE: Step 21 — Clerk Auth for Agency Dashboard + Secure Admin APIs (Remove same-origin bypass)
+
+GOAL:
+Make the agency dashboard (/app/*) and admin APIs (/api/admin/*) protected by real session-based auth using Clerk (locked stack). Remove any same-origin/origin/referer bypass. After this step:
+	•	Anonymous users cannot access /app/*
+	•	Anonymous users cannot access /api/admin/*
+	•	Logged-in agency users can access both
+	•	Public widget APIs remain public (botPublicKey scoped + rate limited)
+
+NON-NEGOTIABLES:
+	1.	Use Clerk (NOT Replit Auth, NOT homemade sessions).
+	2.	Do not expose any admin key to the browser.
+	3.	Do not use origin/referer checks for security.
+	4.	All new routes must validate auth server-side.
+	5.	Must pass QA gates: pnpm lint, pnpm typecheck, pnpm test:e2e, pnpm build.
+
+⸻
+
+A) ENVIRONMENT SETUP (REPLIT SECRETS)
+
+Create these secrets in Replit:
+	•	NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+	•	CLERK_SECRET_KEY
+	•	CLERK_SIGN_IN_URL = /sign-in
+	•	CLERK_SIGN_UP_URL = /sign-up
+	•	CLERK_AFTER_SIGN_IN_URL = /app
+	•	CLERK_AFTER_SIGN_UP_URL = /app
+
+If the project already has an .env.example, update it too (but don’t commit real secrets).
+
+⸻
+
+B) FILES TO CREATE / MODIFY
+
+1) Install Clerk
+
+Run:
+	•	pnpm add @clerk/nextjs
+
+⸻
+
+2) Create middleware for route protection
+
+CREATE: src/middleware.ts
+
+Requirements:
+	•	Protect all dashboard routes: /app(.*)
+	•	Protect all admin APIs: /api/admin(.*)
+	•	Do NOT protect public widget routes: /api/public(.*) and /widget(.*) and marketing pages (/, /pricing, /request-demo, /api/health)
+
+Use Clerk’s clerkMiddleware and route matcher patterns.
+
+⸻
+
+3) Wrap the app in ClerkProvider
+
+MODIFY: src/app/layout.tsx
+	•	Wrap children with <ClerkProvider>
+	•	Keep existing global styles and fonts
+	•	Ensure no hydration errors
+
+⸻
+
+4) Add sign-in / sign-up routes
+
+CREATE:
+	•	src/app/sign-in/[[...sign-in]]/page.tsx
+	•	src/app/sign-up/[[...sign-up]]/page.tsx
+
+Use Clerk <SignIn /> and <SignUp /> components and match the env URLs.
+
+⸻
+
+5) Add a dashboard auth boundary
+
+MODIFY: src/app/app/layout.tsx
+
+Add:
+	•	Top-right user button menu using <UserButton />
+	•	If not signed in, redirect to /sign-in
+
+Implementation requirement:
+	•	Use Clerk server helpers (auth() or currentUser()) in App Router layout.
+	•	Don’t do client-only gating.
+
+⸻
+
+6) Secure admin API routes (server-side auth)
+
+MODIFY:
+	•	src/app/api/admin/bots/route.ts
+	•	src/app/api/admin/bots/[botPublicKey]/route.ts
+
+Requirement:
+	•	At the top of each handler (GET/PATCH), enforce Clerk auth:
+	•	If no session, return 401 { ok:false, error:"unauthorized" }
+	•	Remove any dependency on ADMIN_SEED_KEY, x-admin-key, and remove any same-origin bypass logic.
+	•	Keep response shapes stable.
+
+Preferred pattern:
+	•	Create a small helper:
+
+CREATE src/lib/admin/requireClerkAdmin.ts (or similar)
+
+Logic:
+	•	Use auth() from @clerk/nextjs/server
+	•	If no userId, throw/return 401
+	•	Optionally: for now accept any logged-in user as “agency admin”
+	•	(Later we’ll add Organization role mapping)
+
+Then call it inside both admin routes.
+
+⸻
+
+7) Update dashboard pages to work with auth
+
+Dashboard pages under /app/* currently call admin APIs from the browser.
+
+That’s OK if cookies are used automatically by Clerk and the APIs are same-site.
+So:
+	•	Keep fetch calls but ensure they send cookies (default fetch should include same-origin credentials; if needed set credentials: "include").
+	•	Ensure the pages still load and don’t get 401 when logged in.
+
+⸻
+
+C) MANUAL QA CHECKLIST (CLICK-BY-CLICK)
+	1.	Open /app
+	•	If logged out: should redirect to /sign-in
+	2.	Sign in
+	•	After sign in: lands on /app
+	3.	Visit /app/bots
+	•	Loads list successfully
+	4.	Open a bot detail page
+	•	Saves changes successfully
+	5.	Try hitting /api/admin/bots in browser while logged out
+	•	Returns 401 JSON
+	6.	Confirm public pages still work:
+	•	/, /pricing, /request-demo load fine
+	7.	Confirm public widget still works:
+	•	/widget/<botPublicKey> loads
+	•	/api/public/widget-config?botPublicKey=... works
+
+⸻
+
+D) COMMANDS (RUN IN ORDER)
+
+Run and paste outputs:
+	1.	pnpm lint
+	2.	pnpm typecheck
+	3.	pnpm test:e2e
+	4.	pnpm build
+
+⸻
+
+E) DEFINITION OF DONE
+
+✅ Clerk installed, secrets added
+✅ Middleware protects /app/* and /api/admin/*
+✅ Sign-in and sign-up pages exist and render
+✅ /app/* cannot be accessed logged out
+✅ /api/admin/* returns 401 logged out
+✅ Dashboard works logged in without exposing secrets
+✅ All QA gates pass
+✅ Commit message suggestion:
+feat: add Clerk auth for dashboard and secure admin APIs
+
+⸻
+
+F) IMPORTANT: STOP RULE
+
+Do not start Step 22 or any other step. Finish Step 21 only, verify gates, then stop and report.
