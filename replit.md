@@ -55,12 +55,21 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: Local storage for conversation persistence (`tca_conversation_${botPublicKey}`)
 - **Server-Side Config**: Bot configuration fetched server-side before hydration
 
+### Truth Engine Architecture
+- **Location**: `src/lib/truth/truthEngine.ts`
+- **Purpose**: Answers user questions using ONLY verified business data from the bot's configuration
+- **Data Sources**: Bot.services, Bot.hours, Bot.businessPhone/Email/Address, BotLink
+- **Topic Detection**: `src/lib/public/topicDetect.ts` categorizes queries into 8 topics (SERVICES, PRICING, HOURS, LOCATION, CONTACT, BOOKING, PAYMENT, OTHER)
+- **Lead Capture**: Triggers on high-intent queries (booking, pricing) when data is missing
+- **Analytics**: MissingDataEvent logs track which topics users ask about when bot lacks data
+
 ### Key Design Decisions
 
 1. **Public vs Internal APIs**: Clear separation between authenticated admin endpoints and public widget endpoints
 2. **UUID Validation**: Shared validation utility in `src/lib/public/uuid.ts` for consistent input sanitization
 3. **Idempotent Seeding**: Seed endpoint checks for existing data via AuditLog markers before creating duplicates
 4. **Domain Allowlists**: Bots can restrict which domains are allowed to embed the widget
+5. **Truth Engine Never Invents**: The chat bot only answers from verified business data, never fabricates information
 
 ## External Dependencies
 
