@@ -16,11 +16,17 @@ const isPublicRoute = createRouteMatcher([
 const isAppRoute = createRouteMatcher(["/app(.*)"]);
 const isAdminApiRoute = createRouteMatcher(["/api/admin(.*)"]);
 
-function hasClerkKeys(): boolean {
-  return !!(
-    process.env.CLERK_SECRET_KEY &&
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+function isDevBypassEnabled(): boolean {
+  return (
+    process.env.DEV_BYPASS_AUTH === "true" &&
+    process.env.NODE_ENV !== "production"
   );
+}
+
+function hasValidClerkKeys(): boolean {
+  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
+  const sk = process.env.CLERK_SECRET_KEY || "";
+  return pk.startsWith("pk_") && sk.startsWith("sk_");
 }
 
 const clerkHandler = clerkMiddleware(async (auth, req) => {
@@ -35,7 +41,11 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!hasClerkKeys()) {
+  if (isDevBypassEnabled()) {
+    return NextResponse.next();
+  }
+
+  if (!hasValidClerkKeys()) {
     if (isAppRoute(req)) {
       return NextResponse.redirect(new URL("/auth-error", req.url));
     }

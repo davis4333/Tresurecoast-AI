@@ -7,13 +7,22 @@ export const metadata: Metadata = {
   description: "Capture leads while you sleep."
 };
 
+function shouldUseClerk(): boolean {
+  if (process.env.DEV_BYPASS_AUTH === "true" && process.env.NODE_ENV !== "production") {
+    return false;
+  }
+  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
+  return pk.startsWith("pk_");
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const useClerk = shouldUseClerk();
+  const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
 
   return (
     <html lang="en">
       <body className="bg-background text-foreground antialiased">
-        {clerkPubKey ? (
+        {useClerk ? (
           <ClerkProvider publishableKey={clerkPubKey}>
             {children}
           </ClerkProvider>

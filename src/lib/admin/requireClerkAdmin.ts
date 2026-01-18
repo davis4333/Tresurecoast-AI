@@ -25,11 +25,25 @@ export class ClerkUnauthorizedError extends Error {
   }
 }
 
+function isDevBypassEnabled(): boolean {
+  return (
+    process.env.DEV_BYPASS_AUTH === "true" &&
+    process.env.NODE_ENV !== "production"
+  );
+}
+
+function hasValidClerkKeys(): boolean {
+  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
+  const sk = process.env.CLERK_SECRET_KEY || "";
+  return pk.startsWith("pk_") && sk.startsWith("sk_");
+}
+
 export async function requireClerkAdmin(): Promise<string> {
-  if (
-    !process.env.CLERK_SECRET_KEY ||
-    !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-  ) {
+  if (isDevBypassEnabled()) {
+    return "dev-bypass-user";
+  }
+
+  if (!hasValidClerkKeys()) {
     throw new ClerkMisconfiguredError();
   }
 
