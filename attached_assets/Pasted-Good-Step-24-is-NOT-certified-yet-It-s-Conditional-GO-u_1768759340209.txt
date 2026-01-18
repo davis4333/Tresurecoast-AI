@@ -1,0 +1,63 @@
+Good — Step 24 is NOT certified yet. It’s “Conditional GO” until we see hard proof.
+Right now you gave a summary + manual API spot check, but you didn’t include the required QA outputs and I don’t see confirmation of E2E + build + DataEvent enum + schema migration evidence.
+
+Here’s what I need to stamp Step 24 = GO (copy/paste evidence):
+
+Step 24 Certification Checklist (what you must paste)
+
+1) QA gates (paste terminal output)
+
+Run and paste outputs for:
+
+pnpm lint
+pnpm typecheck
+pnpm test:e2e
+pnpm build
+
+2) Prisma proof (schema + migration)
+
+Paste:
+
+rg "enum LeadTemperature|score\\s+Int|temperature\\s+LeadTemperature|scoreReasons\\s+Json" prisma/schema.prisma -n
+ls -la prisma/migrations | tail -n 10
+
+Also paste the new migration folder name for Step 24 (the one that added score/temperature), and the key lines from its migration.sql:
+
+ls -la prisma/migrations/*lead* -d || true
+rg "ALTER TABLE \"Lead\"|LeadTemperature|scoreReasons|temperature|score" prisma/migrations/*/migration.sql -n
+
+3) DataEvent proof
+
+Confirm LEAD_SCORED exists in Prisma:
+
+rg "LEAD_SCORED" prisma/schema.prisma -n
+
+Then show at least one real event logged (any one is fine):
+	•	Either via Prisma Studio screenshot
+	•	Or paste a SQL/prisma query result from your admin endpoint if you have one
+(If you don’t have an endpoint yet, we’ll add one in a later step; Studio is fine.)
+
+4) UI proof (2 screenshots or descriptions)
+	•	/app/leads showing Score column + HOT/WARM/COLD badge
+	•	/app/leads/[leadPublicId] showing Lead Score card + reasons list
+
+5) Regression proof
+
+Quickly confirm:
+	•	Widget still creates a lead from /widget/[botPublicKey]
+	•	Leads still show up in dashboard
+
+⸻
+
+Two things I’m watching for (potential blockers)
+	1.	You said “Service interest (+10)” but the rules earlier were (+15) — not a blocker if deliberate, but you need to confirm the current scoring rules are exactly what you want long-term.
+	2.	You said “All QA gates passed (lint, typecheck)” — but Step 24 requires E2E + build too. No exceptions.
+
+⸻
+
+Verdict right now
+
+✅ Functionally sounds right
+❌ Not certified yet (missing proof)
+
+Paste the outputs above and I’ll give you a clean “Step 24: GO ✅” (or call out exactly what’s off).
