@@ -68,6 +68,13 @@ model Organization {
   showPoweredBy      Boolean @default(true)
   customDomain       String? @unique
 
+  // Step 26 — Custom domain DNS verification
+  domainVerificationToken   String?
+  customDomainStatus        String   @default("none") // none | pending | verified | failed
+  customDomainVerifiedAt    DateTime?
+  customDomainLastCheckedAt DateTime?
+  customDomainFailureReason String?
+
   workspaces     Workspace[]
   bots           Bot[]
   conversations  Conversation[]

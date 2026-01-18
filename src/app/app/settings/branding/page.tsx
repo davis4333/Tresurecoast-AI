@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { CustomDomainSection } from "./CustomDomainSection";
 
 type BrandingData = {
   whiteLabelEnabled: boolean;
@@ -22,7 +23,6 @@ export default function BrandingSettingsPage() {
   const [brandLogoUrl, setBrandLogoUrl] = useState("");
   const [brandPrimaryColor, setBrandPrimaryColor] = useState("#6366f1");
   const [showPoweredBy, setShowPoweredBy] = useState(true);
-  const [customDomain, setCustomDomain] = useState("");
 
   useEffect(() => {
     async function fetchBranding() {
@@ -36,7 +36,6 @@ export default function BrandingSettingsPage() {
           setBrandLogoUrl(b.brandLogoUrl || "");
           setBrandPrimaryColor(b.brandPrimaryColor || "#6366f1");
           setShowPoweredBy(b.showPoweredBy);
-          setCustomDomain(b.customDomain || "");
         }
       } catch {
         setError("Failed to load branding settings");
@@ -62,7 +61,6 @@ export default function BrandingSettingsPage() {
           brandLogoUrl: brandLogoUrl || null,
           brandPrimaryColor,
           showPoweredBy,
-          customDomain: customDomain || null,
         }),
       });
 
@@ -231,23 +229,6 @@ export default function BrandingSettingsPage() {
             </button>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              Custom Domain
-            </label>
-            <input
-              type="text"
-              value={customDomain}
-              onChange={(e) => setCustomDomain(e.target.value)}
-              disabled={!whiteLabelEnabled}
-              placeholder="chat.yourcompany.com"
-              data-testid="input-custom-domain"
-              className="tca-input"
-            />
-            <p className="text-xs text-[var(--color-text-muted)] mt-1">
-              Enter domain only (e.g., chat.yourcompany.com), no https://
-            </p>
-          </div>
         </div>
 
         <div className="tca-divider" />
@@ -262,6 +243,10 @@ export default function BrandingSettingsPage() {
             {saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
+      </div>
+
+      <div className="mt-6 max-w-2xl">
+        <CustomDomainSection />
       </div>
     </div>
   );
