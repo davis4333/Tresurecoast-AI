@@ -160,6 +160,8 @@ export async function GET(req: Request) {
         email: true,
         phone: true,
         status: true,
+        score: true,
+        temperature: true,
         createdAt: true,
         conversation: {
           select: {
@@ -192,6 +194,8 @@ export async function GET(req: Request) {
         email: lead.email,
         phone: lead.phone,
         status: String(lead.status) as AllowedStatus,
+        score: lead.score,
+        temperature: lead.temperature,
         createdAt: lead.createdAt.toISOString(),
         conversationPublicId: lead.conversation?.publicId || null
       }));

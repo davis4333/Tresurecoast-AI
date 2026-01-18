@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/public/rateLimit";
 import { LeadStatusPatchSchema } from "@/lib/public/zodSchemas";
+import { scoreLead } from "@/lib/leads/scoreLead";
 
 export const runtime = "nodejs";
 
@@ -144,22 +145,68 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const updated = await prisma.lead.updateMany({
+    const existingLead = await prisma.lead.findFirst({
       where: {
         publicId: leadPublicId,
         botId: bot.id
       },
-      data: {
-        status
+      select: {
+        id: true,
+        publicId: true,
+        name: true,
+        email: true,
+        phone: true,
+        organizationId: true,
+        workspaceId: true,
+        conversationId: true,
       }
     });
 
-    if (updated.count === 0) {
+    if (!existingLead) {
       return NextResponse.json(
         { ok: false, error: "Lead not found" },
         { status: 404 }
       );
     }
+
+    const scoreInput = {
+      lead: {
+        name: existingLead.name,
+        email: existingLead.email,
+        phone: existingLead.phone,
+      },
+      signals: {},
+    };
+
+    const scoreResult = scoreLead(scoreInput);
+
+    await prisma.lead.update({
+      where: { id: existingLead.id },
+      data: {
+        status,
+        score: scoreResult.score,
+        temperature: scoreResult.temperature,
+        scoreReasons: scoreResult.reasons,
+      }
+    });
+
+    await prisma.dataEvent.create({
+      data: {
+        organizationId: existingLead.organizationId,
+        workspaceId: existingLead.workspaceId,
+        botId: bot.id,
+        conversationId: existingLead.conversationId,
+        type: "LEAD_SCORED",
+        topic: "GENERAL",
+        payload: {
+          leadPublicId: existingLead.publicId,
+          score: scoreResult.score,
+          temperature: scoreResult.temperature,
+          reasons: scoreResult.reasons,
+          trigger: "status_update",
+        },
+      },
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

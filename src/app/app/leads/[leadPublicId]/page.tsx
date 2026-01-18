@@ -13,6 +13,9 @@ interface Lead {
   email: string | null;
   phone: string | null;
   status: "NEW" | "CONTACTED" | "BOOKED" | "CLOSED";
+  score: number;
+  temperature: "HOT" | "WARM" | "COLD";
+  scoreReasons: string[] | null;
   createdAt: string;
   conversationPublicId: string | null;
 }
@@ -24,6 +27,12 @@ const STATUS_COLORS: Record<string, string> = {
   CONTACTED: "bg-yellow-500 text-black",
   BOOKED: "bg-green-500 text-white",
   CLOSED: "bg-gray-500 text-white",
+};
+
+const TEMPERATURE_COLORS: Record<string, string> = {
+  HOT: "bg-green-500 text-white",
+  WARM: "bg-yellow-500 text-black",
+  COLD: "bg-gray-500 text-white",
 };
 
 export default function LeadDetailPage({ params }: { params: Promise<{ leadPublicId: string }> }) {
@@ -206,6 +215,37 @@ export default function LeadDetailPage({ params }: { params: Promise<{ leadPubli
                 </dd>
               </div>
             </dl>
+          </TcaCardBody>
+        </TcaCard>
+
+        <TcaCard>
+          <TcaCardHeader>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Lead Score</h3>
+          </TcaCardHeader>
+          <TcaCardBody>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <span className={cx("inline-flex items-center rounded-full px-3 py-1 text-sm font-medium", TEMPERATURE_COLORS[lead.temperature])} data-testid="lead-temperature">
+                  {lead.temperature}
+                </span>
+                <span className="text-3xl font-bold text-[var(--color-text-primary)]" data-testid="lead-score">
+                  {lead.score}
+                </span>
+              </div>
+              {lead.scoreReasons && lead.scoreReasons.length > 0 && (
+                <div>
+                  <dt className="mb-2 text-sm font-medium text-[var(--color-text-muted)]">Score Breakdown</dt>
+                  <ul className="space-y-1 text-sm text-[var(--color-text-secondary)]" data-testid="score-reasons">
+                    {lead.scoreReasons.map((reason, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-[var(--color-text-muted)]">-</span>
+                        <span>{reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </TcaCardBody>
         </TcaCard>
 

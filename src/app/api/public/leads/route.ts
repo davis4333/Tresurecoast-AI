@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/public/rateLimit";
 import { LeadRequestSchema } from "@/lib/public/zodSchemas";
+import { scoreLead } from "@/lib/leads/scoreLead";
 
 export const runtime = "nodejs";
 
@@ -156,6 +157,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, leadPublicId: existingLead.publicId });
     }
 
+    const scoreInput = {
+      lead: {
+        name: validName ? name : null,
+        email: validEmail ? email : null,
+        phone: validPhone ? phone : null,
+      },
+      signals: {},
+    };
+
+    const scoreResult = scoreLead(scoreInput);
+
     const lead = await prisma.lead.create({
       data: {
         organizationId: conversation.organizationId,
@@ -165,9 +177,29 @@ export async function POST(req: Request) {
         name: validName ? name : null,
         email: validEmail ? email : null,
         phone: validPhone ? phone : null,
-        status: "NEW"
+        status: "NEW",
+        score: scoreResult.score,
+        temperature: scoreResult.temperature,
+        scoreReasons: scoreResult.reasons,
       },
       select: { publicId: true }
+    });
+
+    await prisma.dataEvent.create({
+      data: {
+        organizationId: conversation.organizationId,
+        workspaceId: conversation.workspaceId,
+        botId: conversation.botId,
+        conversationId: conversation.id,
+        type: "LEAD_SCORED",
+        topic: "GENERAL",
+        payload: {
+          leadPublicId: lead.publicId,
+          score: scoreResult.score,
+          temperature: scoreResult.temperature,
+          reasons: scoreResult.reasons,
+        },
+      },
     });
 
     await prisma.message.create({

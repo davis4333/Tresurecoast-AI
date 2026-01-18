@@ -12,6 +12,8 @@ interface Lead {
   email: string | null;
   phone: string | null;
   status: "NEW" | "CONTACTED" | "BOOKED" | "CLOSED";
+  score: number;
+  temperature: "HOT" | "WARM" | "COLD";
   createdAt: string;
   conversationPublicId: string | null;
 }
@@ -21,6 +23,12 @@ const STATUS_COLORS: Record<string, string> = {
   CONTACTED: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   BOOKED: "bg-green-500/20 text-green-400 border-green-500/30",
   CLOSED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+};
+
+const TEMPERATURE_COLORS: Record<string, string> = {
+  HOT: "bg-green-500/20 text-green-400 border-green-500/30",
+  WARM: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  COLD: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
 const BOT_KEY_STORAGE = "tca_dashboard_bot_key";
@@ -176,6 +184,7 @@ export default function LeadsPage() {
                   <tr className="border-b border-[var(--color-border)] text-left">
                     <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Created</th>
                     <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Contact</th>
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Score</th>
                     <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Status</th>
                     <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Actions</th>
                   </tr>
@@ -193,6 +202,16 @@ export default function LeadsPage() {
                       <td className="px-6 py-4">
                         <div className="max-w-xs truncate text-sm text-[var(--color-text-primary)]">
                           {getContactInfo(lead)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${TEMPERATURE_COLORS[lead.temperature] || ""}`} data-testid={`temp-${lead.leadPublicId}`}>
+                            {lead.temperature}
+                          </span>
+                          <span className="text-sm font-medium text-[var(--color-text-secondary)]" data-testid={`score-${lead.leadPublicId}`}>
+                            {lead.score}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">

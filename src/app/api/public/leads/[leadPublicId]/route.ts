@@ -93,6 +93,9 @@ export async function GET(
         email: true,
         phone: true,
         status: true,
+        score: true,
+        temperature: true,
+        scoreReasons: true,
         createdAt: true,
         conversation: {
           select: {
@@ -118,6 +121,9 @@ export async function GET(
           email: lead.email,
           phone: lead.phone,
           status: lead.status,
+          score: lead.score,
+          temperature: lead.temperature,
+          scoreReasons: lead.scoreReasons,
           createdAt: lead.createdAt.toISOString(),
           conversationPublicId: lead.conversation.publicId,
         },
