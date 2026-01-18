@@ -1,0 +1,348 @@
+Send this to: Replit Agent ✅
+(Reason: Step 24 needs DB + API + UI + QA gates run in the same environment.)
+
+⸻
+
+STEP 24 — LEAD SCORING + ROUTING V1 (SAFE, TRANSPARENT, NO “AI MAGIC”)
+
+Goal: Score leads based on intent + completeness + topic signals, show “HOT/WARM/COLD” in Leads Inbox + Lead Detail, and log scoring events. No auto-actions. No messaging the customer. Just better triage for the business/agency.
+
+Non-negotiables
+	•	Scoring must be deterministic (rules-based) for now.
+	•	Store score + label on Lead so it’s queryable and visible.
+	•	Log every score calculation as a DataEvent (LEAD_SCORED).
+	•	No regressions: existing revenue loop E2E must still pass.
+
+⸻
+
+1) FILES TO CHANGE
+
+NEW FILES
+	1.	src/lib/leads/scoreLead.ts
+	2.	src/lib/leads/scoreSchemas.ts
+
+MODIFIED FILES
+	3.	prisma/schema.prisma
+	4.	src/app/api/public/leads/route.ts (on create lead → compute score + log event)
+	5.	src/app/api/public/leads/status/route.ts (on status update → recompute score + log event)
+	6.	src/app/api/public/leads/[leadPublicId]/route.ts (ensure score fields returned)
+	7.	src/app/api/public/leads/recent/route.ts (include score in list)
+	8.	src/app/app/leads/page.tsx (show score badge + sort)
+	9.	src/app/app/leads/[leadPublicId]/page.tsx (show scoring breakdown)
+	10.	tests/e2e/revenue-loop.spec.ts (minimal assertions that score exists)
+
+⸻
+
+2) PRISMA CHANGES (schema + migration)
+
+2A) Modify prisma/schema.prisma
+
+Add these fields to Lead model (keep everything else unchanged):
+
+enum LeadTemperature {
+  HOT
+  WARM
+  COLD
+}
+
+model Lead {
+  // existing fields...
+
+  score            Int            @default(0)
+  temperature      LeadTemperature @default(COLD)
+  scoreReasons     Json?
+
+  // existing relations...
+}
+
+✅ After editing schema, run migration:
+	•	pnpm db:migrate:dev --name add_lead_scoring_v1
+	•	pnpm db:generate
+
+⸻
+
+3) NEW: SCHEMA + SCORING LOGIC
+
+3A) NEW FILE: src/lib/leads/scoreSchemas.ts
+
+import { z } from "zod";
+
+export const LeadScoreInputSchema = z.object({
+  lead: z.object({
+    name: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    phone: z.string().nullable().optional(),
+    service: z.string().nullable().optional(),
+    preferredTime: z.string().nullable().optional(),
+    message: z.string().nullable().optional(),
+  }),
+  signals: z.object({
+    topic: z.string().optional(),
+    requiresLeadCapture: z.boolean().optional(),
+    missingFields: z.array(z.string()).optional(),
+    suggestedActions: z
+      .array(
+        z.object({
+          type: z.enum(["BOOK", "PAY", "CONTACT"]),
+          url: z.string().optional(),
+          label: z.string(),
+        })
+      )
+      .optional(),
+  }).optional(),
+});
+
+export type LeadScoreInput = z.infer<typeof LeadScoreInputSchema>;
+
+export const LeadScoreResultSchema = z.object({
+  score: z.number().int().min(0).max(100),
+  temperature: z.enum(["HOT", "WARM", "COLD"]),
+  reasons: z.array(z.string()),
+});
+
+export type LeadScoreResult = z.infer<typeof LeadScoreResultSchema>;
+
+3B) NEW FILE: src/lib/leads/scoreLead.ts
+
+Rules-based, transparent scoring. Keep it simple but useful.
+
+import { LeadScoreInput, LeadScoreResult } from "@/lib/leads/scoreSchemas";
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+export function scoreLead(input: LeadScoreInput): LeadScoreResult {
+  const reasons: string[] = [];
+  let score = 0;
+
+  const name = (input.lead.name || "").trim();
+  const email = (input.lead.email || "").trim();
+  const phone = (input.lead.phone || "").trim();
+  const service = (input.lead.service || "").trim();
+  const preferredTime = (input.lead.preferredTime || "").trim();
+  const message = (input.lead.message || "").trim();
+
+  // Contact completeness
+  if (name) {
+    score += 10;
+    reasons.push("Has name (+10)");
+  }
+  if (email) {
+    score += 15;
+    reasons.push("Has email (+15)");
+  }
+  if (phone) {
+    score += 20;
+    reasons.push("Has phone (+20)");
+  }
+
+  // Intent & specifics
+  if (service) {
+    score += 15;
+    reasons.push("Specified service (+15)");
+  }
+  if (preferredTime) {
+    score += 10;
+    reasons.push("Provided preferred time/date (+10)");
+  }
+  if (message.length >= 20) {
+    score += 10;
+    reasons.push("Provided details in message (+10)");
+  } else if (message.length > 0) {
+    score += 5;
+    reasons.push("Provided short message (+5)");
+  }
+
+  // Signals from Truth Engine / chat route (optional)
+  const topic = input.signals?.topic;
+  const requiresLeadCapture = input.signals?.requiresLeadCapture;
+  const missingFields = input.signals?.missingFields || [];
+  const suggestedActions = input.signals?.suggestedActions || [];
+
+  if (topic === "BOOKING" || topic === "PAYMENT") {
+    score += 15;
+    reasons.push("High intent topic (booking/payment) (+15)");
+  }
+  if (topic === "PRICING") {
+    score += 10;
+    reasons.push("Pricing intent (+10)");
+  }
+
+  if (suggestedActions.some((a) => a.type === "BOOK" || a.type === "PAY")) {
+    score += 10;
+    reasons.push("Actionable CTA suggested (book/pay) (+10)");
+  }
+
+  if (requiresLeadCapture) {
+    score += 5;
+    reasons.push("Lead capture was triggered (+5)");
+  }
+
+  // Penalize missing data only slightly (not the customer’s fault)
+  if (missingFields.length >= 2) {
+    score -= 5;
+    reasons.push("Multiple missing business fields (-5)");
+  }
+
+  score = clamp(score, 0, 100);
+
+  let temperature: LeadScoreResult["temperature"] = "COLD";
+  if (score >= 70) temperature = "HOT";
+  else if (score >= 40) temperature = "WARM";
+
+  reasons.push(`Final score: ${score} (${temperature})`);
+
+  return { score, temperature, reasons };
+}
+
+
+⸻
+
+4) API ROUTE PATCHES
+
+4A) Update src/app/api/public/leads/route.ts
+
+When creating a lead:
+	•	compute score with scoreLead
+	•	persist score, temperature, scoreReasons
+	•	write DataEvent type LEAD_SCORED
+
+Requirements:
+	•	If you already store something like service, preferredTime, etc., map it into score input.
+	•	Pull latest conversation signals if available:
+	•	If request contains topic/missingFields/requiresLeadCapture/suggestedActions, use them.
+	•	Otherwise score based on lead fields only.
+	•	Create DataEvent payload: { score, temperature, reasons }.
+
+Implementation rule: Don’t break existing request shape. Add score silently server-side.
+
+4B) Update src/app/api/public/leads/status/route.ts
+
+After status update, recompute score (same logic) and log another LEAD_SCORED event.
+
+4C) Ensure these endpoints return score fields
+	•	GET /api/public/leads/recent
+	•	GET /api/public/leads/[leadPublicId]
+
+Return:
+	•	score
+	•	temperature
+
+⸻
+
+5) DASHBOARD UI UPDATES
+
+5A) Update src/app/app/leads/page.tsx
+
+Add a new column: Score
+	•	Render temperature as badge:
+	•	HOT = green-ish
+	•	WARM = yellow-ish
+	•	COLD = gray-ish
+	•	Show score numeric (e.g., 82)
+	•	Add a sort option (default):
+	•	Sort by newest createdAt still OK, but add a toggle: “Sort by Score”
+	•	Keep styling consistent with TCA components.
+
+5B) Update src/app/app/leads/[leadPublicId]/page.tsx
+
+Add a “Lead Score” card:
+	•	Shows:
+	•	Temperature badge
+	•	Score number
+	•	Reasons list (from scoreReasons JSON if present)
+	•	Read-only.
+
+⸻
+
+6) DATAEVENT SUPPORT
+
+Ensure DataEventType enum includes:
+	•	LEAD_SCORED
+
+If it doesn’t exist yet, add it in Prisma enum and migrate.
+
+When writing DataEvent:
+	•	type: LEAD_SCORED
+	•	topic: "GENERAL" or reuse lead’s detected topic if known
+	•	payload: { leadPublicId, score, temperature, reasons }
+
+⸻
+
+7) TESTS (MINIMAL BUT REAL)
+
+Update tests/e2e/revenue-loop.spec.ts
+
+After lead is created (whatever the current flow is):
+	•	fetch recent leads endpoint used by dashboard
+	•	assert returned lead has:
+	•	score is a number
+	•	temperature is one of HOT/WARM/COLD
+
+Do NOT rewrite the test flow—just add these assertions where you already validate lead exists.
+
+⸻
+
+8) COMMANDS TO RUN (QA GATES)
+
+pnpm lint
+pnpm typecheck
+pnpm db:migrate:dev --name add_lead_scoring_v1
+pnpm db:generate
+pnpm test:e2e
+pnpm build
+pnpm dev
+
+
+⸻
+
+9) MANUAL QA (CLICK-BY-CLICK)
+	1.	Open /widget/[botPublicKey]
+	•	Ask something that triggers lead capture
+	•	Submit lead with name + phone/email
+	2.	Go to /app/leads
+	•	Enter bot key if prompted
+	•	Confirm the new lead shows Score + Temperature
+	3.	Click lead detail
+	•	Confirm “Lead Score” card shows reasons list
+	4.	Change lead status (NEW → CONTACTED)
+	•	Confirm it still works and does not crash
+	5.	Regression:
+	•	/app/bots still works
+	•	/app/insights still works
+	•	/pricing still works
+	•	No console errors
+
+⸻
+
+10) DEFINITION OF DONE (PASS/FAIL)
+
+✅ PASS when:
+	•	Lead table has score, temperature, scoreReasons
+	•	API writes LEAD_SCORED DataEvent
+	•	Leads Inbox shows Score column + badge
+	•	Lead detail shows scoring breakdown
+	•	E2E tests still pass (2/2) + score assertion added
+	•	pnpm lint, pnpm typecheck, pnpm build all green
+
+❌ NO-GO if:
+	•	Any endpoint breaks existing payload shapes used by widget/dashboard
+	•	Any regression in lead capture loop
+	•	Score not persisted or not displayed
+
+⸻
+
+STOP
+
+After all gates pass + manual QA done, STOP and paste:
+	•	outputs of lint/typecheck/e2e/build
+	•	a screenshot or short description of /app/leads showing Score badge
+	•	a screenshot/description of lead detail Score card
+
+Suggested commit message:
+feat(step-24): lead scoring + routing v1 with HOT/WARM/COLD badges
+
+⸻
+
+If Replit tries to add sign-up flows or anything unrelated: do not — Step 24 is strictly scoring + display + events only.

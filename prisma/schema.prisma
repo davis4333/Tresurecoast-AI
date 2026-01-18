@@ -44,6 +44,13 @@ enum DataEventType {
   TRUTH_RESPONSE
   LEAD_CAPTURE_TRIGGERED
   REDIRECT_CLICK
+  LEAD_SCORED
+}
+
+enum LeadTemperature {
+  HOT
+  WARM
+  COLD
 }
 
 model Organization {
@@ -196,6 +203,10 @@ model Lead {
   email   String?
   phone   String?
   answers Json?
+
+  score        Int             @default(0)
+  temperature  LeadTemperature @default(COLD)
+  scoreReasons Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
