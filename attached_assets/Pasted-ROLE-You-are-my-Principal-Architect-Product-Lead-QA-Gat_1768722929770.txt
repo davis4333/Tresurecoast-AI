@@ -1,0 +1,93 @@
+ROLE: You are my Principal Architect + Product Lead + QA Gatekeeper.
+
+CONTEXT:
+Treasure Coast AI already has:
+- Marketing routes: /, /pricing, /request-demo
+- Widget: /widget/[botPublicKey] with ChatBox
+- Public API routes for leads/chat/widget-config
+- Prisma schema includes: Admin, Bot, Conversation, Message, Lead
+- Theme tokens + TCA primitives exist under src/components/tca/*
+Goal now is to create the AGENCY dashboard UI that feels like a real premium SaaS.
+
+STEP 19 GOAL:
+Create /app dashboard routes with a premium sidebar layout and a working Leads Inbox UI.
+This step should NOT break existing pages or widget.
+
+NON-NEGOTIABLES:
+1) Do NOT remove or break existing routes/APIs.
+2) Use the existing design system:
+   - theme tokens in src/styles/theme-tokens.css
+   - utilities in globals.css
+   - TcaPageShell, TcaCard, TcaButton, TcaBadge, cx() utility
+3) Keep everything multi-tenant-ready in UI structure (even if auth/tenant checks aren’t built yet).
+4) No console errors.
+5) After changes run QA gates and paste outputs.
+
+ROUTES TO ADD (NEW):
+A) /app (dashboard home)
+B) /app/leads (Leads Inbox)
+C) /app/leads/[leadPublicId] (Lead Detail)
+D) /app/bots (Bots list placeholder)
+E) /app/conversations (placeholder)
+F) /app/settings (placeholder)
+
+LAYOUT REQUIREMENTS:
+- Create a shared dashboard layout at: src/app/app/layout.tsx
+- Sidebar nav items: Dashboard, Leads, Bots, Conversations, Settings
+- Top bar: “Treasure Coast AI” + environment badge (e.g. “Foundation Build”)
+- Main area uses cards and premium spacing; mobile responsive
+
+LEADS INBOX REQUIREMENTS (WORKING):
+- Build Leads list page that fetches from existing API:
+  GET /api/public/leads/recent?botPublicKey=...
+- Since /app is agency UI, add a temporary “Bot Public Key” selector input at top of /app/leads:
+  - Input field for botPublicKey (UUID)
+  - Save it in localStorage and reuse
+  - On load, auto-fetch leads if key exists
+- Display leads in a table/list:
+  Columns: Created, Name/Email/Phone, Status, Service (if present), Message preview
+  Status shown as badge
+- Clicking a lead opens /app/leads/[leadPublicId]
+
+LEAD DETAIL PAGE (WORKING):
+- Fetch lead by leadPublicId using existing API:
+  GET /api/public/leads/[leadPublicId]
+- Display full lead info in cards (contact, requested service, notes, timestamps)
+- Add a Status update dropdown/buttons:
+  POST /api/public/leads/status (or whatever existing route is for status change)
+  Keep it simple: NEW, CONTACTED, QUALIFIED, CONVERTED, CLOSED
+- Optimistic UI + toast message (can be minimal)
+
+PLACEHOLDERS (OK):
+- /app/bots can be a premium empty state with CTA “Create bot”
+- /app/conversations premium placeholder
+- /app/settings premium placeholder
+
+FILES TO CREATE/MODIFY (EXPECTED):
+- NEW: src/app/app/layout.tsx
+- NEW: src/app/app/page.tsx
+- NEW: src/app/app/leads/page.tsx
+- NEW: src/app/app/leads/[leadPublicId]/page.tsx
+- NEW: src/app/app/bots/page.tsx
+- NEW: src/app/app/conversations/page.tsx
+- NEW: src/app/app/settings/page.tsx
+- OPTIONAL: src/components/tca/TcaSidebar.tsx (if helpful)
+- OPTIONAL: src/components/tca/TcaTopbar.tsx (if helpful)
+
+IMPORTANT:
+If the current API expects botPublicKey to be provided, keep that requirement.
+Do NOT introduce Clerk auth yet unless it already exists.
+This is UI + wiring to existing endpoints only.
+
+QA GATES (RUN IN ORDER):
+1) pnpm lint
+2) pnpm typecheck
+3) pnpm test:e2e
+4) pnpm build
+
+OUTPUT FORMAT:
+1) List files created/modified (paths)
+2) Describe new routes
+3) Paste QA command outputs
+4) Manual verification checklist (exact clicks + expected)
+5) GO/NO-GO verdict
