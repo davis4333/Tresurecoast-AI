@@ -1,0 +1,153 @@
+TITLE: Treasure Coast AI — Full Regression QA (Steps 1–24)
+
+ROLE:
+You are the QA Gatekeeper. Run a full regression sweep across the entire repo to confirm Steps 1–24 still work together.
+You MUST NOT claim anything ran unless you provide the actual command output snippets.
+
+OUTPUT FORMAT (exact):
+A) Environment summary (node, pnpm, prisma versions)
+B) Repo sanity checks (file existence + key routes list)
+C) Database + Prisma verification (schema + migrations + generate + migrate-verify)
+D) Quality gates (lint/typecheck/unit/e2e/build) with PASS/FAIL + output
+E) Runtime smoke tests (curl) with PASS/FAIL + actual JSON
+F) UI/manual checks (what you clicked + what you saw)
+G) Findings (blockers vs non-blockers)
+H) Final verdict: GO / NO-GO
+I) If NO-GO: exact diffs/files to fix
+
+-------------------------
+STEP 0 — ENV + REPO SANITY
+1) Print versions:
+- node -v
+- pnpm -v
+- pnpm prisma -v
+
+2) Confirm critical files exist:
+- prisma/schema.prisma
+- src/app/layout.tsx
+- src/app/page.tsx
+- src/app/pricing/page.tsx
+- src/app/request-demo/page.tsx
+- src/app/widget/[botPublicKey]/page.tsx
+- src/app/widget/[botPublicKey]/ChatBox.tsx
+- src/app/app/layout.tsx
+- src/app/app/leads/page.tsx
+- src/app/app/bots/page.tsx
+- src/app/app/insights/page.tsx
+- src/app/api/public/chat/route.ts
+- src/app/api/public/widget-config/route.ts
+- src/app/api/public/leads/route.ts
+- src/app/api/admin/bots/route.ts
+- src/app/api/admin/insights/route.ts
+- src/middleware.ts
+- src/styles/theme-tokens.css
+- scripts/db-migrate-and-verify.ts
+- docs/DEPLOYMENT.md
+
+Command:
+- ls -la on the above paths (or grep from a recursive ls)
+
+-------------------------
+STEP 1 — DB/PRISMA VERIFICATION
+Run:
+1) pnpm db:generate
+2) pnpm db:migrate-verify
+
+Verify:
+- migrations folder exists and includes the latest migrations (core schema, business profile fields, dataevent swap, lead scoring)
+- schema includes:
+  - DataEventType enum includes: TOPIC_DETECTED, TRUTH_RESPONSE, MISSING_DATA, LEAD_CAPTURE_TRIGGERED, REDIRECT_CLICK, LEAD_SCORED
+  - Lead has: score (Int), temperature (enum LeadTemperature), scoreReasons (Json)
+Provide:
+- rg "enum DataEventType|model DataEvent|enum LeadTemperature|score\\s+Int|temperature" prisma/schema.prisma -n output
+- ls -la prisma/migrations output
+
+-------------------------
+STEP 2 — QUALITY GATES (HARD)
+Run in this order and paste outputs:
+1) pnpm lint
+2) pnpm typecheck
+3) pnpm test:e2e
+4) pnpm build
+
+All must PASS.
+
+-------------------------
+STEP 3 — DEV SERVER + RUNTIME SMOKE TESTS
+Start dev server:
+- pnpm dev
+Confirm it boots without console errors.
+
+Then run curl tests (use the dev host/port Replit uses; if it’s a different URL, use that):
+
+PUBLIC (must work without auth)
+1) GET /api/health  -> expect 200 and ok:true
+2) GET /pricing -> expect 200
+3) GET /request-demo -> expect 200
+
+WIDGET CONFIG (public)
+4) GET /api/public/widget-config?botPublicKey=<KNOWN_VALID_UUID>
+   - expect ok:true and config includes name/greeting/fallbackText and theme if present
+
+TRUTH ENGINE SHAPE (public)
+5) POST /api/public/chat with JSON:
+   {"botPublicKey":"<KNOWN_VALID_UUID>","message":"What are your hours?"}
+   - expect response JSON includes:
+     reply, intent, confidence, topic, missingFields, requiresLeadCapture (and suggestedActions optionally)
+   - if hours missing, intent should be MISSING_DATA and missingFields contains "hours"
+
+6) POST /api/public/chat with JSON:
+   {"botPublicKey":"<KNOWN_VALID_UUID>","message":"Can I book an appointment?"}
+   - expect intent BOOK_OR_PAY_REDIRECT OR LEAD_CAPTURE depending on config
+   - if redirect is returned, suggestedActions should include BOOK/PAY when applicable
+
+LEADS (public)
+7) POST /api/public/leads (create a test lead)
+   - verify response ok:true with leadPublicId
+   - verify lead scoring fields exist somewhere (API response or subsequent fetch)
+
+8) GET /api/public/leads/recent?botPublicKey=<KNOWN_VALID_UUID>&limit=5
+   - ensure each lead includes score + temperature
+   - confirm no 500s
+
+ADMIN (must be protected by Clerk; behavior depends on whether Clerk keys exist)
+9) GET /api/admin/bots
+   - If Clerk keys missing: expect 503 server_misconfigured
+   - If Clerk keys present but not logged in: expect 401 unauthorized
+   - If logged in: expect 200 ok:true
+
+INSIGHTS (admin)
+10) GET /api/admin/insights?botPublicKey=<KNOWN_VALID_UUID>&days=30
+   - same auth behavior rules as above
+   - when allowed, expect ok:true and totals/topMissingFields/topTopics/suggestions arrays
+
+Paste actual JSON outputs (redact secrets).
+
+-------------------------
+STEP 4 — UI MANUAL CHECKS (CLICK-BY-CLICK)
+In browser, verify:
+1) /pricing
+- theme tokens visible (gradient heading, branded button)
+2) /widget/<botPublicKey>
+- themed header, input styles, send button theme
+3) /app
+- if Clerk configured: verify sign-in flow
+- if Clerk not configured: verify fail-closed behavior routes to /auth-error
+4) /app/leads
+- leads table loads, Score column present, click lead detail
+5) /app/leads/<leadPublicId>
+- Lead Score card shows temperature + scoreReasons list
+6) /app/bots and /app/bots/<botPublicKey>
+- bot list loads, editor loads without errors
+7) /app/insights
+- loads, inputs present, load insights (if authorized)
+
+Confirm:
+- zero browser console errors on these routes
+
+-------------------------
+STEP 5 — FINAL REPORT
+Return:
+- PASS/FAIL per section
+- Any bugs found + exact file paths and fixes
+- Final GO/NO-GO
