@@ -1,0 +1,119 @@
+ROLE: Principal Architect + Product Lead + QA Gatekeeper.
+
+CONTEXT:
+We have a Next.js app with:
+- Marketing: /, /pricing, /request-demo
+- Widget: /widget/[botPublicKey]
+- Dashboard shell: /app/* with working Leads inbox and lead detail
+- Prisma schema includes Bot, Lead, Conversation, Message (and Admin)
+- Public API routes exist for widget-config, chat, leads
+- TCA design system exists (theme tokens + TcaButton/TcaCard/TcaBadge/TcaPageShell)
+Goal: Build the missing product core UI: Bots list + Bot detail editor (Business Profile).
+
+STEP 20 GOAL (RELEASE A CORE):
+Create a REAL bots management experience:
+- /app/bots becomes a working Bots list
+- /app/bots/[botPublicKey] becomes Bot Detail with editable Business Profile fields
+- Editing saves to DB and affects widget behavior/config.
+
+NON-NEGOTIABLES:
+1) Do NOT break existing widget, public APIs, or dashboard pages.
+2) Use existing TCA design system (no random styling).
+3) Do not introduce Clerk/auth yet unless already present.
+4) Multi-tenant ready structure: keep botPublicKey as the selector like leads.
+5) All server inputs validated (Zod) in new endpoints.
+6) No console errors.
+7) Run QA gates and paste outputs.
+
+DATA RULES:
+Truth mode is DB-only. No scraping. No guessing.
+Bot editor writes the “Business Profile” data that powers widget responses.
+
+REQUIRED DASHBOARD UX:
+A) /app/bots
+- Top control: BotPublicKey input (like leads) OR a list loader based on a “seed admin mode”.
+- If schema supports listing bots without key, list all bots in DB. If not, add a simple API route for listing bots.
+- Bots list shows:
+  - Bot name
+  - Status badge (ACTIVE/INACTIVE)
+  - Workspace/Org placeholder if fields exist
+  - Actions: “Open Bot”
+
+B) /app/bots/[botPublicKey]
+Create a premium Bot Detail editor with 5 sections:
+1) Identity
+   - Bot Name
+   - Greeting
+   - Niche/template label (read-only if present)
+2) Contact
+   - Business phone
+   - Business email
+   - Address
+3) Hours (simple v1)
+   - Mon–Sun text fields OR one textarea JSON-y format (keep simple)
+4) Services (v1)
+   - List services (name, description, priceRange, durationMinutes, active)
+   - Add/remove service rows
+5) Links (critical)
+   - Booking link
+   - Payment link
+   - Optional multiple links if schema supports (else store 1 booking + 1 payment)
+
+SAVE BEHAVIOR:
+- “Save Changes” button persists updates (PATCH).
+- “Preview Widget” button links to /widget/[botPublicKey] in new tab.
+
+API WORK REQUIRED (add only what’s missing):
+We need secure-ish internal API routes used by dashboard pages:
+- GET /api/admin/bots?botPublicKey=... (or list)
+- GET /api/admin/bots/[botPublicKey]
+- PATCH /api/admin/bots/[botPublicKey]
+These routes MUST validate inputs with Zod.
+They should use Prisma directly.
+If your Prisma schema already has bot fields for these items, map them.
+If not, create minimal fields in schema ONLY if absolutely necessary and migration is easy.
+Prefer working with the existing schema first.
+
+WIDGET SYNC REQUIREMENT:
+Ensure /api/public/widget-config already returns botName + greeting.
+If it doesn’t, update it so the widget header reflects Bot editor changes.
+
+FILES TO CREATE/MODIFY (EXPECTED):
+- MODIFY: src/app/app/bots/page.tsx (replace placeholder with real list)
+- NEW: src/app/app/bots/[botPublicKey]/page.tsx
+- NEW/MODIFY: src/app/api/admin/bots/route.ts (list bots OR fetch by key)
+- NEW: src/app/api/admin/bots/[botPublicKey]/route.ts (get + patch)
+- MODIFY (if needed): src/app/api/public/widget-config/route.ts
+- MODIFY (if needed): src/lib/public/zodSchemas.ts (schemas for bot update)
+- OPTIONAL: src/components/tca/TcaFormField.tsx for consistent fields (only if needed)
+
+IMPORTANT IMPLEMENTATION NOTES:
+- If the schema stores services/links as JSON, edit as structured UI but store back to JSON.
+- If services are normalized tables, implement basic CRUD with nested writes.
+- Keep everything stable and minimal; no overengineering.
+
+QA GATES (RUN IN ORDER):
+1) pnpm lint
+2) pnpm typecheck
+3) pnpm test:e2e
+4) pnpm build
+
+MANUAL VERIFICATION (MUST DO):
+1) Go to /app/bots
+   - Bots list loads OR bot key lookup works
+2) Open a bot
+   - Edit botName and greeting, Save
+   - Reload page, values persist
+3) Open /widget/[botPublicKey]
+   - Header shows updated botName/greeting
+4) Ensure /app/leads still works
+
+OUTPUT FORMAT:
+1) Files created/modified (paths)
+2) Routes added
+3) How data is stored (fields/table/JSON)
+4) QA gate outputs pasted
+5) Manual verification checklist results
+6) GO/NO-GO verdict
+
+STOP after completion.
