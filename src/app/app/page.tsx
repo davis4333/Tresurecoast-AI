@@ -2,6 +2,8 @@ import { TcaCard, TcaCardBody, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaButton } from "@/components/tca/TcaButton";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardPage() {
   return (
     <div className="space-y-6">
