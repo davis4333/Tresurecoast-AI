@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { cx } from "@/components/tca/tca";
 import { TcaBadge } from "@/components/tca/TcaBadge";
+import { useAuth } from "@/hooks/use-auth";
 
 const NAV_ITEMS = [
   { href: "/app", label: "Dashboard", icon: "grid" },
@@ -47,11 +49,42 @@ function NavIcon({ icon }: { icon: string }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { isAuthenticated, isLoading, logout } = useAuth();
+
+  const isLoginPage = pathname === "/app/login";
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !isLoginPage) {
+      router.push("/app/login");
+    }
+  }, [isLoading, isAuthenticated, isLoginPage, router]);
 
   const isActive = (href: string) => {
     if (href === "/app") return pathname === "/app";
     return pathname.startsWith(href);
   };
+
+  async function handleLogout() {
+    await logout();
+    router.push("/app/login");
+  }
+
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)]">
+        <div className="text-[var(--color-text-secondary)]">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="flex min-h-screen bg-[var(--color-background)]">
@@ -82,7 +115,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="border-t border-[var(--color-border)] p-4">
-          <div className="text-xs text-[var(--color-text-muted)]">
+          <button
+            onClick={handleLogout}
+            data-testid="button-logout"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Logout
+          </button>
+          <div className="mt-2 text-xs text-[var(--color-text-muted)]">
             Foundation Build v0.1
           </div>
         </div>
