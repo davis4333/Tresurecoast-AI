@@ -40,3 +40,40 @@ export const LeadStatusPatchSchema = z.object({
     error: "Invalid status. Must be NEW, CONTACTED, BOOKED, or CLOSED"
   })
 });
+
+// Bot update schemas
+export const BotLinkSchema = z.object({
+  type: z.enum(["BOOKING", "PAYMENT", "CONTACT", "OTHER"]),
+  label: z.string().min(1).max(100),
+  url: z.string().url().max(500)
+});
+
+export const BotServiceSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional().nullable(),
+  priceRange: z.string().max(50).optional().nullable(),
+  durationMinutes: z.number().int().min(0).max(1440).optional().nullable(),
+  active: z.boolean().default(true)
+});
+
+export const BotHoursSchema = z.object({
+  monday: z.string().max(100).optional().nullable(),
+  tuesday: z.string().max(100).optional().nullable(),
+  wednesday: z.string().max(100).optional().nullable(),
+  thursday: z.string().max(100).optional().nullable(),
+  friday: z.string().max(100).optional().nullable(),
+  saturday: z.string().max(100).optional().nullable(),
+  sunday: z.string().max(100).optional().nullable()
+});
+
+export const BotUpdateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  greeting: z.string().max(500).optional().nullable(),
+  fallbackText: z.string().max(1000).optional().nullable(),
+  businessPhone: z.string().max(30).optional().nullable(),
+  businessEmail: z.string().email().max(254).optional().nullable(),
+  businessAddress: z.string().max(300).optional().nullable(),
+  hours: BotHoursSchema.optional().nullable(),
+  services: z.array(BotServiceSchema).max(50).optional().nullable(),
+  links: z.array(BotLinkSchema).max(20).optional()
+});

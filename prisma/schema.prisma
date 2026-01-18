@@ -84,6 +84,13 @@ model Bot {
   greeting     String?
   fallbackText String?
 
+  // Business profile fields
+  businessPhone   String?
+  businessEmail   String?
+  businessAddress String?
+  hours           Json?
+  services        Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
