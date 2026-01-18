@@ -105,4 +105,34 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  color: transparent;
+}
+
+/* Step 18.3: Premium micro-utilities */
+.tca-input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  transition: box-shadow var(--transition-base), border-color var(--transition-base);
+}
+
+.tca-input:focus {
+  outline: none;
+  border-color: var(--color-brand-accent);
+  box-shadow: var(--shadow-glow);
+}
+
+.tca-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.tca-input:disabled {
+  opacity: 0.5;
+}
+
+.tca-divider {
+  border-top: 1px solid var(--color-border);
 }

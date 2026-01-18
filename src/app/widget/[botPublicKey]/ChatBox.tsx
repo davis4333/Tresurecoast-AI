@@ -335,7 +335,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
           placeholder="Type a message..."
           disabled={isSending || isLoadingHistory || showLeadForm || isSubmittingLead}
           data-testid="chat-input"
-          className="flex-1 rounded-md border border-white/15 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
+          className="tca-input flex-1 text-sm"
         />
         <button
           onClick={handleSend}
@@ -347,7 +347,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
             !message.trim()
           }
           data-testid="chat-send"
-          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
+          className="tca-btn-primary w-auto px-4 py-2 text-sm disabled:opacity-50"
         >
           {isSending ? "..." : "Send"}
         </button>
