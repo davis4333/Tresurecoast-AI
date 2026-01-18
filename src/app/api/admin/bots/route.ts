@@ -1,10 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
+import { requireAdmin, handleAdminError, AdminUnauthorizedError } from "@/lib/admin/requireAdmin";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
+  try {
+    requireAdmin(req);
+  } catch (error) {
+    if (error instanceof AdminUnauthorizedError) {
+      return error.response;
+    }
+    return handleAdminError(error);
+  }
+
   const url = new URL(req.url);
   const botPublicKey = url.searchParams.get("botPublicKey");
 

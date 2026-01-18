@@ -1,0 +1,58 @@
+TASK: Step 20 Production Patch — Secure Admin Bot APIs + Re-run Gates
+
+GOAL
+- Lock down /api/admin/bots and /api/admin/bots/[botPublicKey] so they are not publicly accessible.
+- Use the same admin header approach already used by /api/admin/seed/route.ts.
+- Keep behavior identical otherwise.
+- Then run QA gates and show outputs.
+
+RULES
+- Do NOT change database schema.
+- Do NOT change public endpoints behavior.
+- Do NOT change UI routes except if needed to pass typecheck.
+- Must be copy/paste-safe and production-safe.
+
+IMPLEMENTATION PLAN
+1) Create a shared helper:
+   - NEW FILE: src/lib/admin/requireAdmin.ts
+   - Exports function requireAdmin(req: Request): void
+   - It reads a header `x-admin-key`
+   - It compares to env `ADMIN_API_KEY`
+   - If missing/mismatch, throw Response with 401 JSON { ok:false, error:"unauthorized" }
+   - If ADMIN_API_KEY is missing in env, treat as misconfigured and return 500 JSON { ok:false, error:"server_misconfigured" }
+
+2) Patch admin routes to call requireAdmin(req) at top:
+   - MODIFY: src/app/api/admin/bots/route.ts
+   - MODIFY: src/app/api/admin/bots/[botPublicKey]/route.ts
+
+3) Update docs:
+   - MODIFY: docs/DEPLOYMENT.md
+   - Add ADMIN_API_KEY to env var table under “Required (Admin)”
+   - Add a short note: admin endpoints require header x-admin-key
+
+4) Update local dev notes (optional but preferred):
+   - If there is any env validation file (src/lib/public/env.ts), add ADMIN_API_KEY as optional (server-only) so it does not break builds.
+   - Do NOT expose it as NEXT_PUBLIC_*
+
+5) Add a quick verification curl command to docs:
+   - Example:
+     curl -i "/api/admin/bots" -H "x-admin-key: $ADMIN_API_KEY"
+
+OUTPUT REQUIRED (STRICT)
+A) Full file contents for:
+   - src/lib/admin/requireAdmin.ts (new)
+   - src/app/api/admin/bots/route.ts (modified)
+   - src/app/api/admin/bots/[botPublicKey]/route.ts (modified)
+B) Show the exact diff:
+   - git diff
+C) Run and paste outputs:
+   - pnpm lint
+   - pnpm typecheck
+   - pnpm test:e2e
+   - pnpm build
+D) Run and paste curl evidence:
+   1) Unauthorized call (no header) returns 401:
+      curl -i "/api/admin/bots"
+   2) Authorized call returns 200:
+      curl -i "/api/admin/bots" -H "x-admin-key: YOUR_KEY"
+E) Final statement: Step 20 is GO only if all gates pass and curl evidence matches.
