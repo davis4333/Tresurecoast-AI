@@ -1,0 +1,85 @@
+TASK: Step 20 Security Fix — Remove Same-Origin Bypass, Require Admin Key Always
+
+GOAL
+- /api/admin/bots and /api/admin/bots/[botPublicKey] must never be callable without auth.
+- Remove the “same-origin” bypass completely.
+- Require header x-admin-key for ALL requests.
+- Use env var ADMIN_API_KEY (not ADMIN_SEED_KEY).
+- Keep existing handler logic the same otherwise.
+- Update docs and rerun QA gates.
+
+FILES TO CHANGE
+
+1) MODIFY: src/lib/admin/requireAdmin.ts
+Replace it with this exact implementation:
+
+import { NextResponse } from "next/server";
+
+export function requireAdmin(req: Request): void {
+  const adminKey = process.env.ADMIN_API_KEY;
+  if (!adminKey) {
+    // server misconfigured
+    throw NextResponse.json({ ok: false, error: "server_misconfigured" }, { status: 500 });
+  }
+
+  const provided = req.headers.get("x-admin-key");
+  if (!provided || provided !== adminKey) {
+    throw NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+}
+
+Notes:
+- No Origin/Referer/Host checks.
+- No bypasses.
+
+2) MODIFY:
+- src/app/api/admin/bots/route.ts
+- src/app/api/admin/bots/[botPublicKey]/route.ts
+
+At the start of GET/PATCH:
+- call requireAdmin(req)
+- if it throws a NextResponse, return it
+
+Example pattern:
+
+import { requireAdmin } from "@/lib/admin/requireAdmin";
+import { NextResponse } from "next/server";
+
+export async function GET(req: Request) {
+  try {
+    requireAdmin(req);
+  } catch (res) {
+    if (res instanceof NextResponse) return res;
+    return NextResponse.json({ ok: false, error: "Internal error" }, { status: 500 });
+  }
+
+  // existing handler code...
+}
+
+Apply same pattern to PATCH in [botPublicKey] route.
+
+3) MODIFY: docs/DEPLOYMENT.md
+Add env var:
+- ADMIN_API_KEY (server-only)
+Document header:
+- x-admin-key: $ADMIN_API_KEY
+
+Add curl examples:
+- Unauthorized: curl -i /api/admin/bots
+- Authorized: curl -i /api/admin/bots -H "x-admin-key: $ADMIN_API_KEY"
+
+4) Vercel env
+- Ensure ADMIN_API_KEY is set in Vercel prod env (do not prefix NEXT_PUBLIC_).
+
+OUTPUT REQUIRED
+A) Show final contents of the 3 modified files
+B) Show `git diff`
+C) Run and paste outputs:
+   - pnpm lint
+   - pnpm typecheck
+   - pnpm test:e2e
+   - pnpm build
+D) Curl proof:
+   1) No header => 401
+   2) With header => 200
+E) Final verdict: GO only if all gates pass and curl matches
