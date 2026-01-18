@@ -1,0 +1,669 @@
+Yep — Step 23 is the right next move. Send this prompt to: Replit (because Replit is the one that can actually edit the repo + run the gates).
+If you want to save Replit time/cost, you can paste the same prompt into Claude first and tell Claude “output only the exact files below”, but the execution still has to happen in Replit.
+
+Below is a drop-in, corrected Step 23 prompt that matches your current project structure (TCA components under src/components/tca/*, Prisma at src/lib/prisma.ts, no logger/db phantom imports, no broken useState(() => …) localStorage bug, and uses your existing Step 21 Clerk fail-closed approach).
+
+⸻
+
+✅ STEP 23 PROMPT (SEND TO REPLIT)
+
+Title: Step 23 — AI Optimization Loop V1 (Missing-Data Insights + Safe Suggestions)
+
+Goal: Add an “Insights” admin dashboard page that aggregates Truth Engine DataEvents and user questions to produce read-only optimization suggestions.
+Non-negotiables:
+	•	Must be Clerk-protected (/api/admin/* + /app/* already protected by middleware).
+	•	Must fail closed if Clerk keys are missing (return 503 server_misconfigured).
+	•	Must pass all gates: pnpm lint, pnpm typecheck, pnpm test:e2e, pnpm build.
+	•	No regressions to widget/public APIs.
+
+⸻
+
+FILES TO CHANGE
+
+New files:
+	1.	src/lib/admin/insightsSchemas.ts
+	2.	src/app/api/admin/insights/route.ts
+	3.	src/app/app/insights/page.tsx
+
+Modified file:
+4) src/app/app/layout.tsx (add Insights nav link)
+
+⸻
+
+1) NEW FILE: src/lib/admin/insightsSchemas.ts
+
+import { z } from "zod";
+
+export const InsightsQuerySchema = z.object({
+  botPublicKey: z.string().uuid("Invalid bot public key"),
+  days: z.coerce.number().int().min(1).max(90).optional().default(30),
+});
+
+export type InsightsQuery = z.infer<typeof InsightsQuerySchema>;
+
+export const InsightsResponseSchema = z.object({
+  ok: z.literal(true),
+  botPublicKey: z.string().uuid(),
+  rangeDays: z.number(),
+  totals: z.object({
+    chats: z.number(),
+    missingDataEvents: z.number(),
+    leadCaptureTriggered: z.number(),
+    redirectClicks: z.number(),
+  }),
+  topMissingFields: z
+    .array(
+      z.object({
+        field: z.string(),
+        count: z.number(),
+      })
+    )
+    .default([]),
+  topTopics: z
+    .array(
+      z.object({
+        topic: z.string(),
+        count: z.number(),
+      })
+    )
+    .default([]),
+  sampleQuestions: z
+    .array(
+      z.object({
+        message: z.string(),
+        createdAt: z.string(),
+        topic: z.string().optional(),
+        missingFields: z.array(z.string()).optional(),
+      })
+    )
+    .default([]),
+  suggestions: z
+    .array(
+      z.object({
+        title: z.string(),
+        reason: z.string(),
+        suggestedFields: z.array(z.string()),
+        exampleValues: z.any().optional(),
+      })
+    )
+    .default([]),
+});
+
+export type InsightsResponse = z.infer<typeof InsightsResponseSchema>;
+
+
+⸻
+
+2) NEW FILE: src/app/api/admin/insights/route.ts
+
+Notes:
+	•	Uses Clerk auth() directly (no mystery helper imports).
+	•	Uses your existing Prisma singleton: @/lib/prisma
+	•	Queries DataEvent by relation conversation.botId (no giant “fetch all conversations then IN (…)” needed).
+	•	Uses Message for sample questions.
+	•	Suggestions are read-only.
+
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { prisma } from "@/lib/prisma";
+import { InsightsQuerySchema } from "@/lib/admin/insightsSchemas";
+import { detectTopic } from "@/lib/public/topicDetect";
+import { ZodError } from "zod";
+
+export const dynamic = "force-dynamic";
+
+function clerkConfigured(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
+  );
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    // Fail-closed if Clerk not configured
+    if (!clerkConfigured()) {
+      return NextResponse.json(
+        { ok: false, error: "server_misconfigured" },
+        { status: 503 }
+      );
+    }
+
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { ok: false, error: "unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const sp = req.nextUrl.searchParams;
+    const query = InsightsQuerySchema.parse({
+      botPublicKey: sp.get("botPublicKey"),
+      days: sp.get("days"),
+    });
+
+    const { botPublicKey, days } = query;
+
+    const bot = await prisma.bot.findUnique({
+      where: { publicKey: botPublicKey },
+      select: { id: true, publicKey: true },
+    });
+
+    if (!bot) {
+      return NextResponse.json(
+        { ok: false, error: "not_found" },
+        { status: 404 }
+      );
+    }
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+
+    const chats = await prisma.conversation.count({
+      where: { botId: bot.id, createdAt: { gte: cutoff } },
+    });
+
+    const [missingDataEvents, leadCaptureTriggered, redirectClicks] =
+      await Promise.all([
+        prisma.dataEvent.count({
+          where: {
+            type: "MISSING_DATA",
+            createdAt: { gte: cutoff },
+            conversation: { botId: bot.id },
+          },
+        }),
+        prisma.dataEvent.count({
+          where: {
+            type: "LEAD_CAPTURE_TRIGGERED",
+            createdAt: { gte: cutoff },
+            conversation: { botId: bot.id },
+          },
+        }),
+        prisma.dataEvent.count({
+          where: {
+            type: "REDIRECT_CLICK",
+            createdAt: { gte: cutoff },
+            conversation: { botId: bot.id },
+          },
+        }),
+      ]);
+
+    const recentEvents = await prisma.dataEvent.findMany({
+      where: {
+        createdAt: { gte: cutoff },
+        conversation: { botId: bot.id },
+        type: {
+          in: ["MISSING_DATA", "TRUTH_RESPONSE", "TOPIC_DETECTED", "LEAD_CAPTURE_TRIGGERED", "REDIRECT_CLICK"],
+        },
+      },
+      select: { type: true, topic: true, payload: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: 800,
+    });
+
+    // Aggregate missing fields + topics
+    const missingFieldsMap = new Map<string, number>();
+    const topicsMap = new Map<string, number>();
+
+    for (const ev of recentEvents) {
+      const topic = (ev.topic ?? (ev.payload as any)?.topic) as string | null;
+      if (topic) topicsMap.set(topic, (topicsMap.get(topic) || 0) + 1);
+
+      if (ev.type === "MISSING_DATA") {
+        const mf = (ev.payload as any)?.missingFields;
+        if (Array.isArray(mf)) {
+          for (const f of mf) {
+            if (typeof f === "string" && f.trim()) {
+              missingFieldsMap.set(f, (missingFieldsMap.get(f) || 0) + 1);
+            }
+          }
+        }
+      }
+    }
+
+    const topMissingFields = Array.from(missingFieldsMap.entries())
+      .map(([field, count]) => ({ field, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const topTopics = Array.from(topicsMap.entries())
+      .map(([topic, count]) => ({ topic, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Sample questions (user messages)
+    const msgs = await prisma.message.findMany({
+      where: {
+        role: "user",
+        createdAt: { gte: cutoff },
+        conversation: { botId: bot.id },
+      },
+      select: { content: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: 25,
+    });
+
+    const sampleQuestions = msgs.map((m) => {
+      const topicGuess = detectTopic(m.content);
+      return {
+        message: m.content,
+        createdAt: m.createdAt.toISOString(),
+        topic: topicGuess.topic,
+      };
+    });
+
+    const suggestions = generateSuggestions(topMissingFields, topTopics);
+
+    return NextResponse.json({
+      ok: true as const,
+      botPublicKey: bot.publicKey,
+      rangeDays: days,
+      totals: {
+        chats,
+        missingDataEvents,
+        leadCaptureTriggered,
+        redirectClicks,
+      },
+      topMissingFields,
+      topTopics,
+      sampleQuestions,
+      suggestions,
+    });
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return NextResponse.json(
+        { ok: false, error: "validation_error", details: err.errors },
+        { status: 400 }
+      );
+    }
+    console.error("[INSIGHTS] error", err);
+    return NextResponse.json(
+      { ok: false, error: "internal_error" },
+      { status: 500 }
+    );
+  }
+}
+
+function generateSuggestions(
+  missingFields: Array<{ field: string; count: number }>,
+  topics: Array<{ topic: string; count: number }>
+) {
+  const suggestions: Array<{
+    title: string;
+    reason: string;
+    suggestedFields: string[];
+    exampleValues?: any;
+  }> = [];
+
+  const map: Record<
+    string,
+    { title: string; fields: string[]; example?: any }
+  > = {
+    hours: {
+      title: "Add business hours",
+      fields: ["hours"],
+      example: { monday: "9:00-18:00", tuesday: "9:00-18:00" },
+    },
+    services: {
+      title: "Add/expand services list",
+      fields: ["services"],
+      example: [
+        { name: "Haircut", priceRange: "$35-$55", durationMinutes: 45 },
+      ],
+    },
+    pricing: {
+      title: "Add pricing ranges",
+      fields: ["services", "pricing"],
+      example: { haircut: "$35-$55", beard: "$15-$25" },
+    },
+    location: {
+      title: "Add address/location",
+      fields: ["businessAddress"],
+      example: "123 Main St, Fort Pierce, FL",
+    },
+    contact: {
+      title: "Add contact info",
+      fields: ["businessPhone", "businessEmail"],
+      example: { phone: "(555) 123-4567", email: "info@business.com" },
+    },
+    policies: {
+      title: "Add policies (cancellation/refunds)",
+      fields: ["policies"],
+      example: { cancellation: "24-hour notice required" },
+    },
+  };
+
+  for (const { field, count } of missingFields.slice(0, 5)) {
+    const key = field.toLowerCase();
+    const s = map[key];
+    if (s) {
+      suggestions.push({
+        title: s.title,
+        reason: `${count} question${count === 1 ? "" : "s"} missing "${field}" data`,
+        suggestedFields: s.fields,
+        exampleValues: s.example,
+      });
+    }
+  }
+
+  if (topics.length > 0 && topics[0].count >= 8) {
+    suggestions.push({
+      title: `Deepen "${topics[0].topic}" coverage`,
+      reason: `${topics[0].count} messages detected for this topic`,
+      suggestedFields: ["services", "hours", "policies"],
+    });
+  }
+
+  return suggestions;
+}
+
+
+⸻
+
+3) NEW FILE: src/app/app/insights/page.tsx
+
+Notes:
+	•	Fixes the localStorage bug: uses useEffect, not useState(() => ...).
+	•	Uses your TCA components path: @/components/tca/*
+	•	Uses your token/utility classes: .tca-input, .tca-card, etc.
+
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { TcaPageShell } from "@/components/tca/TcaPageShell";
+import { TcaCard } from "@/components/tca/TcaCard";
+import { TcaBadge } from "@/components/tca/TcaBadge";
+import { TcaButton } from "@/components/tca/TcaButton";
+
+type InsightsData = {
+  ok: true;
+  botPublicKey: string;
+  rangeDays: number;
+  totals: {
+    chats: number;
+    missingDataEvents: number;
+    leadCaptureTriggered: number;
+    redirectClicks: number;
+  };
+  topMissingFields: Array<{ field: string; count: number }>;
+  topTopics: Array<{ topic: string; count: number }>;
+  sampleQuestions: Array<{
+    message: string;
+    createdAt: string;
+    topic?: string;
+    missingFields?: string[];
+  }>;
+  suggestions: Array<{
+    title: string;
+    reason: string;
+    suggestedFields: string[];
+    exampleValues?: any;
+  }>;
+};
+
+export default function InsightsPage() {
+  const [botPublicKey, setBotPublicKey] = useState("");
+  const [days, setDays] = useState(30);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [insights, setInsights] = useState<InsightsData | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("tca_selected_bot_public_key");
+    if (stored) setBotPublicKey(stored);
+  }, []);
+
+  const leadCaptureRate = useMemo(() => {
+    if (!insights || insights.totals.chats <= 0) return "0.0";
+    return ((insights.totals.leadCaptureTriggered / insights.totals.chats) * 100).toFixed(1);
+  }, [insights]);
+
+  async function handleLoad() {
+    if (!botPublicKey) {
+      setError("Enter a bot public key.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setInsights(null);
+
+    try {
+      const params = new URLSearchParams({
+        botPublicKey,
+        days: String(days),
+      });
+
+      const res = await fetch(`/api/admin/insights?${params.toString()}`);
+      const data = await res.json();
+
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || "Failed to load insights");
+      }
+
+      setInsights(data);
+      localStorage.setItem("tca_selected_bot_public_key", botPublicKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <TcaPageShell
+      title="Insights"
+      description="Missing-data trends + safe suggestions to improve Truth Mode coverage"
+    >
+      <TcaCard className="mb-6">
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1">
+            <label className="block text-sm mb-1 tca-text-secondary">
+              Bot Public Key
+            </label>
+            <input
+              className="tca-input w-full"
+              placeholder="UUID"
+              value={botPublicKey}
+              onChange={(e) => setBotPublicKey(e.target.value)}
+            />
+          </div>
+
+          <div className="w-full md:w-32">
+            <label className="block text-sm mb-1 tca-text-secondary">
+              Days
+            </label>
+            <input
+              className="tca-input w-full"
+              type="number"
+              min={1}
+              max={90}
+              value={days}
+              onChange={(e) => setDays(parseInt(e.target.value || "30", 10))}
+            />
+          </div>
+
+          <TcaButton onClick={handleLoad} disabled={loading || !botPublicKey}>
+            {loading ? "Loading..." : "Load Insights"}
+          </TcaButton>
+        </div>
+
+        {error && (
+          <div className="mt-4 p-3 rounded-md border tca-border bg-red-50 text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+      </TcaCard>
+
+      {insights ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <TcaCard>
+              <div className="text-sm tca-text-secondary">Chats</div>
+              <div className="text-3xl font-bold tca-text-primary">{insights.totals.chats}</div>
+            </TcaCard>
+
+            <TcaCard>
+              <div className="text-sm tca-text-secondary">Missing Data Events</div>
+              <div className="text-3xl font-bold text-orange-600">{insights.totals.missingDataEvents}</div>
+            </TcaCard>
+
+            <TcaCard>
+              <div className="text-sm tca-text-secondary">Lead Capture Rate</div>
+              <div className="text-3xl font-bold text-blue-600">{leadCaptureRate}%</div>
+            </TcaCard>
+
+            <TcaCard>
+              <div className="text-sm tca-text-secondary">Redirect Clicks</div>
+              <div className="text-3xl font-bold text-green-600">{insights.totals.redirectClicks}</div>
+            </TcaCard>
+          </div>
+
+          {insights.suggestions?.length > 0 && (
+            <TcaCard className="mb-6">
+              <h2 className="text-xl font-semibold mb-4">Suggested Improvements</h2>
+              <div className="space-y-4">
+                {insights.suggestions.map((s, idx) => (
+                  <div key={idx} className="border-l-4 border-blue-500 pl-4 py-2">
+                    <div className="font-semibold">{s.title}</div>
+                    <div className="text-sm tca-text-secondary mt-1">{s.reason}</div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {s.suggestedFields.map((f) => (
+                        <TcaBadge key={f} variant="info">
+                          {f}
+                        </TcaBadge>
+                      ))}
+                    </div>
+                    {s.exampleValues !== undefined && (
+                      <pre className="mt-3 text-xs p-3 rounded-md tca-surface tca-border overflow-x-auto">
+                        {JSON.stringify(s.exampleValues, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </TcaCard>
+          )}
+
+          {insights.topMissingFields?.length > 0 && (
+            <TcaCard className="mb-6">
+              <h2 className="text-xl font-semibold mb-4">Top Missing Fields</h2>
+              <div className="space-y-2">
+                {insights.topMissingFields.map((x) => (
+                  <div key={x.field} className="flex justify-between items-center py-2 border-b last:border-0 tca-border">
+                    <div className="font-medium">{x.field}</div>
+                    <TcaBadge variant="warning">{x.count}</TcaBadge>
+                  </div>
+                ))}
+              </div>
+            </TcaCard>
+          )}
+
+          {insights.topTopics?.length > 0 && (
+            <TcaCard className="mb-6">
+              <h2 className="text-xl font-semibold mb-4">Top Topics</h2>
+              <div className="flex flex-wrap gap-2">
+                {insights.topTopics.map((x) => (
+                  <TcaBadge key={x.topic} variant="secondary">
+                    {x.topic} · {x.count}
+                  </TcaBadge>
+                ))}
+              </div>
+            </TcaCard>
+          )}
+
+          {insights.sampleQuestions?.length > 0 && (
+            <TcaCard>
+              <h2 className="text-xl font-semibold mb-4">Sample Customer Questions</h2>
+              <div className="space-y-3">
+                {insights.sampleQuestions.slice(0, 12).map((q, idx) => (
+                  <div key={idx} className="p-3 rounded-md tca-surface tca-border">
+                    <div className="tca-text-primary">{q.message}</div>
+                    <div className="text-xs tca-text-secondary mt-1">
+                      {new Date(q.createdAt).toLocaleString()}
+                      {q.topic ? ` · ${q.topic}` : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TcaCard>
+          )}
+        </>
+      ) : (
+        <TcaCard className="text-center py-12">
+          <div className="tca-text-secondary">
+            Enter a bot public key and load insights.
+          </div>
+        </TcaCard>
+      )}
+    </TcaPageShell>
+  );
+}
+
+
+⸻
+
+4) MODIFY: src/app/app/layout.tsx (Add nav item)
+
+Find the sidebar/nav items and add Insights pointing to /app/insights.
+Use whatever nav structure you already have, but add something equivalent to:
+	•	Label: Insights
+	•	Href: /app/insights
+
+Example item (adjust to match your array shape):
+
+{ name: "Insights", href: "/app/insights", icon: "📊" }
+
+
+⸻
+
+COMMANDS TO RUN (REPLIT)
+
+Run in this order:
+
+pnpm lint
+pnpm typecheck
+pnpm test:e2e
+pnpm build
+pnpm dev
+
+
+⸻
+
+MANUAL QA CHECKLIST
+	1.	Visit /app/insights
+
+	•	If not logged in: Clerk should redirect you to sign-in.
+	•	If Clerk keys missing: should fail closed (you already implemented fail-closed globally).
+
+	2.	Enter bot public key (use your seeded bot key) + click “Load Insights”
+
+	•	Stats render, no console errors.
+	•	Suggestions show only read-only content.
+
+	3.	Regression:
+
+	•	/widget/[botPublicKey] works
+	•	/app/leads works
+	•	/app/bots works
+	•	Public APIs still open
+
+⸻
+
+DEFINITION OF DONE
+	•	/api/admin/insights exists and is Clerk-protected
+	•	Returns: totals + topMissingFields + topTopics + sampleQuestions + suggestions
+	•	/app/insights displays results in premium UI using TCA components + token classes
+	•	Nav includes Insights
+	•	All gates pass: lint/typecheck/e2e/build
+
+⸻
+
+STOP + COMMIT
+
+Stop when green. Commit message:
+
+feat(step-23): add insights dashboard + optimization suggestions
+
+⸻
+
+If you want, paste Replit’s Step 23 output back here (files changed + gate outputs) and I’ll stamp GO/NO-GO like a QA gatekeeper.

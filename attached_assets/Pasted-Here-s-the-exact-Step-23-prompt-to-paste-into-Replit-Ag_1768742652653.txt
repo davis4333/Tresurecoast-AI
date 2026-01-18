@@ -1,0 +1,407 @@
+Here’s the exact Step 23 prompt to paste into Replit Agent (send to Replit, not Claude). It’s written to keep Replit from drifting and to enforce minimal, safe changes.
+
+⸻
+
+✅ REPLIT PROMPT — STEP 23 (PASTE THIS)
+
+You are implementing Step 23 — AI OPTIMIZATION LOOP V1 (Missing Data Insights + Safe Suggestions) for Treasure Coast AI.
+
+HARD RULES (DO NOT BREAK)
+	1.	Do not refactor existing systems.
+	2.	Do not rename folders / move design system files.
+	3.	Only change files listed below unless a compile error forces a tiny fix.
+	•	If you must change an extra file (ex: TcaBadge), it must be minimal + non-breaking, and you must explain why.
+	4.	No new dependencies.
+	5.	Use existing TCA primitives and styling tokens. Keep UI premium and consistent.
+
+⸻
+
+GOAL
+
+Add an Insights page that shows:
+	•	Missing data trends (from DataEvent)
+	•	Top topics
+	•	Sample customer questions
+	•	Safe suggestions (read-only) for what to add to the bot profile
+
+This is NOT autopilot editing. It only surfaces insights.
+
+⸻
+
+FILES TO CREATE / MODIFY
+
+NEW FILE 1: src/lib/admin/insightsSchemas.ts
+
+import { z } from "zod";
+
+export const InsightsQuerySchema = z.object({
+  botPublicKey: z.string().uuid("Invalid bot public key"),
+  days: z.coerce.number().int().min(1).max(90).optional().default(30),
+});
+
+export type InsightsQuery = z.infer<typeof InsightsQuerySchema>;
+
+export const InsightsResponseSchema = z.object({
+  ok: z.literal(true),
+  botPublicKey: z.string().uuid(),
+  rangeDays: z.number(),
+  totals: z.object({
+    chats: z.number(),
+    missingDataEvents: z.number(),
+    leadCaptureTriggered: z.number(),
+    redirectClicks: z.number(),
+  }),
+  topMissingFields: z.array(
+    z.object({
+      field: z.string(),
+      count: z.number(),
+    })
+  ),
+  topTopics: z.array(
+    z.object({
+      topic: z.string(),
+      count: z.number(),
+    })
+  ),
+  sampleQuestions: z.array(
+    z.object({
+      message: z.string(),
+      createdAt: z.string(),
+      topic: z.string().optional(),
+      missingFields: z.array(z.string()).optional(),
+    })
+  ),
+  suggestions: z.array(
+    z.object({
+      title: z.string(),
+      reason: z.string(),
+      suggestedFields: z.array(z.string()),
+      exampleValues: z.any().optional(),
+    })
+  ),
+});
+
+export type InsightsResponse = z.infer<typeof InsightsResponseSchema>;
+
+
+⸻
+
+NEW FILE 2: src/app/api/admin/insights/route.ts
+
+Notes
+	•	Must be protected by Clerk: use auth() from @clerk/nextjs/server
+	•	Must fail closed when Clerk keys missing: return 503 { ok:false, error:"server_misconfigured" }
+	•	Must validate query via InsightsQuerySchema
+	•	Must aggregate from Conversation, DataEvent, and Message
+	•	Must handle case where bot not found (404)
+
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { prisma } from "@/lib/db";
+import { InsightsQuerySchema } from "@/lib/admin/insightsSchemas";
+import { ZodError } from "zod";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  try {
+    // Fail-closed if Clerk not configured
+    if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {
+      return NextResponse.json(
+        { ok: false, error: "server_misconfigured" },
+        { status: 503 }
+      );
+    }
+
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { ok: false, error: "unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const searchParams = req.nextUrl.searchParams;
+    const rawQuery = {
+      botPublicKey: searchParams.get("botPublicKey"),
+      days: searchParams.get("days"),
+    };
+
+    const query = InsightsQuerySchema.parse(rawQuery);
+    const { botPublicKey, days } = query;
+
+    const bot = await prisma.bot.findUnique({
+      where: { publicKey: botPublicKey },
+      select: { id: true },
+    });
+
+    if (!bot) {
+      return NextResponse.json(
+        { ok: false, error: "not_found" },
+        { status: 404 }
+      );
+    }
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        botId: bot.id,
+        createdAt: { gte: cutoffDate },
+      },
+      select: { id: true },
+    });
+
+    const conversationIds = conversations.map((c) => c.id);
+
+    const [
+      missingDataEvents,
+      leadCaptureEvents,
+      redirectClickEvents,
+      events,
+      messages,
+    ] = await Promise.all([
+      prisma.dataEvent.count({
+        where: {
+          conversationId: { in: conversationIds },
+          type: "MISSING_DATA",
+        },
+      }),
+      prisma.dataEvent.count({
+        where: {
+          conversationId: { in: conversationIds },
+          type: "LEAD_CAPTURE_TRIGGERED",
+        },
+      }),
+      prisma.dataEvent.count({
+        where: {
+          conversationId: { in: conversationIds },
+          type: "REDIRECT_CLICK",
+        },
+      }),
+      prisma.dataEvent.findMany({
+        where: {
+          conversationId: { in: conversationIds },
+          type: { in: ["MISSING_DATA", "TRUTH_RESPONSE", "TOPIC_DETECTED"] },
+        },
+        select: {
+          type: true,
+          payload: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 500,
+      }),
+      prisma.message.findMany({
+        where: {
+          conversationId: { in: conversationIds },
+          role: "user",
+        },
+        select: {
+          content: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 25,
+      }),
+    ]);
+
+    const missingFieldsMap = new Map<string, number>();
+    const topicsMap = new Map<string, number>();
+
+    for (const ev of events) {
+      const payload = ev.payload as any;
+
+      if (ev.type === "MISSING_DATA" && Array.isArray(payload?.missingFields)) {
+        for (const field of payload.missingFields) {
+          missingFieldsMap.set(field, (missingFieldsMap.get(field) || 0) + 1);
+        }
+      }
+
+      if (payload?.topic && typeof payload.topic === "string") {
+        topicsMap.set(payload.topic, (topicsMap.get(payload.topic) || 0) + 1);
+      }
+    }
+
+    const topMissingFields = Array.from(missingFieldsMap.entries())
+      .map(([field, count]) => ({ field, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const topTopics = Array.from(topicsMap.entries())
+      .map(([topic, count]) => ({ topic, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const sampleQuestions = messages.map((m) => ({
+      message: m.content,
+      createdAt: m.createdAt.toISOString(),
+    }));
+
+    const suggestions = generateSuggestions(topMissingFields, topTopics);
+
+    return NextResponse.json({
+      ok: true,
+      botPublicKey,
+      rangeDays: days,
+      totals: {
+        chats: conversations.length,
+        missingDataEvents,
+        leadCaptureTriggered: leadCaptureEvents,
+        redirectClicks: redirectClickEvents,
+      },
+      topMissingFields,
+      topTopics,
+      sampleQuestions,
+      suggestions,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { ok: false, error: "validation_error", details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { ok: false, error: "internal_error" },
+      { status: 500 }
+    );
+  }
+}
+
+function generateSuggestions(
+  missingFields: Array<{ field: string; count: number }>,
+  topics: Array<{ topic: string; count: number }>
+) {
+  const suggestions: Array<{
+    title: string;
+    reason: string;
+    suggestedFields: string[];
+    exampleValues?: any;
+  }> = [];
+
+  const fieldSuggestions: Record<string, { title: string; fields: string[]; example?: any }> = {
+    hours: {
+      title: "Add Business Hours",
+      fields: ["hours"],
+      example: { monday: "9AM-6PM", tuesday: "9AM-6PM" },
+    },
+    pricing: {
+      title: "Add Service Pricing",
+      fields: ["services"],
+      example: [{ name: "Haircut", price: "$45" }],
+    },
+    services: {
+      title: "Add Service Descriptions",
+      fields: ["services"],
+      example: [{ name: "Haircut", description: "Classic cut", durationMinutes: 45 }],
+    },
+    location: {
+      title: "Add Business Location",
+      fields: ["businessAddress"],
+      example: "123 Main St, Fort Pierce, FL",
+    },
+    contact: {
+      title: "Add Contact Information",
+      fields: ["businessPhone", "businessEmail"],
+      example: { phone: "(555) 123-4567", email: "info@business.com" },
+    },
+    policies: {
+      title: "Add Business Policies",
+      fields: ["policies"],
+      example: { cancellation: "24 hour notice required" },
+    },
+  };
+
+  for (const { field, count } of missingFields.slice(0, 5)) {
+    const key = field.toLowerCase();
+    const suggestion = fieldSuggestions[key];
+    if (suggestion) {
+      suggestions.push({
+        title: suggestion.title,
+        reason: `${count} question${count > 1 ? "s" : ""} about ${field}`,
+        suggestedFields: suggestion.fields,
+        exampleValues: suggestion.example,
+      });
+    }
+  }
+
+  if (topics.length > 0 && topics[0].count > 5) {
+    const topTopic = topics[0].topic;
+    suggestions.push({
+      title: `Expand "${topTopic}" Information`,
+      reason: `${topics[0].count} questions about ${topTopic}`,
+      suggestedFields: ["services", "hours", "links"],
+    });
+  }
+
+  return suggestions;
+}
+
+
+⸻
+
+NEW FILE 3: src/app/app/insights/page.tsx
+
+Rules
+	•	Must use your existing TCA primitives from src/components/tca/*
+	•	Must be premium + consistent with theme tokens
+	•	Must NOT introduce random grey Tailwind styling that fights tokens
+
+Create a client page that:
+	•	Loads botPublicKey from localStorage key: tca_selected_bot_public_key
+	•	Inputs: botPublicKey (uuid), days (1-90)
+	•	Fetches /api/admin/insights?botPublicKey=...&days=...
+	•	Displays stats cards + suggestions + missing fields + topics + sample questions
+
+(Implement the UI cleanly using TcaPageShell, TcaCard, TcaBadge, TcaButton, and .tca-input.)
+
+⸻
+
+MODIFY FILE 4: src/app/app/layout.tsx
+
+Add sidebar nav item:
+	•	Label: Insights
+	•	Route: /app/insights
+	•	Icon: use existing icon system or emoji 📊 if that’s how your sidebar is built
+Keep nav style consistent.
+
+⸻
+
+COMMANDS TO RUN (MUST PASTE OUTPUTS)
+	1.	pnpm lint
+	2.	pnpm typecheck
+	3.	pnpm test:e2e
+	4.	pnpm build
+
+⸻
+
+MANUAL QA (MUST CONFIRM)
+	1.	Visit /app/insights while logged in → page loads
+	2.	Enter botPublicKey + click Load → shows totals + top missing fields/topics
+	3.	Suggestions render and are read-only
+	4.	No console errors
+	5.	Regression: /app/leads, /app/bots, /widget/[key] still work
+
+⸻
+
+STOP CONDITION
+
+After changes, output:
+	•	Full list of files changed
+	•	QA gate outputs
+	•	Manual QA confirmations
+
+Commit message suggestion:
+feat(step-23): insights dashboard for missing data + safe suggestions
+
+⸻
+
+✅ Who to send it to
+
+Send this prompt to: REPLIT AGENT.
+Claude isn’t needed here because this step is tightly integrated with your existing file paths + Replit can run gates immediately.
+
+If you want, after Replit finishes Step 23, paste its “files changed + gate outputs” and I’ll stamp GO / NO-GO instantly.
