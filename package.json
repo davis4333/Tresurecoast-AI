@@ -12,7 +12,17 @@
     "format": "prettier . --write",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:migrate-verify": "tsx scripts/db-migrate-and-verify.ts",
+    "deploy:check": "pnpm lint && pnpm typecheck && pnpm test:e2e && pnpm build",
+    "postinstall": "prisma generate",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@playwright/test": "^1.57.0",
@@ -34,6 +44,7 @@
     "prettier-plugin-tailwindcss": "^0.5.14",
     "prisma": "^5.11.0",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.4.5"
   },
   "engines": {

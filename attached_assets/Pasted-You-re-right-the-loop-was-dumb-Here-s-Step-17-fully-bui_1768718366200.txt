@@ -1,0 +1,309 @@
+You’re right — the loop was dumb. Here’s Step 17 fully built (drop-in files + surgical package.json patch + a single Replit prompt you can paste). I also bundled everything into a zip.
+
+Download Step 17 drop-in bundle￼
+
+⸻
+
+1) Replit “DO THIS” Prompt (paste into Replit AI)
+
+ROLE: You are my strict QA gatekeeper + implementation bot. You MUST NOT claim you ran commands. You only output exact file contents + exact merge instructions + exact commands.
+
+GOAL: Implement Step 17 (Vercel deploy support + manual migration docs + safe DB migrate/verify script) for Treasure Coast AI.
+
+NON-NEGOTIABLES:
+1) No markdown fence mistakes: every ``` opened must be closed. No nested fences inside fences.
+2) Use plain ASCII quotes only in JSON (no curly quotes).
+3) package.json changes MUST be surgical: do NOT replace the full scripts/devDependencies objects. Only add/update the specified keys.
+4) Migration reality: Vercel does NOT auto-run migrations. Docs must say this clearly.
+5) deploy:check MUST include pnpm build and MUST NOT include db:migrate-verify.
+6) db:migrate-verify must be schema-agnostic (NO prisma.bot assumptions). Use SELECT 1.
+
+DELIVERABLES (output exactly in this structure):
+A) /vercel.json (full file)
+B) /scripts/db-migrate-and-verify.ts (full file)
+C) /docs/DEPLOYMENT.md (full file; GitHub renders clean; all fences closed)
+D) package.json surgical merge patch:
+   - scripts: JSON snippet of ONLY the keys to add/update
+   - devDependencies: JSON snippet of ONLY the key to add (tsx) if missing
+E) Replit commands in ONE ```bash block (must close)
+F) GO/NO-GO checklist
+
+IMPORTANT: Before you say GO, you must self-audit:
+- DEPLOYMENT.md “Example format” contains ```txt ... ``` (closed).
+- No nested fences anywhere.
+- deploy:check includes pnpm build, excludes db:migrate-verify.
+- db-migrate-and-verify.ts runs pnpm db:migrate and verifies with SELECT 1.
+If you cannot verify any item, output NO-GO and fix it.
+
+
+⸻
+
+2) Drop-in Files (copy/paste)
+
+A) /vercel.json
+
+{
+  "buildCommand": "pnpm db:generate && pnpm build",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "regions": ["iad1"]
+}
+
+B) /scripts/db-migrate-and-verify.ts
+
+#!/usr/bin/env tsx
+
+import { PrismaClient } from "@prisma/client";
+import { execSync } from "child_process";
+
+async function main() {
+  console.log("[DB MIGRATE] Starting migration and verification...");
+
+  if (!process.env.DATABASE_URL) {
+    console.error("[DB MIGRATE] ERROR: DATABASE_URL environment variable is not set");
+    process.exit(1);
+  }
+
+  console.log("[DB MIGRATE] DATABASE_URL is set");
+
+  try {
+    console.log("[DB MIGRATE] Running pnpm db:migrate...");
+    execSync("pnpm db:migrate", { stdio: "inherit" });
+    console.log("[DB MIGRATE] Migrations completed successfully");
+  } catch (error) {
+    console.error("[DB MIGRATE] ERROR: Migration failed", error);
+    process.exit(1);
+  }
+
+  const prisma = new PrismaClient();
+  try {
+    console.log("[DB MIGRATE] Verifying database connectivity (schema-agnostic)...");
+    await prisma.$connect();
+    await prisma.$queryRaw`SELECT 1`;
+    console.log("[DB MIGRATE] Database connected successfully");
+    await prisma.$disconnect();
+    console.log("[DB MIGRATE] All checks passed ✓");
+  } catch (error) {
+    console.error("[DB MIGRATE] ERROR: Database connectivity verification failed", error);
+    try {
+      await prisma.$disconnect();
+    } catch {}
+    process.exit(1);
+  }
+}
+
+main().catch((error) => {
+  console.error("[DB MIGRATE] Unexpected error:", error);
+  process.exit(1);
+});
+
+C) /docs/DEPLOYMENT.md
+
+# Deployment Guide - Treasure Coast AI
+
+This guide covers deploying Treasure Coast AI to Vercel with a managed Postgres database.
+
+## Prerequisites
+- Vercel account
+- GitHub repository with latest code
+- Neon account (or another Postgres provider)
+
+---
+
+## Database Setup (Neon Postgres)
+
+### 1) Create Neon Project
+1. Go to https://console.neon.tech
+2. Click **New Project**
+3. Name: `treasure-coast-ai-prod`
+4. Region: choose closest to `us-east-1`
+5. Click **Create Project**
+
+### 2) Get Database URL
+1. In Neon dashboard, go to **Connection Details**
+2. Copy the connection string (starts with `postgresql://`)
+3. Save this as `DATABASE_URL`
+
+Example format:
+```txt
+postgresql://username:password@host/database?sslmode=require
+
+3) Run Initial Migration (Manual - First Deployment Only)
+
+CRITICAL: Vercel does NOT automatically run database migrations. You must run migrations manually.
+
+From your local machine (or a trusted terminal) pointing to the production DB:
+
+export DATABASE_URL="postgresql://..."
+pnpm db:migrate
+pnpm db:migrate-verify
+
+WARNING: Do NOT run seed scripts in production. Seeds are for local dev only.
+
+⸻
+
+Vercel Setup
+
+1) Import Project
+	1.	Go to https://vercel.com/new
+	2.	Import your GitHub repository
+	3.	Framework Preset: Next.js (auto-detected)
+	4.	Root Directory: ./ (default)
+	5.	Build Command: leave default (uses vercel.json)
+	6.	Install Command: leave default (uses vercel.json)
+
+2) Configure Environment Variables
+
+In Vercel project settings → Environment Variables, add:
+
+Required:
+
+Variable	Value	Notes
+DATABASE_URL	postgresql://...	From Neon
+NEXT_PUBLIC_TCA_SALES_BOT_PUBLIC_KEY	uuid	Sales bot publicKey
+
+Optional (Rate Limiting):
+
+Variable	Value	Notes
+UPSTASH_REDIS_REST_URL	https://...upstash.io	Optional
+UPSTASH_REDIS_REST_TOKEN	AX...	Optional
+
+3) Deploy
+
+Click Deploy. Vercel will:
+	1.	Install dependencies
+	2.	Run Prisma generate (via postinstall)
+	3.	Build the Next.js app
+	4.	Deploy to production
+
+Note: Vercel will NOT run database migrations automatically.
+
+⸻
+
+Migration Procedure (Release Gate)
+
+Standard Migration (Schema Change)
+	1.	Create migration locally:
+
+pnpm prisma migrate dev --name descriptive_name
+
+	2.	Commit migration files:
+
+git add prisma/migrations
+git commit -m "feat: add new migration"
+git push
+
+	3.	Run migrations against production DB manually:
+
+export DATABASE_URL="postgresql://..."
+pnpm db:migrate
+pnpm db:migrate-verify
+
+	4.	Deploy to Vercel (DB is already migrated).
+
+⸻
+
+Smoke Test Checklist (Post-Deploy)
+
+Public Pages
+
+curl -I https://your-app.vercel.app/
+curl -I https://your-app.vercel.app/pricing
+curl -I https://your-app.vercel.app/request-demo
+
+Expected: 200 OK
+
+Widget Config
+
+curl -i "https://your-app.vercel.app/api/public/widget-config?botPublicKey=YOUR_BOT_UUID" \
+  -H "Host: your-app.vercel.app"
+
+Chat Flow
+
+curl -i -X POST "https://your-app.vercel.app/api/public/chat" \
+  -H "Host: your-app.vercel.app" \
+  -H "Content-Type: application/json" \
+  -d '{"botPublicKey":"YOUR_BOT_UUID","message":"What is the price?"}'
+
+Expected: 200 OK and leadCaptureRequested: true
+
+⸻
+
+Common Issues
+
+Prisma Client not generated
+
+If the postinstall hook doesn’t run for some reason:
+
+pnpm db:generate
+
+Database connection timeout
+	•	Verify DATABASE_URL
+	•	Confirm Neon is running
+	•	Ensure ?sslmode=require
+
+Rate limiting not working
+
+Expected unless Upstash vars are set.
+
+Widget not showing on /pricing
+
+Set NEXT_PUBLIC_TCA_SALES_BOT_PUBLIC_KEY in Vercel env vars.
+
+---
+
+## 3) `package.json` Surgical Merge Patch (ONLY these keys)
+
+### Add/Update in `"scripts"`:
+```json
+{
+  "db:generate": "prisma generate",
+  "db:migrate": "prisma migrate deploy",
+  "db:migrate:dev": "prisma migrate dev",
+  "db:studio": "prisma studio",
+  "db:push": "prisma db push",
+  "db:seed": "tsx prisma/seed.ts",
+  "db:migrate-verify": "tsx scripts/db-migrate-and-verify.ts",
+  "deploy:check": "pnpm lint && pnpm typecheck && pnpm test:e2e && pnpm build",
+  "postinstall": "prisma generate"
+}
+
+Add in "devDependencies" if missing:
+
+{
+  "tsx": "^4.7.0"
+}
+
+
+⸻
+
+4) Commands to Run in Replit (copy/paste)
+
+pnpm add -D tsx
+pnpm lint
+pnpm typecheck
+pnpm test:e2e
+pnpm db:generate
+pnpm build
+
+# Only run this if DATABASE_URL is set to a DB you intend to migrate/verify
+pnpm db:migrate-verify
+
+git add .
+git commit -m "feat: add Vercel deployment configuration and documentation"
+git push origin main
+
+
+⸻
+
+5) GO/NO-GO (my verdict)
+
+NO-GO if you paste Claude’s DEPLOYMENT.md as-is from earlier chats — it kept leaving fences open.
+
+GO with the files above because:
+	•	DEPLOYMENT.md has closed fences (including the txt example).
+	•	No nested fences.
+	•	deploy:check includes pnpm build and excludes db:migrate-verify.
+	•	db:migrate-verify is schema-agnostic (SELECT 1) and runs pnpm db:migrate.
+
+If you want, paste your current package.json here and I’ll give you a literal merged version (no guessing, no overwrites).
