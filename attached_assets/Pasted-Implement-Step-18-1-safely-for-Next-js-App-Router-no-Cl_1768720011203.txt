@@ -1,0 +1,308 @@
+Implement Step 18.1 safely for Next.js App Router (no Client/Server conflicts).
+
+GOAL
+- Add centralized global theme tokens (CSS variables).
+- Apply tokens to:
+  1) /pricing page (theme-aware styling + hover glow WITHOUT JS event handlers)
+  2) Widget ChatBox header only
+- Zero regressions; all existing tests must still pass.
+
+FILES
+
+1) CREATE: src/styles/theme-tokens.css
+Create with this exact content:
+
+:root {
+  /* Brand colors - high-tech blue/purple gradient palette */
+  --color-brand-primary: #6366f1;
+  --color-brand-primary-hover: #4f46e5;
+  --color-brand-secondary: #8b5cf6;
+  --color-brand-accent: #06b6d4;
+
+  /* Semantic colors */
+  --color-background: #ffffff;
+  --color-surface: #f9fafb;
+  --color-surface-hover: #f3f4f6;
+  --color-border: #e5e7eb;
+  --color-border-subtle: #f3f4f6;
+
+  /* Text colors */
+  --color-text-primary: #111827;
+  --color-text-secondary: #6b7280;
+  --color-text-muted: #9ca3af;
+  --color-text-inverse: #ffffff;
+
+  /* Status colors */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Spacing scale */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+
+  /* Border radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* Shadows - subtle, high-tech */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-glow: 0 0 20px 0 rgb(99 102 241 / 0.15);
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: #0f172a;
+    --color-surface: #1e293b;
+    --color-surface-hover: #334155;
+    --color-border: #334155;
+    --color-border-subtle: #1e293b;
+    --color-text-primary: #f1f5f9;
+    --color-text-secondary: #cbd5e1;
+    --color-text-muted: #94a3b8;
+  }
+}
+
+2) MODIFY: src/app/globals.css
+At the very top (after any existing @tailwind lines is fine), add:
+
+@import "../styles/theme-tokens.css";
+
+Also add these utility classes at the bottom of globals.css (do NOT remove existing styles):
+
+.tca-btn-primary {
+  display: inline-block;
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  background-color: var(--color-brand-primary);
+  color: var(--color-text-inverse);
+  text-align: center;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  text-decoration: none;
+  transition: box-shadow var(--transition-base), background-color var(--transition-base), transform var(--transition-base);
+  border: none;
+  cursor: pointer;
+}
+
+.tca-btn-primary:hover {
+  background-color: var(--color-brand-primary-hover);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+.tca-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+3) REPLACE: src/app/pricing/page.tsx
+IMPORTANT: This must remain a Server Component (NO "use client"). So no JS event handlers.
+
+Replace entire file with:
+
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Pricing - Treasure Coast AI",
+  description: "Simple, transparent pricing for AI-powered customer engagement",
+};
+
+export default function PricingPage() {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "var(--color-background)",
+        color: "var(--color-text-primary)",
+      }}
+    >
+      <header
+        style={{
+          borderBottom: "1px solid var(--color-border)",
+          padding: "var(--space-lg) var(--space-xl)",
+          backgroundColor: "var(--color-surface)",
+        }}
+      >
+        <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+          <h1
+            style={{
+              fontSize: "1.5rem",
+              fontWeight: "700",
+              color: "var(--color-brand-primary)",
+              margin: 0,
+            }}
+          >
+            Treasure Coast AI
+          </h1>
+        </div>
+      </header>
+
+      <main
+        style={{
+          maxWidth: "1200px",
+          margin: "0 auto",
+          padding: "var(--space-2xl) var(--space-xl)",
+        }}
+      >
+        <div style={{ textAlign: "center", marginBottom: "var(--space-2xl)" }}>
+          <h2
+            style={{
+              fontSize: "2.5rem",
+              fontWeight: "800",
+              marginBottom: "var(--space-md)",
+              background:
+                "linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-secondary))",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            Simple, Transparent Pricing
+          </h2>
+          <p
+            style={{
+              fontSize: "1.25rem",
+              color: "var(--color-text-secondary)",
+              maxWidth: "600px",
+              margin: "0 auto",
+            }}
+          >
+            AI-powered customer engagement for your business
+          </p>
+        </div>
+
+        <div
+          className="tca-card"
+          style={{
+            maxWidth: "400px",
+            margin: "0 auto",
+            padding: "var(--space-xl)",
+          }}
+        >
+          <div style={{ marginBottom: "var(--space-lg)" }}>
+            <h3
+              style={{
+                fontSize: "1.5rem",
+                fontWeight: "700",
+                marginBottom: "var(--space-sm)",
+                marginTop: 0,
+              }}
+            >
+              Professional
+            </h3>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-xs)" }}>
+              <span
+                style={{
+                  fontSize: "3rem",
+                  fontWeight: "800",
+                  color: "var(--color-brand-primary)",
+                }}
+              >
+                $99
+              </span>
+              <span style={{ color: "var(--color-text-secondary)" }}>/month</span>
+            </div>
+          </div>
+
+          <ul style={{ marginBottom: "var(--space-xl)", listStyle: "none", padding: 0 }}>
+            {[
+              "24/7 AI customer support",
+              "Lead capture & management",
+              "Custom business knowledge",
+              "Service booking integration",
+              "Analytics dashboard",
+            ].map((feature) => (
+              <li
+                key={feature}
+                style={{
+                  padding: "var(--space-sm) 0",
+                  color: "var(--color-text-secondary)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--space-sm)",
+                }}
+              >
+                <span style={{ color: "var(--color-success)" }}>✓</span>
+                {feature}
+              </li>
+            ))}
+          </ul>
+
+          <a href="/request-demo" className="tca-btn-primary">
+            Request Demo
+          </a>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+4) MODIFY: src/app/widget/[botPublicKey]/ChatBox.tsx
+Update ONLY the header container where bot name/greeting renders.
+
+Replace the header block with:
+
+{/* Header - apply theme tokens */}
+<div
+  style={{
+    padding: "var(--space-md)",
+    borderBottom: "1px solid var(--color-border)",
+    backgroundColor: "var(--color-brand-primary)",
+    color: "var(--color-text-inverse)",
+    borderTopLeftRadius: "var(--radius-lg)",
+    borderTopRightRadius: "var(--radius-lg)",
+    boxShadow: "var(--shadow-md)",
+  }}
+>
+  <h2 style={{ fontSize: "1.125rem", fontWeight: "600", margin: 0 }}>
+    {config?.botName || "Chat Support"}
+  </h2>
+
+  {config?.greeting && (
+    <p
+      style={{
+        fontSize: "0.875rem",
+        marginTop: "var(--space-xs)",
+        opacity: 0.9,
+        margin: "var(--space-xs) 0 0 0",
+      }}
+    >
+      {config.greeting}
+    </p>
+  )}
+</div>
+
+NOTES
+- Use optional chaining (config?.) to prevent runtime crashes if config is undefined during initial render.
+- Do not change any other widget logic.
+
+RUN THESE TESTS (in this exact order)
+pnpm lint
+pnpm typecheck
+pnpm test:e2e
+pnpm build
+
+MANUAL CHECK
+- /pricing: gradient heading + hover glow on button
+- /widget/<botPublicKey>: header is branded purple/blue, white text, rounded + shadow
+
+DELIVERABLE
+- Commit-ready code with all tests passing.
+- Report any failing command output (do not claim pass unless actually run).

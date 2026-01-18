@@ -13,10 +13,16 @@ type ChatMessage = {
   timestamp: string;
 };
 
+type WidgetConfig = {
+  botName?: string;
+  greeting?: string;
+};
+
 export function ChatBox({ botPublicKey }: ChatBoxProps) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [config, setConfig] = useState<WidgetConfig | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -32,6 +38,24 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  useEffect(() => {
+    async function fetchConfig() {
+      try {
+        const res = await fetch(`/api/public/widget-config?botPublicKey=${encodeURIComponent(botPublicKey)}`);
+        const data = await res.json();
+        if (data.ok && data.config) {
+          setConfig({
+            botName: data.config.botName,
+            greeting: data.config.greeting,
+          });
+        }
+      } catch {
+        // Silently fail - header will show defaults
+      }
+    }
+    fetchConfig();
+  }, [botPublicKey]);
 
   const fetchHistory = useCallback(
     async (convId: string) => {
@@ -198,6 +222,36 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
 
   return (
     <div className="space-y-4">
+      {/* Header - apply theme tokens */}
+      <div
+        style={{
+          padding: "var(--space-md)",
+          borderBottom: "1px solid var(--color-border)",
+          backgroundColor: "var(--color-brand-primary)",
+          color: "var(--color-text-inverse)",
+          borderTopLeftRadius: "var(--radius-lg)",
+          borderTopRightRadius: "var(--radius-lg)",
+          boxShadow: "var(--shadow-md)",
+        }}
+      >
+        <h2 style={{ fontSize: "1.125rem", fontWeight: "600", margin: 0 }}>
+          {config?.botName || "Chat Support"}
+        </h2>
+
+        {config?.greeting && (
+          <p
+            style={{
+              fontSize: "0.875rem",
+              marginTop: "var(--space-xs)",
+              opacity: 0.9,
+              margin: "var(--space-xs) 0 0 0",
+            }}
+          >
+            {config.greeting}
+          </p>
+        )}
+      </div>
+
       {isLoadingHistory && (
         <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-center">
           <p className="text-sm text-white/60">Loading conversation...</p>
