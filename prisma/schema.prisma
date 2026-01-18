@@ -38,6 +38,14 @@ enum BotLinkType {
   OTHER
 }
 
+enum DataEventType {
+  TOPIC_DETECTED
+  MISSING_DATA
+  TRUTH_RESPONSE
+  LEAD_CAPTURE_TRIGGERED
+  REDIRECT_CLICK
+}
+
 model Organization {
   id        Int      @id @default(autoincrement())
   publicId  String   @unique @db.Uuid @default(dbgenerated("gen_random_uuid()"))
@@ -50,6 +58,7 @@ model Organization {
   conversations  Conversation[]
   leads          Lead[]
   auditLogs      AuditLog[]
+  dataEvents     DataEvent[]
 
   @@index([createdAt])
 }
@@ -67,6 +76,7 @@ model Workspace {
   leads         Lead[]
   conversations Conversation[]
   auditLogs     AuditLog[]
+  dataEvents    DataEvent[]
 
   @@index([organizationId])
   @@index([createdAt])
@@ -101,6 +111,7 @@ model Bot {
   allowlist     BotDomainAllowlist[]
   leads         Lead[]
   conversations Conversation[]
+  dataEvents    DataEvent[]
 
   @@index([organizationId])
   @@index([workspaceId])
@@ -221,21 +232,29 @@ model AuditLog {
   @@index([createdAt])
 }
 
-model MissingDataEvent {
-  id             Int      @id @default(autoincrement())
+model DataEvent {
+  id       Int           @id @default(autoincrement())
+  publicId String        @unique @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+
   organizationId Int
   workspaceId    Int
   botId          Int
-  conversationId Int
+  conversationId Int?
 
-  topics      String[]
-  userMessage String
+  type    DataEventType
+  topic   String?
+  payload Json?
 
   createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  bot          Bot          @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([workspaceId])
   @@index([botId])
   @@index([conversationId])
+  @@index([type])
   @@index([createdAt])
 }

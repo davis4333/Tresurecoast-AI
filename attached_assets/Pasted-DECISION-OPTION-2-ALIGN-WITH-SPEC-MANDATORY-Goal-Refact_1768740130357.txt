@@ -1,0 +1,75 @@
+DECISION: OPTION 2 — ALIGN WITH SPEC (MANDATORY)
+
+Goal: Refactor Step 22 implementation to match the master spec so the Truth Engine becomes a stable universal core.
+
+NON-NEGOTIABLE CHANGES:
+1) Replace MissingDataEvent model with a general DataEvent model + DataEventType enum.
+   - DataEvent must support: TOPIC_DETECTED, MISSING_DATA, TRUTH_RESPONSE, LEAD_CAPTURE_TRIGGERED, REDIRECT_CLICK (optional now but model should allow it).
+   - Each event must be scoped to organizationId/workspaceId/botId and reference conversationId when applicable.
+   - Store payload as JSON for flexibility (e.g., topic, missingFields, sourcedFrom, confidence, intent).
+
+2) Topic detection must include 9 topics total, including POLICIES.
+   - Keep existing topics, add POLICIES.
+   - Ensure topic detection writes a TOPIC_DETECTED DataEvent.
+
+3) Create separate types module:
+   - src/lib/truth/types.ts (or equivalent)
+   - Define Zod schemas + TS types for:
+     - Topic enum
+     - TruthIntent enum
+     - TruthResult schema:
+       {
+         reply: string,
+         intent: string,
+         confidence: number (0-1),
+         sourcedFrom: string[],
+         requiresLeadCapture: boolean,
+         missingFields: string[],
+         suggestedActions?: { type: "BOOK"|"PAY"|"CONTACT", url?: string, label: string }[]
+       }
+
+4) Rename/reshape engine implementation to match spec naming + output shape:
+   - engine.ts (or keep truthEngine.ts but must export a single engine interface that returns TruthResult exactly)
+   - Ensure strict truth mode:
+     - If not in DB => do NOT answer it; set requiresLeadCapture true + missingFields populated; reply must say missing info and offer lead capture or contact business.
+
+5) Booking/Payment redirect flows:
+   - Implement deterministic fallback logic:
+     - If a specific service is chosen and service-specific link exists => use it
+     - Else if general booking/payment link exists => use it
+     - Else => lead capture + contact info
+   - Ensure redirects are “links only” and open new tab.
+   - Log redirect suggestions and/or clicks as DataEvent (TRUTH_RESPONSE and/or REDIRECT_CLICK).
+
+6) Wire the Truth Engine into /api/public/chat:
+   - Chat route must:
+     - call Truth Engine with bot profile data (name, greeting, fallbackText, businessPhone/email/address, hours, services, links/policies when present)
+     - return TruthResult fields
+     - persist TRUTH_RESPONSE DataEvent with sourcedFrom + confidence + intent + missingFields.
+
+MIGRATIONS:
+- Create a new Prisma migration for DataEvent model and enum.
+- Remove/replace MissingDataEvent model cleanly.
+- Ensure Prisma client regeneration + migration deploy works.
+
+QUALITY GATES (MUST RUN AND PASTE RESULTS):
+- pnpm lint
+- pnpm typecheck
+- pnpm test:e2e
+- pnpm build
+
+ADDITIONAL REQUIRED CHECKS:
+- Confirm /widget still works
+- Confirm /api/public/chat returns the full TruthResult shape
+- Confirm DataEvent rows are being written for:
+  - TOPIC_DETECTED
+  - MISSING_DATA (when applicable)
+  - TRUTH_RESPONSE (always)
+
+OUTPUT REQUIRED:
+1) List of files changed + full file contents for all new/modified files.
+2) Prisma schema diff summary + migration folder name.
+3) QA gate outputs.
+4) Short proof: sample chat request + response JSON showing TruthResult fields and example DataEvent records created.
+
+Do not proceed to Step 23 until this Step 22 alignment is complete and verified.
