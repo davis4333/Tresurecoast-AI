@@ -1,0 +1,290 @@
+STEP 22 — TRUTH ENGINE v1 (STRICT “TRUTH MODE” + TOPIC DETECTION + DATA EVENTS)
+GOAL
+Replace the current heuristic chat logic with a strict Truth Engine that:
+1) Answers ONLY from the bot’s Business Profile fields in DB (no hallucinations).
+2) Detects user topic (hours, services, contact, location, booking/payment intent, etc.).
+3) Logs analytics events for topic + missing-data into the database.
+4) Integrates into /api/public/chat so widget behavior stays stable and E2E tests keep passing.
+
+NON-NEGOTIABLE RULES
+- If data is missing in DB, the bot MUST say it does not have that info and route to lead capture or “contact the business”.
+- Never invent hours, prices, services, addresses, policies.
+- Must return a structured Truth Engine output including:
+  { reply, intent, confidence, sourcedFrom[], requiresLeadCapture, missingFields[] }
+- Must not break existing routes, widget, or dashboard.
+- Must pass: pnpm lint, pnpm typecheck, pnpm test:e2e, pnpm build
+- Keep “payments/bookings” as external links only. We can suggest link clicks but never process money.
+
+SCOPE
+Implement these 4 sub-tasks:
+A) Add DataEvent storage to Prisma
+B) Create topic detection module
+C) Create Truth Engine module (strict responses from DB)
+D) Update /api/public/chat to use Truth Engine and log DataEvents
+
+===========================================================
+A) PRISMA — Add DataEvent model + migration
+===========================================================
+
+1) MODIFY: prisma/schema.prisma
+Add enum + model at bottom (keep formatting consistent). Do NOT remove existing models.
+
+Add this enum:
+enum DataEventType {
+TOPIC_DETECTED
+MISSING_DATA
+TRUTH_RESPONSE
+}
+
+Add this model:
+model DataEvent {
+id Int @id @default(autoincrement())
+publicId String @unique @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+
+organizationId Int
+workspaceId Int
+botId Int
+
+type DataEventType
+topic String?
+payload Json?
+
+createdAt DateTime @default(now())
+
+organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+@@index([organizationId])
+@@index([workspaceId])
+@@index([botId])
+@@index([type])
+@@index([createdAt])
+}
+
+2) RUN migration:
+pnpm prisma migrate dev --name add_data_events_truth_engine
+pnpm db:generate
+
+===========================================================
+B) TOPIC DETECTION — New file
+===========================================================
+
+NEW FILE: src/lib/truth/topics.ts
+
+Create keyword-based topic detection. Keep it deterministic.
+
+FULL FILE CONTENTS:
+
+import { z } from "zod";
+
+export const TopicSchema = z.enum([
+  "HOURS",
+  "SERVICES",
+  "PRICING",
+  "LOCATION",
+  "CONTACT",
+  "BOOKING",
+  "PAYMENT",
+  "POLICIES",
+  "GENERAL",
+]);
+
+export type Topic = z.infer<typeof TopicSchema>;
+
+export type TopicResult = {
+  topic: Topic;
+  confidence: number; // 0..1
+  matched: string[];
+};
+
+function hasAny(text: string, words: string[]) {
+  return words.filter((w) => text.includes(w));
+}
+
+export function detectTopic(message: string): TopicResult {
+  const t = message.toLowerCase();
+
+  const hours = hasAny(t, ["hours", "open", "close", "closing", "opening", "when are you open", "what time", "today", "tomorrow"]);
+  if (hours.length) return { topic: "HOURS", confidence: 0.9, matched: hours };
+
+  const services = hasAny(t, ["services", "service", "offer", "do you do", "can you do", "haircut", "fade", "beard", "tattoo", "epoxy", "classes"]);
+  if (services.length) return { topic: "SERVICES", confidence: 0.75, matched: services };
+
+  const pricing = hasAny(t, ["price", "pricing", "cost", "how much", "rate", "$", "charge"]);
+  if (pricing.length) return { topic: "PRICING", confidence: 0.8, matched: pricing };
+
+  const location = hasAny(t, ["address", "located", "location", "where are you", "directions", "near"]);
+  if (location.length) return { topic: "LOCATION", confidence: 0.85, matched: location };
+
+  const contact = hasAny(t, ["phone", "call", "number", "email", "contact", "text"]);
+  if (contact.length) return { topic: "CONTACT", confidence: 0.85, matched: contact };
+
+  const booking = hasAny(t, ["book", "booking", "schedule", "appointment", "reserve", "availability"]);
+  if (booking.length) return { topic: "BOOKING", confidence: 0.85, matched: booking };
+
+  const payment = hasAny(t, ["pay", "payment", "deposit", "invoice", "checkout"]);
+  if (payment.length) return { topic: "PAYMENT", confidence: 0.85, matched: payment };
+
+  const policies = hasAny(t, ["policy", "policies", "cancel", "cancellation", "refund", "late", "reschedule"]);
+  if (policies.length) return { topic: "POLICIES", confidence: 0.75, matched: policies };
+
+  return { topic: "GENERAL", confidence: 0.4, matched: [] };
+}
+
+===========================================================
+C) TRUTH ENGINE — New files
+===========================================================
+
+NEW FILE: src/lib/truth/types.ts
+
+import { z } from "zod";
+
+export const TruthIntentSchema = z.enum([
+  "ANSWERED_FROM_PROFILE",
+  "MISSING_DATA",
+  "BOOK_OR_PAY_REDIRECT",
+  "LEAD_CAPTURE",
+]);
+
+export type TruthIntent = z.infer<typeof TruthIntentSchema>;
+
+export const TruthResultSchema = z.object({
+  reply: z.string(),
+  intent: TruthIntentSchema,
+  confidence: z.number().min(0).max(1),
+  sourcedFrom: z.array(z.string()),
+  requiresLeadCapture: z.boolean(),
+  missingFields: z.array(z.string()),
+  topic: z.string(),
+});
+
+export type TruthResult = z.infer<typeof TruthResultSchema>;
+
+NEW FILE: src/lib/truth/engine.ts
+
+import type { Bot, BotLink } from "@prisma/client";
+import { detectTopic } from "./topics";
+import type { TruthResult } from "./types";
+
+type BotWithLinks = Bot & { links: BotLink[] };
+
+function fmtContact(bot: BotWithLinks) {
+  const parts: string[] = [];
+  if (bot.businessPhone) parts.push(`Phone: ${bot.businessPhone}`);
+  if (bot.businessEmail) parts.push(`Email: ${bot.businessEmail}`);
+  return parts.length ? parts.join(" • ") : "";
+}
+
+function getLink(bot: BotWithLinks, type: "BOOKING" | "PAYMENT") {
+  // Prefer BotLink.type match, fallback to any “booking”/“pay” url-ish link in OTHER.
+  const byType = bot.links?.find((l) => l.type === type && l.url);
+  if (byType?.url) return byType.url;
+
+  const t = type === "BOOKING" ? "book" : "pay";
+  const heuristic = bot.links?.find((l) => (l.label || "").toLowerCase().includes(t) && l.url);
+  return heuristic?.url || null;
+}
+
+function normalizeJson<T>(value: unknown): T | null {
+  if (!value) return null;
+  try {
+    return value as T;
+  } catch {
+    return null;
+  }
+}
+
+function renderHours(hours: unknown): { text: string; used: boolean } {
+  // Expect array of { day: string, open?: string, close?: string, closed?: boolean }
+  const h = normalizeJson<any[]>(hours);
+  if (!h || !Array.isArray(h) || h.length === 0) return { text: "", used: false };
+
+  const lines = h
+    .map((d) => {
+      const day = d.day ?? d.name ?? "";
+      if (!day) return null;
+      if (d.closed) return `${day}: Closed`;
+      const open = d.open ?? d.start ?? "";
+      const close = d.close ?? d.end ?? "";
+      if (open && close) return `${day}: ${open}–${close}`;
+      return `${day}: (hours not fully set)`;
+    })
+    .filter(Boolean);
+
+  if (!lines.length) return { text: "", used: false };
+  return { text: lines.join("\n"), used: true };
+}
+
+function renderServices(services: unknown): { text: string; used: boolean; hasPrices: boolean } {
+  // Expect array of { name, description?, priceRange?, durationMinutes? }
+  const s = normalizeJson<any[]>(services);
+  if (!s || !Array.isArray(s) || s.length === 0) return { text: "", used: false, hasPrices: false };
+
+  let hasPrices = false;
+
+  const lines = s
+    .map((x) => {
+      const name = x.name;
+      if (!name) return null;
+      const price = x.priceRange || x.price || null;
+      if (price) hasPrices = true;
+      const dur = x.durationMinutes ? `${x.durationMinutes} min` : x.duration ? `${x.duration}` : null;
+
+      const meta = [price ? `Price: ${price}` : null, dur ? `Duration: ${dur}` : null].filter(Boolean).join(" • ");
+      return meta ? `• ${name} — ${meta}` : `• ${name}`;
+    })
+    .filter(Boolean);
+
+  if (!lines.length) return { text: "", used: false, hasPrices };
+  return { text: lines.join("\n"), used: true, hasPrices };
+}
+
+export function runTruthEngine(input: { message: string; bot: BotWithLinks }): TruthResult {
+  const { message, bot } = input;
+  const topicResult = detectTopic(message);
+
+  const missing: string[] = [];
+  const sourcedFrom: string[] = [];
+
+  const contactLine = fmtContact(bot);
+
+  // Booking/Payment: prefer redirect flow if links exist
+  if (topicResult.topic === "BOOKING") {
+    const url = getLink(bot, "BOOKING");
+    if (url) {
+      sourcedFrom.push("links[BOOKING]");
+      return {
+        reply: `You can book here: ${url}\n\nIf you’d like, I can also take your details and have the team confirm availability.`,
+        intent: "BOOK_OR_PAY_REDIRECT",
+        confidence: 0.9,
+        sourcedFrom,
+        requiresLeadCapture: true,
+        missingFields: [],
+        topic: topicResult.topic,
+      };
+    }
+    missing.push("links[BOOKING]");
+    return {
+      reply: `I don’t have a booking link in my system yet. ${contactLine ? `\n\n${contactLine}` : ""}\n\nIf you want, leave your name + best contact and what you’re trying to book — the team will follow up.`,
+      intent: "MISSING_DATA",
+      confidence: 0.8,
+      sourcedFrom,
+      requiresLeadCapture: true,
+      missingFields: missing,
+      topic: topicResult.topic,
+    };
+  }
+
+  if (topicResult.topic === "PAYMENT") {
+    const url = getLink(bot, "PAYMENT");
+    if (url) {
+      sourcedFrom.push("links[PAYMENT]");
+      return {
+        reply: `You can pay here: ${url}\n\nIf you want, tell me what service you’re paying for and I’ll pass it to the team.`,
+        intent: "BOOK_OR_PAY_REDIRECT",
+        confidence: 0.9,
+        sourcedFrom,
+        requiresLeadCapture: true,
+        missingFields: [],
+        topic: topicResult.topic
