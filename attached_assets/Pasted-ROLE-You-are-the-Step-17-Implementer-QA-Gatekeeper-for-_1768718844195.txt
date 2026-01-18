@@ -1,0 +1,118 @@
+ROLE: You are the Step-17 Implementer + QA Gatekeeper for Treasure Coast AI.
+Goal: Implement “Step 17: Vercel Deployment + Production Gates” in a Next.js + Prisma app. 
+Rules: DO NOT hallucinate. DO NOT claim commands passed unless you actually ran them and paste the outputs. DO NOT overwrite package.json—surgically merge only. Use ONLY ASCII quotes in JSON. No nested markdown code fences inside other fences.
+
+DELIVERABLES (MUST CREATE / UPDATE EXACTLY):
+A) Create /vercel.json at repo root with:
+{
+  "buildCommand": "pnpm db:generate && pnpm build",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "regions": ["iad1"]
+}
+
+B) Create /scripts/db-migrate-and-verify.ts (schema-agnostic verification; no prisma.bot assumptions):
+- Must: error if DATABASE_URL missing
+- Must: run migrations using production-safe deploy command
+- Must: verify connectivity using SELECT 1 (or equivalent) via Prisma
+- Must: cleanly disconnect prisma in success/failure paths
+Use tsx to run the file (no chmod required)
+
+Reference implementation (OK to copy exactly):
+#!/usr/bin/env tsx
+import { PrismaClient } from "@prisma/client";
+import { execSync } from "child_process";
+
+async function main() {
+  console.log("[DB MIGRATE] Starting migration and verification...");
+
+  if (!process.env.DATABASE_URL) {
+    console.error("[DB MIGRATE] ERROR: DATABASE_URL environment variable is not set");
+    process.exit(1);
+  }
+
+  console.log("[DB MIGRATE] DATABASE_URL is set");
+
+  try {
+    console.log("[DB MIGRATE] Running prisma migrate deploy...");
+    execSync("pnpm db:migrate", { stdio: "inherit" });
+    console.log("[DB MIGRATE] Migrations completed successfully");
+  } catch (error) {
+    console.error("[DB MIGRATE] ERROR: Migration failed", error);
+    process.exit(1);
+  }
+
+  const prisma = new PrismaClient();
+  try {
+    console.log("[DB MIGRATE] Verifying database connectivity...");
+    await prisma.$connect();
+    await prisma.$queryRaw`SELECT 1`;
+    console.log("[DB MIGRATE] Database connected successfully");
+    await prisma.$disconnect();
+    console.log("[DB MIGRATE] All checks passed ✓");
+  } catch (error) {
+    console.error("[DB MIGRATE] ERROR: Database connectivity verification failed", error);
+    await prisma.$disconnect();
+    process.exit(1);
+  }
+}
+
+main().catch((error) => {
+  console.error("[DB MIGRATE] Unexpected error:", error);
+  process.exit(1);
+});
+
+C) Create /docs/DEPLOYMENT.md with a clear Vercel + Neon guide.
+CRITICAL FORMAT RULES:
+- Any code fence you open MUST be closed.
+- The “Example format” DATABASE_URL must be inside a fenced block that is closed immediately after the URL line.
+- Do NOT nest code fences (no ```json inside ```markdown).
+
+Minimum required sections:
+- Prerequisites
+- Neon setup + where to get DATABASE_URL
+- Explicit statement: “Vercel does NOT automatically run migrations”
+- Manual migration procedure (first deploy + code update)
+- Env vars list (required + optional Upstash)
+- Rollback notes (Prisma no rollback; Neon PITR/branch restore)
+- Smoke tests (curl examples)
+
+D) Update package.json S-U-R-G-I-C-A-L-L-Y (do NOT replace the whole file).
+Add/update these scripts ONLY (keep all existing scripts):
+"db:generate": "prisma generate"
+"db:migrate": "prisma migrate deploy"
+"db:migrate:dev": "prisma migrate dev"
+"db:studio": "prisma studio"
+"db:push": "prisma db push"
+"db:seed": "tsx prisma/seed.ts"
+"db:migrate-verify": "tsx scripts/db-migrate-and-verify.ts"
+"test:e2e": "playwright test"
+"deploy:check": "pnpm lint && pnpm typecheck && pnpm test:e2e && pnpm build"
+"postinstall": "prisma generate"
+
+Dev dependency:
+- Ensure "tsx" is present in devDependencies (any recent 4.x is OK)
+
+E) QA GATES (MUST RUN IN THIS ORDER AND PASTE OUTPUTS):
+1) pnpm add -D tsx
+2) pnpm lint
+3) pnpm typecheck
+4) pnpm test:e2e
+5) pnpm db:generate
+6) pnpm build
+7) pnpm db:migrate-verify
+
+If db:migrate-verify fails due to DATABASE_URL not set, state that clearly and mark NO-GO until DATABASE_URL is configured. Do NOT pretend it passed.
+
+OUTPUT FORMAT (MANDATORY):
+1) “Files changed summary” (created/modified)
+2) Full contents of:
+   - vercel.json
+   - scripts/db-migrate-and-verify.ts
+   - docs/DEPLOYMENT.md
+3) The exact package.json changes (only the keys added/updated)
+4) A single bash block with the commands you ran
+5) QA Gate Results table (pass/fail) + pasted terminal outputs (or key excerpts)
+6) Final verdict: GO/NO-GO with reasons
+
+START NOW.
