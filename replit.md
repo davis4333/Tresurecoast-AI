@@ -64,7 +64,24 @@ Preferred communication style: Simple, everyday language.
 - **TruthResult Shape**: `{ reply, intent, confidence, sourcedFrom[], requiresLeadCapture, missingFields[], topic, suggestedActions[] }`
 - **Intent Types**: ANSWERED_FROM_PROFILE, MISSING_DATA, BOOK_OR_PAY_REDIRECT, LEAD_CAPTURE
 - **Lead Capture**: Triggers on high-intent queries (booking, pricing) when data is missing
-- **Analytics**: DataEvent model logs track TOPIC_DETECTED, TRUTH_RESPONSE, MISSING_DATA, LEAD_CAPTURE_TRIGGERED, REDIRECT_CLICK events
+- **Analytics**: DataEvent model logs track TOPIC_DETECTED, TRUTH_RESPONSE, MISSING_DATA, LEAD_CAPTURE_TRIGGERED, REDIRECT_CLICK, LEAD_SCORED events
+
+### Lead Scoring Architecture
+- **Location**: `src/lib/leads/scoreLead.ts`
+- **Schemas**: `src/lib/leads/scoreSchemas.ts` - Zod schemas for LeadScoreInput, LeadScoreResult
+- **Purpose**: Rules-based scoring that evaluates lead quality from contact completeness and intent signals
+- **Score Range**: 0-100 (clamped)
+- **Temperature Thresholds**: HOT ≥70, WARM ≥40, COLD <40
+- **Scoring Factors**:
+  - Contact completeness: name (+10), email (+15), phone (+20)
+  - Service interest: has specific service (+10)
+  - High-intent topics: BOOKING/PAYMENT/PRICING (+15 each)
+  - Message detail: 50+ chars (+5), 100+ chars (+10)
+  - Suggested actions: book/pay actions (+10), has redirect (+5)
+  - Missing data penalty: multiple missing fields (-5)
+- **Persistence**: score, temperature (enum), scoreReasons (String[]) stored on Lead model
+- **Events**: LEAD_SCORED DataEvent logged on lead creation and status updates
+- **Recomputation**: Score recomputed on status changes to maintain accuracy
 
 ### Key Design Decisions
 
