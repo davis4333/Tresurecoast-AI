@@ -7,98 +7,41 @@ export const metadata: Metadata = {
 
 export default function PricingPage() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "var(--color-background)",
-        color: "var(--color-text-primary)",
-      }}
-    >
+    <div className="tca-background tca-text-primary" style={{ minHeight: "100vh" }}>
       <header
-        style={{
-          borderBottom: "1px solid var(--color-border)",
-          padding: "var(--space-lg) var(--space-xl)",
-          backgroundColor: "var(--color-surface)",
-        }}
+        className="tca-surface tca-border"
+        style={{ padding: "var(--space-lg) var(--space-xl)", borderTop: "none", borderLeft: "none", borderRight: "none" }}
       >
         <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-          <h1
-            style={{
-              fontSize: "1.5rem",
-              fontWeight: "700",
-              color: "var(--color-brand-primary)",
-              margin: 0,
-            }}
-          >
+          <h1 className="tca-text-brand" style={{ fontSize: "1.5rem", fontWeight: "700", margin: 0 }}>
             Treasure Coast AI
           </h1>
         </div>
       </header>
 
-      <main
-        style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "var(--space-2xl) var(--space-xl)",
-        }}
-      >
+      <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "var(--space-2xl) var(--space-xl)" }}>
         <div style={{ textAlign: "center", marginBottom: "var(--space-2xl)" }}>
           <h2
-            style={{
-              fontSize: "2.5rem",
-              fontWeight: "800",
-              marginBottom: "var(--space-md)",
-              background:
-                "linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-secondary))",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
+            className="tca-gradient-text"
+            style={{ fontSize: "2.5rem", fontWeight: "800", marginBottom: "var(--space-md)" }}
           >
             Simple, Transparent Pricing
           </h2>
-          <p
-            style={{
-              fontSize: "1.25rem",
-              color: "var(--color-text-secondary)",
-              maxWidth: "600px",
-              margin: "0 auto",
-            }}
-          >
+          <p className="tca-text-secondary" style={{ fontSize: "1.25rem", maxWidth: "600px", margin: "0 auto" }}>
             AI-powered customer engagement for your business
           </p>
         </div>
 
-        <div
-          className="tca-card"
-          style={{
-            maxWidth: "400px",
-            margin: "0 auto",
-            padding: "var(--space-xl)",
-          }}
-        >
+        <div className="tca-card" style={{ maxWidth: "400px", margin: "0 auto", padding: "var(--space-xl)" }}>
           <div style={{ marginBottom: "var(--space-lg)" }}>
-            <h3
-              style={{
-                fontSize: "1.5rem",
-                fontWeight: "700",
-                marginBottom: "var(--space-sm)",
-                marginTop: 0,
-              }}
-            >
+            <h3 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "var(--space-sm)", marginTop: 0 }}>
               Professional
             </h3>
             <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-xs)" }}>
-              <span
-                style={{
-                  fontSize: "3rem",
-                  fontWeight: "800",
-                  color: "var(--color-brand-primary)",
-                }}
-              >
+              <span className="tca-text-brand" style={{ fontSize: "3rem", fontWeight: "800" }}>
                 $99
               </span>
-              <span style={{ color: "var(--color-text-secondary)" }}>/month</span>
+              <span className="tca-text-secondary">/month</span>
             </div>
           </div>
 
@@ -112,13 +55,8 @@ export default function PricingPage() {
             ].map((feature) => (
               <li
                 key={feature}
-                style={{
-                  padding: "var(--space-sm) 0",
-                  color: "var(--color-text-secondary)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--space-sm)",
-                }}
+                className="tca-text-secondary"
+                style={{ padding: "var(--space-sm) 0", display: "flex", alignItems: "center", gap: "var(--space-sm)" }}
               >
                 <span style={{ color: "var(--color-success)" }}>✓</span>
                 {feature}

@@ -259,17 +259,15 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
       )}
 
       {!isLoadingHistory && messages.length > 0 && (
-        <div className="max-h-96 space-y-3 overflow-y-auto rounded-lg border border-white/10 bg-white/5 p-4">
+        <div className="tca-surface tca-border tca-radius-lg max-h-96 space-y-3 overflow-y-auto p-4">
           {messages.map((msg, idx) => (
             <div
               key={idx}
               className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                  msg.role === "user"
-                    ? "bg-white text-black"
-                    : "border border-white/10 bg-white/5 text-white/90"
+                className={`max-w-[80%] ${
+                  msg.role === "user" ? "tca-bubble-user" : "tca-bubble-assistant"
                 }`}
               >
                 <p className="text-sm">{msg.content}</p>
