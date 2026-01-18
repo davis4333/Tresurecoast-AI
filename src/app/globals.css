@@ -14,41 +14,87 @@ body {
 }
 
 body {
-  background: #0b0e13;
-  color: #f8fafc;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* Premium button styles */
 .tca-btn-primary {
-  display: inline-block;
-  width: 100%;
-  padding: var(--space-md) var(--space-lg);
-  background-color: var(--color-brand-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: linear-gradient(135deg, var(--color-brand-primary) 0%, var(--color-brand-primary-hover) 100%);
   color: var(--color-text-inverse);
   text-align: center;
   border-radius: var(--radius-md);
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 0.875rem;
   text-decoration: none;
-  transition: box-shadow var(--transition-base), background-color var(--transition-base), transform var(--transition-base);
+  transition: all var(--transition-base);
   border: none;
   cursor: pointer;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.1), inset 0 1px 0 0 rgb(255 255 255 / 0.1);
 }
 
 .tca-btn-primary:hover {
-  background-color: var(--color-brand-primary-hover);
-  box-shadow: var(--shadow-glow);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-glow), 0 4px 12px 0 rgb(99 102 241 / 0.3);
 }
 
+.tca-btn-primary:active {
+  transform: translateY(0);
+}
+
+.tca-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  text-align: center;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: all var(--transition-base);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+
+.tca-btn-secondary:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-text-muted);
+}
+
+/* Premium card styles */
 .tca-card {
-  background-color: var(--color-surface);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.tca-card-elevated {
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
 /* Utility classes */
 .tca-surface {
   background-color: var(--color-surface);
+}
+
+.tca-surface-elevated {
+  background-color: var(--color-surface-elevated);
 }
 
 .tca-background {
@@ -59,12 +105,20 @@ body {
   border: 1px solid var(--color-border);
 }
 
+.tca-border-subtle {
+  border: 1px solid var(--color-border-subtle);
+}
+
 .tca-text-primary {
   color: var(--color-text-primary);
 }
 
 .tca-text-secondary {
   color: var(--color-text-secondary);
+}
+
+.tca-text-muted {
+  color: var(--color-text-muted);
 }
 
 .tca-text-brand {
@@ -85,14 +139,14 @@ body {
 
 /* Message bubble classes */
 .tca-bubble-user {
-  background-color: var(--color-brand-primary);
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-hover));
   color: var(--color-text-inverse);
   border-radius: var(--radius-lg);
   padding: var(--space-sm) var(--space-md);
 }
 
 .tca-bubble-assistant {
-  background-color: var(--color-surface);
+  background-color: var(--color-surface-elevated);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -101,28 +155,29 @@ body {
 
 /* Gradient text */
 .tca-gradient-text {
-  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-secondary));
+  background: linear-gradient(135deg, var(--color-brand-primary) 0%, var(--color-brand-secondary) 50%, var(--color-brand-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   color: transparent;
 }
 
-/* Step 18.3: Premium micro-utilities */
+/* Premium input styles */
 .tca-input {
   width: 100%;
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   border-radius: var(--radius-md);
-  padding: var(--space-sm) var(--space-md);
-  transition: box-shadow var(--transition-base), border-color var(--transition-base);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  transition: all var(--transition-base);
 }
 
 .tca-input:focus {
   outline: none;
-  border-color: var(--color-brand-accent);
-  box-shadow: var(--shadow-glow);
+  border-color: var(--color-brand-primary);
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.15);
 }
 
 .tca-input::placeholder {
@@ -131,8 +186,182 @@ body {
 
 .tca-input:disabled {
   opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .tca-divider {
   border-top: 1px solid var(--color-border);
+}
+
+/* Premium focus ring */
+.tca-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-brand-primary);
+}
+
+/* Status badge styles */
+.tca-status-new {
+  background: rgb(59 130 246 / 0.15);
+  color: #60a5fa;
+  border: 1px solid rgb(59 130 246 / 0.25);
+}
+
+.tca-status-contacted {
+  background: rgb(234 179 8 / 0.15);
+  color: #facc15;
+  border: 1px solid rgb(234 179 8 / 0.25);
+}
+
+.tca-status-booked {
+  background: rgb(34 197 94 / 0.15);
+  color: #4ade80;
+  border: 1px solid rgb(34 197 94 / 0.25);
+}
+
+.tca-status-closed {
+  background: rgb(113 113 122 / 0.15);
+  color: #a1a1aa;
+  border: 1px solid rgb(113 113 122 / 0.25);
+}
+
+/* Sidebar nav link */
+.tca-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.tca-nav-link:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.tca-nav-link.active {
+  color: var(--color-text-primary);
+  background: var(--color-surface-elevated);
+}
+
+.tca-nav-link.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: var(--color-brand-primary);
+  border-radius: 0 2px 2px 0;
+}
+
+/* Page header pattern */
+.tca-page-header {
+  margin-bottom: 2rem;
+}
+
+.tca-page-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--color-text-primary);
+}
+
+.tca-page-subtitle {
+  margin-top: 0.5rem;
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+}
+
+/* Table styles */
+.tca-table {
+  width: 100%;
+}
+
+.tca-table th {
+  text-align: left;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tca-table td {
+  padding: 1rem 1.25rem;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.tca-table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.tca-table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+/* Skeleton loading */
+.tca-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 25%,
+    var(--color-surface-hover) 50%,
+    var(--color-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: tca-shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes tca-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Empty state */
+.tca-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.tca-empty-state-icon {
+  width: 4rem;
+  height: 4rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+}
+
+.tca-empty-state-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.tca-empty-state-description {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  max-width: 24rem;
 }
