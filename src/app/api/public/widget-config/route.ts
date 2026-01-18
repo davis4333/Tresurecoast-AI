@@ -67,7 +67,16 @@ export async function GET(req: Request) {
         name: true,
         greeting: true,
         fallbackText: true,
-        allowlist: { select: { domain: true } }
+        allowlist: { select: { domain: true } },
+        organization: {
+          select: {
+            whiteLabelEnabled: true,
+            brandCompanyName: true,
+            brandLogoUrl: true,
+            brandPrimaryColor: true,
+            showPoweredBy: true,
+          }
+        }
       }
     });
 
@@ -110,6 +119,8 @@ export async function GET(req: Request) {
       bot.fallbackText?.trim() ||
       "I'm not 100% sure from the info I have. Want to leave your name and number so the team can follow up?";
 
+    const org = bot.organization;
+
     return NextResponse.json({
       ok: true,
       config: {
@@ -120,6 +131,13 @@ export async function GET(req: Request) {
         theme: {
           mode: "dark",
           accent: null
+        },
+        branding: {
+          whiteLabelEnabled: org.whiteLabelEnabled,
+          brandCompanyName: org.brandCompanyName,
+          brandLogoUrl: org.brandLogoUrl,
+          brandPrimaryColor: org.brandPrimaryColor,
+          showPoweredBy: org.showPoweredBy,
         }
       }
     });

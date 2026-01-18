@@ -1,0 +1,311 @@
+YOU ARE REPLIT AI WORKING INSIDE AN EXISTING NEXT.JS (APP ROUTER) + PRISMA + CLERK PROJECT.
+PROJECT: Treasure Coast AI Platform
+STEP 25: WHITE-LABEL BRANDING SYSTEM (ORG-SCOPED)
+
+CONTEXT (DO NOT CHANGE):
+- Steps 1–24 are complete and passing gates.
+- Multi-tenant via Organization -> Workspaces -> Bots.
+- Auth is Clerk.
+- Permissions: AGENCY_OWNER / AGENCY_ADMIN can edit org settings; other org roles can view.
+- Payment processing is external (out of scope).
+- DO NOT introduce botPublicKey-based admin endpoints or “platform admin” auth. Branding is ORGANIZATION-scoped.
+
+GOAL:
+Add an Organization-level white-label branding system that:
+1) Lets org owners/admins set branding fields.
+2) Applies branding across the dashboard via a CSS variable.
+3) Ships branding down to the public widget via /api/public/widget-config.
+4) Themes the widget (header + send button) and optionally “Powered by”.
+
+REQUIRED BRANDING FIELDS (Organization model):
+- whiteLabelEnabled: Boolean (default false)
+- brandCompanyName: String? (nullable)
+- brandLogoUrl: String? (nullable)
+- brandPrimaryColor: String (default "#6366f1")
+- showPoweredBy: Boolean (default true)
+- customDomain: String? (nullable, UNIQUE)
+
+IMPORTANT RULES:
+- Branding settings page must be ORGANIZATION-scoped (no bot selector, no botPublicKey input).
+- GET /api/org/branding: any authenticated org member can view.
+- PUT /api/org/branding: ONLY AGENCY_OWNER or AGENCY_ADMIN can update.
+- customDomain uniqueness must return 409 if taken by another org.
+- Validation:
+  - brandPrimaryColor must be strict hex: #RRGGBB
+  - customDomain must be domain-only (no https://)
+  - brandLogoUrl must be a valid URL or null
+
+FILES TO ADD / CHANGE
+
+(1) MODIFY: prisma/schema.prisma
+Add fields to Organization (keep existing primary key type as-is).
+
+Example (merge into your Organization model):
+  whiteLabelEnabled  Boolean @default(false)
+  brandCompanyName   String?
+  brandLogoUrl       String?
+  brandPrimaryColor  String  @default("#6366f1")
+  showPoweredBy      Boolean @default(true)
+  customDomain       String? @unique
+
+(2) MIGRATION
+Create a Prisma migration (preferred):
+  pnpm prisma migrate dev --name step25_org_branding
+
+(3) NEW FILE: src/lib/validators/branding.ts
+Create a Zod schema for org branding:
+
+<FILE:src/lib/validators/branding.ts>
+import { z } from "zod";
+
+const hexColorRegex = /^#[0-9A-Fa-f]{6}$/;
+const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+
+export const BrandingSchema = z.object({
+  whiteLabelEnabled: z.boolean(),
+  brandCompanyName: z.string().max(80).nullable().or(z.literal("")),
+  brandLogoUrl: z.string().url().nullable().or(z.literal("")),
+  brandPrimaryColor: z.string().regex(hexColorRegex, "Must be a valid hex color (#RRGGBB)"),
+  showPoweredBy: z.boolean(),
+  customDomain: z.string().regex(domainRegex, "Must be a valid domain (e.g., example.com)").nullable().or(z.literal("")),
+});
+
+export type BrandingInput = z.infer<typeof BrandingSchema>;
+
+export const BrandingResponseSchema = z.object({
+  ok: z.literal(true),
+  branding: BrandingSchema,
+});
+</FILE>
+
+(4) NEW FILE: src/app/api/org/branding/route.ts
+Org-scoped API (GET + PUT). Uses Clerk auth + org membership roles.
+Adjust prisma import to your repo (some repos use "@/lib/db", some "@/lib/prisma").
+
+<FILE:src/app/api/org/branding/route.ts>
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { ZodError } from "zod";
+import { BrandingSchema } from "@/lib/validators/branding";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+
+function jsonError(requestId: string, status: number, error: string, message: string, details?: unknown) {
+  return NextResponse.json({ ok: false, requestId, error, message, details }, { status });
+}
+
+async function getMembershipOrThrow(userId: string) {
+  const membership = await prisma.organizationMember.findFirst({
+    where: { clerkUserId: userId },
+    include: {
+      organization: {
+        select: {
+          id: true,
+          whiteLabelEnabled: true,
+          brandCompanyName: true,
+          brandLogoUrl: true,
+          brandPrimaryColor: true,
+          showPoweredBy: true,
+          customDomain: true,
+        },
+      },
+    },
+  });
+
+  return membership;
+}
+
+function canEdit(role: string) {
+  return role === "AGENCY_OWNER" || role === "AGENCY_ADMIN";
+}
+
+export async function GET(req: NextRequest) {
+  const requestId = crypto.randomUUID();
+  try {
+    const { userId } = await auth();
+    if (!userId) return jsonError(requestId, 401, "unauthorized", "Authentication required");
+
+    const membership = await getMembershipOrThrow(userId);
+    if (!membership) return jsonError(requestId, 404, "not_found", "Organization not found");
+
+    const org = membership.organization;
+    return NextResponse.json({
+      ok: true,
+      branding: {
+        whiteLabelEnabled: org.whiteLabelEnabled,
+        brandCompanyName: org.brandCompanyName,
+        brandLogoUrl: org.brandLogoUrl,
+        brandPrimaryColor: org.brandPrimaryColor,
+        showPoweredBy: org.showPoweredBy,
+        customDomain: org.customDomain,
+      },
+    });
+  } catch {
+    return jsonError(requestId, 500, "internal_error", "Failed to retrieve branding");
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  const requestId = crypto.randomUUID();
+  try {
+    const { userId } = await auth();
+    if (!userId) return jsonError(requestId, 401, "unauthorized", "Authentication required");
+
+    const membership = await getMembershipOrThrow(userId);
+    if (!membership) return jsonError(requestId, 404, "not_found", "Organization not found");
+    if (!canEdit(membership.role)) {
+      return jsonError(requestId, 403, "forbidden", "Only organization owners/admins can update branding");
+    }
+
+    const body = await req.json();
+    const validated = BrandingSchema.parse(body);
+
+    const normalized = {
+      whiteLabelEnabled: validated.whiteLabelEnabled,
+      brandCompanyName: validated.brandCompanyName || null,
+      brandLogoUrl: validated.brandLogoUrl || null,
+      brandPrimaryColor: validated.brandPrimaryColor,
+      showPoweredBy: validated.showPoweredBy,
+      customDomain: validated.customDomain || null,
+    };
+
+    // customDomain uniqueness check (only if changing)
+    if (normalized.customDomain && normalized.customDomain !== membership.organization.customDomain) {
+      const existing = await prisma.organization.findUnique({
+        where: { customDomain: normalized.customDomain },
+        select: { id: true },
+      });
+      if (existing && existing.id !== membership.organizationId) {
+        return jsonError(requestId, 409, "domain_taken", "This custom domain is already in use by another organization");
+      }
+    }
+
+    const updated = await prisma.organization.update({
+      where: { id: membership.organizationId },
+      data: normalized,
+      select: {
+        whiteLabelEnabled: true,
+        brandCompanyName: true,
+        brandLogoUrl: true,
+        brandPrimaryColor: true,
+        showPoweredBy: true,
+        customDomain: true,
+      },
+    });
+
+    return NextResponse.json({ ok: true, branding: updated });
+  } catch (err: any) {
+    if (err instanceof ZodError) {
+      return jsonError(requestId, 400, "validation_error", "Invalid branding data", err.errors);
+    }
+    return jsonError(requestId, 500, "internal_error", "Failed to update branding");
+  }
+}
+</FILE>
+
+(5) NEW FILE: src/components/branding/BrandingCssVars.tsx
+Mount once in your authenticated layout.
+
+<FILE:src/components/branding/BrandingCssVars.tsx>
+"use client";
+
+import { useEffect } from "react";
+
+export function BrandingCssVars() {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function apply() {
+      try {
+        const res = await fetch("/api/org/branding", { method: "GET" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+
+        const enabled = Boolean(data?.branding?.whiteLabelEnabled);
+        const color = data?.branding?.brandPrimaryColor || "#6366f1";
+        document.documentElement.style.setProperty("--tca-brand-primary", enabled ? color : "#6366f1");
+      } catch {
+        // silent fail
+      }
+    }
+
+    apply();
+    return () => { cancelled = true; };
+  }, []);
+
+  return null;
+}
+</FILE>
+
+(6) DASHBOARD SETTINGS PAGE
+Create a page where your existing settings pages live, for example:
+- src/app/(dashboard)/dashboard/settings/branding/page.tsx
+(or adapt to your existing structure)
+
+REQUIREMENTS:
+- On mount: GET /api/org/branding
+- Fields: enable toggle, company name, logo URL, primary color (text + color picker), showPoweredBy toggle, customDomain
+- Save: PUT /api/org/branding
+- Disable fields unless whiteLabelEnabled = true (except toggle)
+- On successful save: update CSS var --tca-brand-primary immediately
+- Use your design-system components (TcaPageShell, TcaCard, TcaButton) to match the existing app.
+
+(7) globals.css
+Add default CSS var:
+
+:root { --tca-brand-primary: #6366f1; }
+
+Use it minimally (avoid visual regressions).
+
+(8) PUBLIC WIDGET CONFIG: src/app/api/public/widget-config/route.ts
+Extend the response with a NEW field only:
+
+config.branding = {
+  whiteLabelEnabled,
+  brandCompanyName,
+  brandLogoUrl,
+  brandPrimaryColor,
+  showPoweredBy,
+}
+
+Do NOT rename existing fields.
+
+(9) WIDGET UI: src/app/widget/[botPublicKey]/ChatBox.tsx
+Theme using config.branding:
+- Header bg = brandPrimaryColor
+- Send button bg = brandPrimaryColor
+- If whiteLabelEnabled and (logo/company): show them in header
+- If showPoweredBy: show footer
+  - If whiteLabelEnabled and company: “Powered by {company}”
+  - Else: “Powered by Treasure Coast AI”
+
+(10) NAV + LAYOUT
+- Add “Branding” link to settings nav.
+- Mount <BrandingCssVars /> once in authenticated layout.
+
+TESTS
+- Unit test for BrandingSchema:
+  - valid payload passes
+  - invalid hex fails
+  - invalid domain fails
+- If you have API route tests already, add:
+  - GET requires auth
+  - PUT requires owner/admin
+  - PUT rejects duplicate domain (409)
+- E2E: branding page loads + can save (use existing auth helper)
+
+GATES (RUN ALL, FAIL IF ANY FAIL):
+1) pnpm prisma generate
+2) pnpm prisma migrate dev --name step25_org_branding
+3) pnpm lint
+4) pnpm typecheck
+5) pnpm test
+6) pnpm test:e2e
+7) pnpm build
+
+STOP WHEN DONE and print:
+- Summary of files changed
+- Command outputs
+- Manual QA checklist results (including widget branding)

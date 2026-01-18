@@ -13,9 +13,18 @@ type ChatMessage = {
   timestamp: string;
 };
 
+type WidgetBranding = {
+  whiteLabelEnabled?: boolean;
+  brandCompanyName?: string | null;
+  brandLogoUrl?: string | null;
+  brandPrimaryColor?: string;
+  showPoweredBy?: boolean;
+};
+
 type WidgetConfig = {
   botName?: string;
   greeting?: string;
+  branding?: WidgetBranding;
 };
 
 export function ChatBox({ botPublicKey }: ChatBoxProps) {
@@ -46,8 +55,9 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
         const data = await res.json();
         if (data.ok && data.config) {
           setConfig({
-            botName: data.config.botName,
+            botName: data.config.name,
             greeting: data.config.greeting,
+            branding: data.config.branding,
           });
         }
       } catch {
@@ -220,36 +230,58 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
 
   const leadHasAny = !!leadName.trim() || !!leadEmail.trim() || !!leadPhone.trim();
 
+  const branding = config?.branding;
+  const headerBg = branding?.whiteLabelEnabled && branding?.brandPrimaryColor
+    ? branding.brandPrimaryColor
+    : "var(--color-brand-primary)";
+  const showLogo = branding?.whiteLabelEnabled && branding?.brandLogoUrl;
+  const showCompanyName = branding?.whiteLabelEnabled && branding?.brandCompanyName;
+  const showPoweredBy = branding?.showPoweredBy !== false;
+  const poweredByText = branding?.whiteLabelEnabled && branding?.brandCompanyName
+    ? `Powered by ${branding.brandCompanyName}`
+    : "Powered by Treasure Coast AI";
+
   return (
-    <div className="space-y-4">
-      {/* Header - apply theme tokens */}
+    <div className="flex flex-col space-y-4">
+      {/* Header - apply theme tokens and branding */}
       <div
         style={{
           padding: "var(--space-md)",
           borderBottom: "1px solid var(--color-border)",
-          backgroundColor: "var(--color-brand-primary)",
+          backgroundColor: headerBg,
           color: "var(--color-text-inverse)",
           borderTopLeftRadius: "var(--radius-lg)",
           borderTopRightRadius: "var(--radius-lg)",
           boxShadow: "var(--shadow-md)",
         }}
       >
-        <h2 style={{ fontSize: "1.125rem", fontWeight: "600", margin: 0 }}>
-          {config?.botName || "Chat Support"}
-        </h2>
+        <div className="flex items-center gap-3">
+          {showLogo && (
+            <img
+              src={branding.brandLogoUrl!}
+              alt="Logo"
+              className="h-8 w-8 rounded object-contain"
+            />
+          )}
+          <div>
+            <h2 style={{ fontSize: "1.125rem", fontWeight: "600", margin: 0 }}>
+              {showCompanyName ? branding.brandCompanyName : (config?.botName || "Chat Support")}
+            </h2>
 
-        {config?.greeting && (
-          <p
-            style={{
-              fontSize: "0.875rem",
-              marginTop: "var(--space-xs)",
-              opacity: 0.9,
-              margin: "var(--space-xs) 0 0 0",
-            }}
-          >
-            {config.greeting}
-          </p>
-        )}
+            {config?.greeting && (
+              <p
+                style={{
+                  fontSize: "0.875rem",
+                  marginTop: "var(--space-xs)",
+                  opacity: 0.9,
+                  margin: "var(--space-xs) 0 0 0",
+                }}
+              >
+                {config.greeting}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {isLoadingHistory && (
@@ -347,11 +379,21 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
             !message.trim()
           }
           data-testid="chat-send"
+          style={{
+            backgroundColor: headerBg,
+          }}
           className="tca-btn-primary w-auto px-4 py-2 text-sm disabled:opacity-50"
         >
           {isSending ? "..." : "Send"}
         </button>
       </div>
+
+      {/* Powered by footer */}
+      {showPoweredBy && (
+        <div className="text-center text-xs text-[var(--color-text-muted)]">
+          {poweredByText}
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cx } from "@/components/tca/tca";
 import { TcaBadge } from "@/components/tca/TcaBadge";
+import { BrandingCssVars } from "@/components/branding/BrandingCssVars";
 import dynamic from "next/dynamic";
 
 const NAV_ITEMS = [
@@ -13,10 +14,16 @@ const NAV_ITEMS = [
   { href: "/app/conversations", label: "Conversations", icon: "chat" },
   { href: "/app/insights", label: "Insights", icon: "chart" },
   { href: "/app/settings", label: "Settings", icon: "settings" },
+  { href: "/app/settings/branding", label: "Branding", icon: "palette" },
 ];
 
 function NavIcon({ icon }: { icon: string }) {
   const iconMap: Record<string, JSX.Element> = {
+    palette: (
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+      </svg>
+    ),
     grid: (
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -91,6 +98,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-[var(--color-background)]">
+      <BrandingCssVars />
       <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="flex h-16 items-center justify-between border-b border-[var(--color-border)] px-4">
           <Link href="/app" className="text-lg font-extrabold text-[var(--color-brand-primary)]">
