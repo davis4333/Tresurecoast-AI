@@ -88,6 +88,10 @@ test.describe("Revenue Loop E2E", () => {
     expect(foundLead).toBeDefined();
     expect(foundLead.status).toBe("NEW");
     expect(foundLead.conversationPublicId).toBe(conversationPublicId);
+    expect(typeof foundLead.score).toBe("number");
+    expect(foundLead.score).toBeGreaterThanOrEqual(0);
+    expect(foundLead.score).toBeLessThanOrEqual(100);
+    expect(["HOT", "WARM", "COLD"]).toContain(foundLead.temperature);
 
     // Step 4: Update lead status
     const statusResponse = await request.patch(
@@ -129,6 +133,11 @@ test.describe("Revenue Loop E2E", () => {
     expect(new Date(detailData.lead.createdAt).toISOString()).toBe(
       detailData.lead.createdAt
     );
+    expect(typeof detailData.lead.score).toBe("number");
+    expect(detailData.lead.score).toBeGreaterThanOrEqual(0);
+    expect(detailData.lead.score).toBeLessThanOrEqual(100);
+    expect(["HOT", "WARM", "COLD"]).toContain(detailData.lead.temperature);
+    expect(Array.isArray(detailData.lead.scoreReasons)).toBe(true);
 
     // Step 6: Fetch conversation messages
     const messagesResponse = await request.get(
