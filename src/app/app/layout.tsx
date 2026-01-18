@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UserButton } from "@clerk/nextjs";
 import { cx } from "@/components/tca/tca";
 import { TcaBadge } from "@/components/tca/TcaBadge";
 
@@ -93,8 +94,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">Dashboard</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <TcaBadge>Foundation Build</TcaBadge>
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{
+                elements: {
+                  avatarBox: "w-8 h-8",
+                },
+              }}
+            />
           </div>
         </header>
 

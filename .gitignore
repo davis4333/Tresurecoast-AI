@@ -23,3 +23,6 @@ pnpm-debug.log*
 
 # typescript
 *.tsbuildinfo
+
+# clerk configuration (can include secrets)
+/.clerk/

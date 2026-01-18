@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
-import { requireAdmin, handleAdminError, AdminUnauthorizedError } from "@/lib/admin/requireAdmin";
+import { requireClerkAdmin, ClerkUnauthorizedError, handleClerkError } from "@/lib/admin/requireClerkAdmin";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   try {
-    requireAdmin(req);
+    await requireClerkAdmin();
   } catch (error) {
-    if (error instanceof AdminUnauthorizedError) {
+    if (error instanceof ClerkUnauthorizedError) {
       return error.response;
     }
-    return handleAdminError(error);
+    return handleClerkError(error);
   }
 
   const url = new URL(req.url);

@@ -1,0 +1,131 @@
+STEP 21 — AUTH (AGENCY-ONLY, INVITE-ONLY) + PROTECT /app + /api/admin (NO PUBLIC SIGN-UP)
+
+GOAL
+Secure the dashboard and admin APIs with Clerk.
+This is NOT a self-serve SaaS. We do NOT want public sign-up.
+We want:
+- Sign-in only
+- Invite-only users (managed in Clerk dashboard)
+- /app/* protected
+- /api/admin/* protected
+- Keep public widget + public APIs working (/widget/* and /api/public/*)
+
+NON-NEGOTIABLES
+- DO NOT add a public sign-up flow/route.
+- DO NOT expose any admin API key to the browser.
+- DO NOT break existing E2E tests (revenue loop).
+- Must pass: pnpm lint, pnpm typecheck, pnpm test:e2e, pnpm build.
+- Keep existing routes working: /, /pricing, /request-demo, /widget/[botPublicKey].
+
+ASSUMPTIONS
+Next.js App Router + TypeScript strict is already set up.
+We will use Clerk for auth.
+
+========================================
+A) DEPENDENCIES
+========================================
+1) Install Clerk:
+pnpm add @clerk/nextjs
+
+2) Add/verify scripts remain unchanged.
+
+========================================
+B) ENV VARS (REPLIT SECRETS)
+========================================
+Add these secrets in Replit:
+- CLERK_SECRET_KEY
+- NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
+Also add:
+- NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+- NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up   (set but we will NOT create route; it’s ok if Clerk expects the variable, but do not expose sign-up UI)
+- NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/app
+- NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/app (not used; no sign-up route)
+
+IMPORTANT: In Clerk Dashboard, disable public sign-ups (invite-only).
+
+========================================
+C) FILES TO CREATE/MODIFY
+========================================
+
+1) NEW: middleware.ts (at project root)
+- Protect these routes:
+  - /app(.*)
+  - /api/admin(.*)
+- Allow these routes (public):
+  - / (home)
+  - /pricing
+  - /request-demo
+  - /widget/(.*)
+  - /api/public/(.*)
+  - /api/health
+  - /api/admin/seed should also be protected (same as /api/admin/*)
+- Use Clerk authMiddleware and publicRoutes matcher properly for Next.js App Router.
+
+2) MODIFY: src/app/layout.tsx
+- Wrap the app with <ClerkProvider>.
+- Ensure it does not break existing styling or theme tokens.
+
+3) NEW: src/app/sign-in/[[...sign-in]]/page.tsx
+- Create a Clerk SignIn page using <SignIn />.
+- IMPORTANT: no sign-up link shown.
+  - Use appearance props or a simple message “Contact admin for access” if needed.
+  - If removing link is non-trivial, it’s acceptable to leave default UI BUT we must disable public sign-ups in Clerk settings so it cannot be abused.
+
+4) MODIFY: src/app/app/layout.tsx (dashboard layout)
+- Add a small authenticated header area with:
+  - “Signed in as: {user.primaryEmailAddress}”
+  - A SignOut button (Clerk <UserButton /> is fine).
+- All /app pages should require auth by middleware, so layout assumes signed in.
+- Do not redesign; minimal premium UI consistent with existing theme.
+
+5) MODIFY: Admin API routes to require auth
+Files:
+- src/app/api/admin/bots/route.ts
+- src/app/api/admin/bots/[botPublicKey]/route.ts
+- src/app/api/admin/seed/route.ts
+
+Replace the current “same-origin bypass / x-admin-key” scheme with Clerk auth.
+Implementation requirement:
+- Use Clerk server auth in route handlers:
+  - import { auth } from "@clerk/nextjs/server"
+  - const { userId } = auth()
+  - if (!userId) return NextResponse.json({ok:false,error:"unauthorized"},{status:401})
+This makes admin APIs accessible only when the browser has a valid Clerk session cookie.
+
+DO NOT change any /api/public routes.
+
+========================================
+D) QA + VERIFICATION TASKS
+========================================
+1) Run gates:
+pnpm lint
+pnpm typecheck
+pnpm test:e2e
+pnpm build
+
+2) Manual checks:
+- Visit /app while signed out -> should redirect to /sign-in
+- Sign in -> /app loads
+- /app/leads loads and works
+- /app/bots loads and bots list appears
+- Admin endpoints:
+  - signed out: GET /api/admin/bots returns 401
+  - signed in: GET /api/admin/bots returns 200
+
+3) Ensure public widget still works:
+- /widget/[botPublicKey] loads
+- /api/public/widget-config works without auth
+
+========================================
+E) OUTPUT FORMAT REQUIRED
+========================================
+When done, respond with:
+1) List of files created/modified
+2) Full contents of each new file (middleware.ts, sign-in page)
+3) A brief summary of each modified file changes
+4) QA gate outputs (copy/paste)
+5) GO/NO-GO verdict
+
+DO NOT claim tests passed unless you actually ran them.
+========================================

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
 import { BotUpdateSchema } from "@/lib/public/zodSchemas";
-import { requireAdmin, handleAdminError, AdminUnauthorizedError } from "@/lib/admin/requireAdmin";
+import { requireClerkAdmin, ClerkUnauthorizedError, handleClerkError } from "@/lib/admin/requireClerkAdmin";
 
 export const runtime = "nodejs";
 
@@ -15,12 +15,12 @@ export async function GET(
   context: RouteContext
 ): Promise<NextResponse> {
   try {
-    requireAdmin(request);
+    await requireClerkAdmin();
   } catch (error) {
-    if (error instanceof AdminUnauthorizedError) {
+    if (error instanceof ClerkUnauthorizedError) {
       return error.response;
     }
-    return handleAdminError(error);
+    return handleClerkError(error);
   }
 
   try {
@@ -103,12 +103,12 @@ export async function PATCH(
   context: RouteContext
 ): Promise<NextResponse> {
   try {
-    requireAdmin(request);
+    await requireClerkAdmin();
   } catch (error) {
-    if (error instanceof AdminUnauthorizedError) {
+    if (error instanceof ClerkUnauthorizedError) {
       return error.response;
     }
-    return handleAdminError(error);
+    return handleClerkError(error);
   }
 
   try {

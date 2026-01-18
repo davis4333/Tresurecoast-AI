@@ -1,38 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireClerkAdmin, ClerkUnauthorizedError, handleClerkError } from "@/lib/admin/requireClerkAdmin";
 
 export const runtime = "nodejs";
-
-/**
- * DEV-ONLY seed endpoint.
- * Requires header: x-admin-seed-key matching env var ADMIN_SEED_KEY.
- *
- * IDEMPOTENT by default:
- * - Checks for existing seed via AuditLog marker "[SEED_V1 orgId=X wsId=Y botId=Z]"
- * - Returns existing org/workspace/bot IDs if found (always returns latest seed)
- * - Creates new seed only if none exists OR if header x-seed-force = "true"
- */
 
 export async function GET() {
   return NextResponse.json({ ok: false, error: "Method not allowed" }, { status: 405 });
 }
 
 export async function POST(req: Request) {
-  const headerKey = req.headers.get("x-admin-seed-key");
-  const envKey = process.env.ADMIN_SEED_KEY;
-
-  if (!envKey) {
-    return NextResponse.json(
-      { ok: false, error: "ADMIN_SEED_KEY is not set in environment." },
-      { status: 500 }
-    );
-  }
-
-  if (!headerKey || headerKey !== envKey) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized seed attempt." },
-      { status: 401 }
-    );
+  try {
+    await requireClerkAdmin();
+  } catch (error) {
+    if (error instanceof ClerkUnauthorizedError) {
+      return error.response;
+    }
+    return handleClerkError(error);
   }
 
   const forceCreate = req.headers.get("x-seed-force") === "true";
