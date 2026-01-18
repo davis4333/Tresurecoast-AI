@@ -26,7 +26,14 @@ Preferred communication style: Simple, everyday language.
 - **API Routes**: Next.js Route Handlers in `src/app/api/`
 - **Runtime**: Node.js runtime specified for all API routes
 - **Public API Layer**: Endpoints under `/api/public/` for widget integration (no auth required)
-- **Admin API Layer**: Protected endpoints under `/api/admin/` requiring `x-admin-seed-key` header
+- **Admin API Layer**: Protected endpoints under `/api/admin/` requiring Clerk authentication
+
+### Authentication
+- **Provider**: Clerk (@clerk/nextjs)
+- **Middleware**: `src/middleware.ts` protects `/app/*` and `/api/admin/*` routes
+- **Pattern**: Invite-only (no public sign-up), sign-in only at `/sign-in`
+- **ClerkProvider**: Conditionally loaded in root layout when publishable key exists
+- **Admin Helper**: `src/lib/admin/requireClerkAdmin.ts` for API route protection
 
 ### API Structure
 | Endpoint | Purpose |
@@ -68,6 +75,8 @@ Preferred communication style: Simple, everyday language.
 | `DATABASE_URL` | PostgreSQL connection string (provided by Replit) |
 | `ADMIN_SEED_KEY` | Secret key for admin seed endpoint authentication |
 | `NEXT_PUBLIC_APP_URL` | Base URL for server-side API calls (e.g., `http://127.0.0.1:3000`) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk public key for client-side auth |
+| `CLERK_SECRET_KEY` | Clerk secret key for server-side auth |
 
 ### Package Manager
 - **pnpm**: Version 9.15.0 specified in `packageManager` field
