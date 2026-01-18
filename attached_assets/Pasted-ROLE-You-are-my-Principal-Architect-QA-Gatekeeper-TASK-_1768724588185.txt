@@ -1,0 +1,119 @@
+ROLE: You are my Principal Architect + QA Gatekeeper.
+TASK: Perform a Step 20 Production Audit for Treasure Coast AI and output an evidence-backed report. Do NOT claim anything passed unless you show the actual file contents + command outputs.
+
+NON-NEGOTIABLE OUTPUT RULES
+- No hallucinations. If you can’t find something, say “MISSING”.
+- Provide FULL file contents for the requested files (not summaries).
+- Provide command outputs exactly as printed.
+- Keep quotes ASCII. No curly quotes.
+- No broken code fences. Every ``` must close.
+
+WHAT STEP 20 CLAIMS (VERIFY)
+- Prisma migration extended Bot with business profile fields (phone, email, address, hours, services, links).
+- Admin endpoints exist:
+  - GET /api/admin/bots
+  - GET/PATCH /api/admin/bots/[botPublicKey]
+- Dashboard pages exist:
+  - /app/bots
+  - /app/bots/[botPublicKey]
+- Widget + Truth Mode still work, and widget-config reflects bot changes.
+- Security: Admin routes are protected (at minimum env token/header guard).
+
+RUN THESE COMMANDS (IN ORDER) AND PASTE OUTPUTS
+1) pnpm lint
+2) pnpm typecheck
+3) pnpm test:e2e
+4) pnpm build
+
+THEN: PRODUCE THIS REPORT FORMAT EXACTLY
+
+========================
+STEP 20 AUDIT REPORT
+========================
+
+A) Git / Diff Evidence
+1) Show latest commit hash + message:
+- Run: git log -1 --oneline
+- Paste output.
+
+2) Show changed files for Step 20 (diffstat):
+- Run: git show --name-status --oneline -1
+- Paste output.
+
+B) Prisma / DB Evidence
+1) Paste FULL contents of prisma/schema.prisma
+2) Show migrations directory listing:
+- Run: ls -la prisma/migrations
+- Paste output.
+3) Paste the contents of the latest migration SQL file(s):
+- Provide full file content for the most recent migration folder.
+
+C) Critical API ROUTES (FULL FILE CONTENTS)
+Paste FULL contents of:
+1) src/app/api/admin/bots/route.ts
+2) src/app/api/admin/bots/[botPublicKey]/route.ts
+3) src/app/api/public/widget-config/route.ts
+4) src/app/api/public/chat/route.ts
+5) src/app/api/public/leads/recent/route.ts
+6) src/app/api/public/leads/[leadPublicId]/route.ts
+7) src/app/api/public/leads/status/route.ts
+
+D) Dashboard Pages (FULL FILE CONTENTS)
+Paste FULL contents of:
+1) src/app/app/bots/page.tsx
+2) src/app/app/bots/[botPublicKey]/page.tsx
+3) src/app/app/layout.tsx
+
+E) Security Gates (MUST VERIFY)
+1) Admin route protection:
+- Explicitly show where admin APIs are protected (token/header/auth check).
+- If none exists, say: FAIL: admin routes unprotected.
+
+2) Tenant scoping readiness:
+- Show whether admin endpoints are scoped or explicitly “agency-only”.
+- If public endpoints return cross-tenant data with no gating, flag it.
+
+F) Runtime Behavior Checks (CURL EVIDENCE)
+Run these against the running dev server (or `curl` with localhost). Paste outputs.
+Assume dev runs on the Replit web URL; if you can only run locally, use localhost.
+
+1) Health:
+curl -i /api/health
+
+2) Widget config returns the business-profile-aware fields (prove it):
+- First, pick a real botPublicKey from seed/db.
+- Then run:
+curl -i "/api/public/widget-config?botPublicKey=REAL_KEY"
+
+Paste response JSON.
+
+3) Create a lead (prove endpoints still work):
+curl -i -X POST "/api/public/leads" \
+  -H "Content-Type: application/json" \
+  -d '{"botPublicKey":"REAL_KEY","conversationPublicId":"TEST_CONV","email":"test@example.com","name":"Test User","message":"Need pricing"}'
+
+Paste response.
+
+4) Fetch recent leads:
+curl -i "/api/public/leads/recent?botPublicKey=REAL_KEY&limit=5"
+Paste response.
+
+G) Truth Mode Compatibility (MUST CHECK)
+Show the exact code path that answers user questions.
+- Identify where business profile fields are used (services/hours/links).
+- If Truth Engine is still placeholder or not using DB data, say: FAIL.
+
+H) Findings + Verdict
+List PASS/FAIL for:
+- Schema correct + migration present
+- widget-config returns updated fields
+- admin routes exist + protected
+- bots pages exist + compile
+- leads loop still works
+- truth mode uses DB and does not hallucinate
+- all QA gates pass
+
+Final: GO or NO-GO.
+If NO-GO: provide exact file-level fixes required.
+
+END.
