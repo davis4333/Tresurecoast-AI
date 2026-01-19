@@ -123,6 +123,19 @@ Preferred communication style: Simple, everyday language.
 - **Host Policy**: Public endpoints validate origin/host against bot allowlists
 - **Tenant Binding**: `enforceTenantBinding()` prevents cross-tenant access via custom domains
 
+### Industry Templates Architecture (Step 37)
+- **Location**: `src/lib/templates/*` - All template logic isolated here
+- **Types**: `src/lib/templates/types.ts` - TemplateKey, IndustryTemplate, StarterKnowledge, RecommendedLink
+- **Registry**: `src/lib/templates/registry.ts` - 7 templates (universal_blank, barber_shop, nail_salon, fitness_gym, dentist, sober_living, epoxy_flooring)
+- **Placeholder Engine**: `src/lib/templates/placeholders.ts` - Safe placeholder replacement with graceful degradation
+- **Apply Template**: `src/lib/templates/applyTemplate.ts` - applyTemplateToBlueprint(), generateStarterKnowledge(), getTemplateDefaults()
+- **KB Seeding**: `src/lib/templates/seedKnowledge.ts` - Dedup-safe seeding via contentHash and title checks
+- **Placeholders**: {BusinessName}, {Phone}, {Address}, {Hours}, {Website}, {BookingUrl}, {PaymentsUrl}, {ServiceArea}
+- **KB Title Prefix**: Template KB entries use "Template:" prefix for easy identification
+- **UI Integration**: Template dropdown in both onboarding wizard (`/app/onboarding`) and admin client creation (`/app/admin/clients`)
+- **Schema Updates**: `templateKey` field added to OnboardingFormSchema and CreateClientSchema (default: universal_blank)
+- **Unit Tests**: `tests/unit/templates.test.ts` with 32 tests covering registry, placeholders, and template application
+
 ### Environment Variables Required
 | Variable | Purpose |
 |----------|---------|
