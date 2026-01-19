@@ -1,0 +1,94 @@
+Replit — STEP 34 (Agency-First): “Create Client + Bot” Wizard + Seed/Invite Flow
+
+ROLE
+You are the repo’s senior engineer + QA gatekeeper.
+Implement Step 34 as described, then run gates and provide verbatim outputs.
+
+CONSTRAINTS
+- NO public signup. NO self-serve onboarding.
+- Agency creates clients + bots manually.
+- Must preserve multi-tenant isolation (OrganizationMember).
+- Must work in DEV_BYPASS_AUTH mode without Clerk keys (dev), and also not weaken production rules.
+- One step at a time, no extra scope.
+
+DELIVERABLES (WHAT TO BUILD)
+
+A) DATA MODEL (Prisma)
+1) Add a minimal BusinessProfile model (org-scoped) OR add fields to Organization (choose ONE, prefer new model if cleaner):
+   Required fields:
+   - id (int autoinc)
+   - organizationId (FK)
+   - businessName (string)
+   - category (string)
+   - phone (string nullable)
+   - address (string nullable)
+   - hours (json nullable)
+   - websiteUrl (string nullable)
+   - bookingUrl (string nullable)
+   - tone (string, ex: "professional" | "friendly" | "luxury" | "direct")
+   - primaryGoal (string, ex: "bookings" | "leads" | "faq")
+   - createdAt/updatedAt
+   Constraints:
+   - unique(organizationId) (one profile per org)
+
+2) Create a proper migration (prisma migrate dev) — do NOT use db push.
+
+B) API (Agency Admin Only)
+Create new agency-only endpoints protected by existing admin guard (same pattern used for /api/admin/*):
+1) POST /api/admin/clients
+   Input:
+   - orgName (required)
+   - clientEmail (optional for later)
+   - ownerClerkUserId (required in dev; in prod we’ll use real Clerk later)
+   - businessProfile fields (above)
+   Behavior:
+   - Create Organization
+   - Create OrganizationMember with role AGENCY_OWNER for ownerClerkUserId
+   - Create default Workspace
+   - Create Bot using existing blueprint generator (reuse buildBotBlueprint or equivalent) driven by profile fields
+   - Create a starter Knowledge Base source auto-generated from profile (title “Business Profile”, content = formatted profile info)
+   Output:
+   - orgId, orgPublicId if exists, botPublicKey, embed snippet (script + iframe), and a “next steps” string.
+
+2) POST /api/admin/clients/[orgId]/invite
+   Input: role (CLIENT default)
+   Behavior:
+   - Create OrganizationInvite (reuse existing invite system if present; if not, implement minimal invite table)
+   - Return inviteLink
+
+C) UI (Agency Dashboard)
+1) Add Admin page: /app/admin/clients
+   - Form to create a client:
+     orgName, ownerUserId (text), businessName, category, tone, primaryGoal, phone, address, hours, websiteUrl, bookingUrl
+   - On submit: call POST /api/admin/clients
+   - Show results card:
+     - botPublicKey
+     - install snippets (script + iframe)
+     - buttons: “Open Bot”, “Create Client Invite”
+2) Add a simple clients list table (org name, createdAt, bot count, open link)
+
+D) QUALITY + SECURITY
+- Enforce: only admin can access /api/admin/clients* and /app/admin/*
+- Ensure org isolation: any org-scoped route must use getOrgContext and never “first org”.
+- Add unit tests:
+  - BusinessProfile validation
+  - POST /api/admin/clients creates org + member + bot + KB record
+- Add E2E test:
+  - Admin creates client → sees botPublicKey → navigates to bot → sees Install section
+
+E) GATES REQUIRED (paste verbatim outputs)
+1) pnpm prisma validate
+2) pnpm prisma migrate dev --name step34_business_profile_and_admin_client_wizard
+3) pnpm prisma migrate status
+4) pnpm lint
+5) pnpm typecheck
+6) pnpm vitest run
+7) pnpm test:e2e
+8) pnpm build
+
+REPORT FORMAT REQUIRED
+1) Root Cause / Design Notes (short)
+2) File manifest (new/modified)
+3) Verbatim command outputs (all gates)
+4) Manual smoke steps to verify in browser
+STOP after Step 34. Do not proceed to Step 35.

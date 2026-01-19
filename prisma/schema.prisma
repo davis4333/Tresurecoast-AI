@@ -87,6 +87,7 @@ model Organization {
   members          OrganizationMember[]
   invites          OrganizationInvite[]
   knowledgeSources BotKnowledgeSource[]
+  businessProfile  BusinessProfile?
 
   @@index([createdAt])
 }
@@ -343,5 +344,27 @@ model BotKnowledgeSource {
 
   @@unique([botId, contentHash])
   @@index([botId])
+  @@index([organizationId])
+}
+
+model BusinessProfile {
+  id             Int      @id @default(autoincrement())
+  organizationId Int      @unique
+
+  businessName String
+  category     String
+  phone        String?
+  address      String?
+  hours        Json?
+  websiteUrl   String?
+  bookingUrl   String?
+  tone         String   // "professional" | "friendly" | "luxury" | "bold" | "chill"
+  primaryGoal  String   // "bookings" | "leads" | "faqs" | "support"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   @@index([organizationId])
 }
