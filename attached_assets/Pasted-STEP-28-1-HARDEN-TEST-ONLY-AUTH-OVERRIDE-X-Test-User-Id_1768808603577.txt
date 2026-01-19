@@ -1,0 +1,66 @@
+STEP 28.1 — HARDEN TEST-ONLY AUTH OVERRIDE (X-Test-User-Id) + PROOF
+
+GOAL:
+Ensure the X-Test-User-Id override can NEVER be used in production, and cannot accidentally become active unless explicitly intended for tests.
+
+CURRENT SITUATION (from your report):
+- getOrgContext was modified to accept a test user id
+- it reads X-Test-User-Id header
+- it only works with DEV_BYPASS_AUTH=true in non-production
+We must now “fail closed” and add explicit proof gates.
+
+RULES:
+- The override must be OFF by default.
+- It must be impossible to activate in production even if someone sets env vars wrong.
+- Return VERBATIM outputs for all commands requested.
+
+A) CODE HARDENING REQUIREMENTS (implement all)
+1) getOrgContext MUST require ALL of these to be true before reading X-Test-User-Id:
+   - NODE_ENV !== "production"
+   - DEV_BYPASS_AUTH === "true"
+   - process.env.PLAYWRIGHT_TEST === "true"   (new required gate)
+   If any are false: ignore the header entirely.
+
+2) Header allowlist:
+   Only accept header name exactly: "x-test-user-id"
+   - trim
+   - reject empty
+   - enforce max length 128
+   - allow only [a-zA-Z0-9_-] (reject anything else)
+   If invalid: ignore it (do not throw).
+
+3) The override must be request-scoped:
+   - getOrgContext should accept an optional Request and extract header from that request only
+   - DO NOT read global state or cached values
+
+4) Add an audit log line (dev only):
+   If override is used, console.log:
+   "[TEST AUTH OVERRIDE] using X-Test-User-Id=<id>"
+   This helps prove when it triggers during tests.
+
+B) PROOF TESTS (add these)
+1) Unit test (vitest) for getOrgContext:
+   - When NODE_ENV="production": header is ignored even if DEV_BYPASS_AUTH="true" and PLAYWRIGHT_TEST="true"
+   - When NODE_ENV!="production" but DEV_BYPASS_AUTH!="true": header ignored
+   - When NODE_ENV!="production", DEV_BYPASS_AUTH="true", PLAYWRIGHT_TEST!="true": header ignored
+   - When all gates satisfied: header accepted
+
+2) E2E proof:
+   Update Playwright config (or test setup) to set:
+   PLAYWRIGHT_TEST=true
+   so tests still pass.
+
+C) QA / GATES (verbatim outputs)
+Run and paste:
+pnpm test
+pnpm test:e2e --reporter line
+pnpm typecheck
+pnpm build
+
+D) DELIVERABLE
+Return:
+1) Files changed list
+2) Exact diff/patch summary
+3) Verbatim command outputs from (C)
+
+STOP after returning results.

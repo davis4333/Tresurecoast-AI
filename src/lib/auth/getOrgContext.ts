@@ -176,9 +176,41 @@ export function isOwner(role: OrgRole): boolean {
   return role === "AGENCY_OWNER";
 }
 
+const VALID_TEST_USER_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const MAX_TEST_USER_ID_LENGTH = 128;
+
+function isTestAuthOverrideEnabled(): boolean {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.DEV_BYPASS_AUTH === "true" &&
+    process.env.PLAYWRIGHT_TEST === "true"
+  );
+}
+
+function validateTestUserId(value: string | null): string | undefined {
+  if (!value) return undefined;
+
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.length > MAX_TEST_USER_ID_LENGTH) return undefined;
+  if (!VALID_TEST_USER_ID_PATTERN.test(trimmed)) return undefined;
+
+  return trimmed;
+}
+
 export function getTestUserId(request: Request): string | undefined {
-  if (!DEV_BYPASS_AUTH || IS_PRODUCTION) {
+  if (!isTestAuthOverrideEnabled()) {
     return undefined;
   }
-  return request.headers.get("X-Test-User-Id") || undefined;
+
+  const rawValue = request.headers.get("x-test-user-id");
+  const validatedUserId = validateTestUserId(rawValue);
+
+  if (validatedUserId) {
+    console.log(`[TEST AUTH OVERRIDE] using X-Test-User-Id=${validatedUserId}`);
+  }
+
+  return validatedUserId;
 }
+
+export { isTestAuthOverrideEnabled as _isTestAuthOverrideEnabled_forTesting };

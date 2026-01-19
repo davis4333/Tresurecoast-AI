@@ -21,6 +21,9 @@ export default defineConfig({
     command: "pnpm dev",
     url: "http://localhost:5000",
     reuseExistingServer: true,
-    timeout: 120000
+    timeout: 120000,
+    env: {
+      PLAYWRIGHT_TEST: "true"
+    }
   }
 });
