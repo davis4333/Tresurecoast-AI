@@ -1,0 +1,97 @@
+STEP 29C — MEMBERSHIP MANAGEMENT API (INVITES + MEMBERS CRUD)
+
+GOAL
+Implement agency-grade org member management with invites:
+- Admins can list members, create invites, update roles, remove members.
+- Users can accept invite tokens to join an org.
+- Enforce “cannot remove/demote last owner” rule.
+- Enforce tenant isolation everywhere.
+- Use org selection (cookie/header) via getOrgContext({ request: req, testUserId: getTestUserId(req) }).
+
+NON-NEGOTIABLES
+- All routes: export const runtime="nodejs"; export const dynamic="force-dynamic";
+- Use Prisma transactions where needed (accept invite).
+- Invite tokens must be cryptographically secure and unique.
+- Invites must have expiry and single-use.
+- Never allow CLIENT role to view admin-only data.
+- Never allow removing yourself.
+- Must not create duplicate membership for same (organizationId, clerkUserId).
+- Keep Step 28.1 test auth override security gates unchanged.
+
+BUILD THESE FILES
+
+1) NEW: src/lib/validators/membership.ts
+- Zod schemas:
+  - InviteCreateSchema: { role: enum("AGENCY_OWNER","AGENCY_ADMIN","CLIENT"), expiresInDays: number 1..30 default 7 }
+  - InviteAcceptSchema: { token: string min(1) }
+  - MemberUpdateSchema: { role: enum(...) }
+- Export helper:
+  validateLastOwnerConstraint(prisma, orgId, excludeMemberId?) -> { ok:boolean; error?:string }
+  * checks org has >= 1 AGENCY_OWNER excluding excludeMemberId.
+
+2) NEW: src/lib/utils/inviteToken.ts
+- generateInviteToken(): string => "inv_" + 32 hex chars (randomBytes(16))
+- isValidInviteTokenFormat(token): boolean => /^inv_[0-9a-f]{32}$/
+- getInviteExpiry(days): Date
+- isInviteExpired(expiresAt): boolean
+
+3) NEW: src/app/api/org/members/route.ts
+GET /api/org/members (admin-only)
+- ctx = await getOrgContext({ request: req, testUserId: getTestUserId(req) })
+- if !ctx.ok => return ctx.status
+- if !isAdmin(ctx.role) => 403
+- return members list:
+  id, clerkUserId, role, createdAt, updatedAt (order createdAt asc)
+
+4) NEW: src/app/api/org/members/invite/route.ts
+POST /api/org/members/invite (admin-only)
+- ctx via getOrgContext({ request:req, testUserId: getTestUserId(req) })
+- validate body with InviteCreateSchema
+- create OrganizationInvite:
+  organizationId = ctx.org.id
+  token = generateInviteToken()
+  role = requested
+  createdByClerkUserId = ctx.userId
+  expiresAt = getInviteExpiry(expiresInDays)
+- Response includes inviteLink:
+  baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  inviteLink = `${baseUrl}/invite/${token}`
+- Return { ok:true, invite:{ id, token, role, expiresAt, inviteLink } }
+
+5) NEW: src/app/api/org/members/accept/route.ts
+POST /api/org/members/accept
+- Authenticated user required.
+- Use SAME auth logic pattern as getOrgContext to resolve userId safely:
+  - If test override enabled, allow userId from getTestUserId(req) ONLY under existing Step 28.1 gates.
+  - Else Clerk auth userId.
+- Body validate InviteAcceptSchema.
+- Validate token format isValidInviteTokenFormat; else 400 invalid_token.
+- Load invite by token include organization { id, publicId, name }.
+- Reject if not found 404, used 400, expired 400.
+- Reject if existing membership already exists 400 already_member.
+- Transaction:
+  A) create OrganizationMember with invite.role
+  B) mark invite usedAt + usedByClerkUserId
+- Return ok true with membership + organization details.
+
+6) NEW: src/app/api/org/members/[memberId]/route.ts
+PATCH (admin-only) update member role
+- parse memberId int
+- load member; must belong to ctx.org.id else 404
+- validate body MemberUpdateSchema
+- if demoting OWNER -> non-owner, enforce validateLastOwnerConstraint(prisma, ctx.org.id, memberId)
+- update role, return ok true member { id, role, updatedAt }
+
+DELETE (admin-only) remove member
+- parse memberId int
+- load member; must belong to ctx.org.id else 404
+- disallow removing self (member.clerkUserId === ctx.userId) => 400 cannot_remove_self
+- if removing OWNER enforce validateLastOwnerConstraint(prisma, ctx.org.id, memberId)
+- delete member; return ok true
+
+STATIC PROOFS REQUIRED (PASTE VERBATIM)
+1) pnpm typecheck
+2) pnpm build
+3) rg -n "OrganizationInvite|members/invite|members/accept|validateLastOwnerConstraint|generateInviteToken" src prisma -S
+4) find src/app/api/org/members -maxdepth 4 -type f -print
+STOP after outputs.
