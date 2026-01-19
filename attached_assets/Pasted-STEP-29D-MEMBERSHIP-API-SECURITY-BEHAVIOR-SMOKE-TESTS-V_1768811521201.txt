@@ -1,0 +1,77 @@
+STEP 29D — MEMBERSHIP API SECURITY + BEHAVIOR SMOKE TESTS (VERBATIM OUTPUTS)
+
+GOAL
+Prove:
+- Admin-only routes are locked down
+- Invite lifecycle works (create -> accept -> cannot reuse -> expiry works)
+- Last-owner constraint works
+- Cannot remove self works
+- Tenant isolation holds under org selection (cookie/header)
+
+PRE-REQ
+Use DEV_BYPASS_AUTH=true, PLAYWRIGHT_TEST=true (non-production).
+We will drive identity via x-test-user-id and org selection via x-org-public-id header.
+(Keep existing Step 28.1 gates unchanged.)
+
+A) STATIC GREPS (paste verbatim)
+1) rg -n "DEV_BYPASS_AUTH|PLAYWRIGHT_TEST|getTestUserId\\(" src/app/api/org/members -S
+2) rg -n "isAdmin\\(" src/app/api/org/members -S
+3) rg -n "organizationId_clerkUserId" src/app/api/org/members -S
+4) rg -n "Cannot remove yourself|cannot_remove_self|last_owner" src/app/api/org/members -S
+
+B) DB SEED (ONLY IF NEEDED)
+If you already have Org A/Org B + memberships from Step 27 tests, reuse them.
+If not, create minimal seed via prisma/psql so we have:
+- Org A (publicId known)
+- Org B (publicId known)
+- user_a_owner = AGENCY_OWNER in Org A
+- user_a_client = CLIENT in Org A
+- user_b_admin = AGENCY_ADMIN in Org B
+
+After seeding, output a single query proving:
+SELECT o.id,o."publicId",o.name,m."clerkUserId",m.role
+FROM "Organization" o
+JOIN "OrganizationMember" m ON m."organizationId"=o.id
+ORDER BY o.id, m.role;
+
+C) RUNTIME CURL-LIKE TESTS (use node fetch, curl, or httpie — paste request + response)
+Use headers:
+- x-test-user-id: <user>
+- x-org-public-id: <orgPublicId>
+
+TESTS REQUIRED (in order):
+1) As Org A CLIENT:
+- GET /api/org/members => MUST 403
+- POST /api/org/members/invite => MUST 403
+
+2) As Org A OWNER:
+- GET /api/org/members => 200 + list includes owner + client
+- POST /api/org/members/invite { role:"CLIENT", expiresInDays:7 } => 200 returns token + inviteLink
+Store returned token as INVITE_TOKEN
+
+3) Accept invite:
+- POST /api/org/members/accept { token: INVITE_TOKEN } as x-test-user-id: user_new_member
+Expected: 200 ok true, membership created, org returned
+
+4) Reuse invite should fail:
+- POST /api/org/members/accept again with same token as user_new_member2
+Expected: 400 invite_used (or equivalent)
+
+5) Last-owner constraint:
+- Identify Org A OWNER membership id (from members list)
+- PATCH /api/org/members/[ownerId] { role:"CLIENT" } as Org A OWNER
+Expected: 400 last_owner (cannot demote last owner)
+
+6) Cannot remove self:
+- DELETE /api/org/members/[ownerId] as Org A OWNER
+Expected: 400 cannot_remove_self
+
+7) Tenant isolation sanity:
+- As Org B ADMIN, GET /api/org/members with x-org-public-id=OrgBPublicId
+Expected: 200 list for Org B only (must not show Org A members)
+
+D) GATES (paste verbatim)
+1) pnpm typecheck
+2) pnpm build
+
+STOP after outputs.
