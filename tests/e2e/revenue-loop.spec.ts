@@ -164,6 +164,75 @@ test.describe("Revenue Loop E2E", () => {
     expect(messagesData.messages[0].content).toBe("What's the price?");
   });
 
+  test("onboarding wizard creates bot and shows install section", async ({ page }) => {
+    const testUserId = "e2e-onboarding-user-" + Date.now();
+    const uniqueBizName = `E2E Biz ${Date.now()}`;
+
+    const orgData = await prisma.organization.findFirst({
+      include: { workspaces: true }
+    });
+
+    if (!orgData) {
+      throw new Error("No organization found. Seed data before running E2E tests.");
+    }
+
+    await prisma.organizationMember.upsert({
+      where: {
+        organizationId_clerkUserId: {
+          organizationId: orgData.id,
+          clerkUserId: testUserId
+        }
+      },
+      update: { role: "AGENCY_ADMIN" },
+      create: {
+        organizationId: orgData.id,
+        clerkUserId: testUserId,
+        role: "AGENCY_ADMIN"
+      }
+    });
+
+    await page.setExtraHTTPHeaders({
+      "X-Test-User-Id": testUserId,
+      "X-Org-Public-Id": orgData.publicId
+    });
+
+    await page.goto("/app/onboarding", { waitUntil: "networkidle" });
+
+    const bizNameInput = page.locator('[data-testid="input-business-name"]');
+    const categoryInput = page.locator('[data-testid="input-category"]');
+    const generateButton = page.locator('[data-testid="button-generate-bot"]');
+
+    await expect(bizNameInput).toBeVisible({ timeout: 10000 });
+    await expect(categoryInput).toBeVisible();
+    await expect(generateButton).toBeVisible();
+
+    await bizNameInput.fill(uniqueBizName);
+    await categoryInput.fill("Dental Practice");
+    await generateButton.click();
+
+    await page.waitForURL(/\/app\/bots\/[0-9a-f-]+/, { timeout: 15000 });
+
+    const expectedBotName = `${uniqueBizName} Assistant`;
+    await expect(page.locator(`text=${expectedBotName}`)).toBeVisible({ timeout: 5000 });
+
+    await expect(page.locator('[data-testid="install-section"]')).toBeVisible({ timeout: 5000 });
+
+    await expect(page.locator('[data-testid="script-embed-snippet"]')).toBeVisible();
+
+    const codeContent = await page.locator('[data-testid="script-embed-snippet"]').inputValue();
+    expect(codeContent).toContain("/embed/widget.js");
+    expect(codeContent).toContain("data-bot-key");
+
+    await prisma.organizationMember.delete({
+      where: {
+        organizationId_clerkUserId: {
+          organizationId: orgData.id,
+          clerkUserId: testUserId
+        }
+      }
+    });
+  });
+
   test("widget UI smoke test", async ({ page }) => {
     await page.goto(`/widget/${botPublicKey}`);
 

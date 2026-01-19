@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { TcaCard, TcaCardBody, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaButton } from "@/components/tca/TcaButton";
 
@@ -21,7 +20,6 @@ const PRIMARY_GOAL_OPTIONS = [
 ];
 
 export default function OnboardingPage() {
-  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -84,9 +82,7 @@ export default function OnboardingPage() {
 
       if (data.ok && data.botPublicKey) {
         showToast("Bot created successfully!", "success");
-        setTimeout(() => {
-          router.push(`/app/bots/${data.botPublicKey}`);
-        }, 500);
+        window.location.href = `/app/bots/${data.botPublicKey}`;
       } else {
         setError(data.message || "Failed to generate bot");
       }

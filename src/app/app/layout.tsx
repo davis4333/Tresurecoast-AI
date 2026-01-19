@@ -67,7 +67,8 @@ function DevBypassAvatar() {
   );
 }
 
-const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const isDevBypass = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true";
+const hasClerkKey = !isDevBypass && !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 const ClerkUserButtonDynamic = hasClerkKey
   ? dynamic(

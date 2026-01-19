@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { TcaCard, TcaCardBody, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaButton } from "@/components/tca/TcaButton";
@@ -49,9 +50,9 @@ interface Bot {
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 
-export default function BotDetailPage({ params }: { params: Promise<{ botPublicKey: string }> }) {
-  const resolvedParams = use(params);
-  const botPublicKey = resolvedParams.botPublicKey;
+export default function BotDetailPage() {
+  const params = useParams<{ botPublicKey: string }>();
+  const botPublicKey = params.botPublicKey;
 
   const [bot, setBot] = useState<Bot | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -528,7 +529,7 @@ export default function BotDetailPage({ params }: { params: Promise<{ botPublicK
         </TcaCardBody>
       </TcaCard>
 
-      <TcaCard>
+      <TcaCard data-testid="install-section">
         <TcaCardHeader>
           <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Install Widget</h3>
         </TcaCardHeader>
