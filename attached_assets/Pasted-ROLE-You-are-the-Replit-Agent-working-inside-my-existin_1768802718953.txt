@@ -1,0 +1,127 @@
+ROLE
+You are the Replit Agent working inside my existing Next.js 14 + Prisma repo. Your job is to PATCH Step 26 (Custom Domain DNS Verification) with strict QA gates. Do NOT invent files or rename models. Only modify what’s necessary and prove correctness with command outputs.
+
+GOAL
+Step 26 is already passing build/typecheck, but we found a real bug:
+- Token length inconsistency: PUT /api/org/custom-domain returned a 56-char token while GET/rotate-token returns 64-char tokens.
+You must:
+1) Find the exact cause.
+2) Fix it so ALL tokens are ALWAYS 64 hex chars (32 bytes) and the PUT response always returns the stored token.
+3) Add a small safety check to fail closed if token length isn’t 64 when setting/saving.
+4) Provide final QA evidence: token lengths + API responses.
+
+CONSTRAINTS
+- Keep existing architecture/patterns (Step 25/26):
+  - runtime = "nodejs"
+  - dynamic = "force-dynamic"
+  - getOrgContext() from _helpers.ts
+  - single-tenant “first org” pattern (no OrganizationMember)
+- Keep imports consistent: use "@/lib/prisma" (NOT "@/lib/db")
+- Do NOT change Prisma schema (Step 26 fields already exist)
+- Do NOT add new dependencies
+
+STEP 1 — REPRO + ROOT CAUSE INVESTIGATION
+A) Run these commands and paste output:
+1) Confirm token generator implementation and call sites
+   rg -n "generateVerificationToken|domainVerificationToken|verificationToken" src/app/api/org/custom-domain src/lib/services/dnsVerification.ts
+
+2) Print the generator function exactly
+   sed -n '1,120p' src/lib/services/dnsVerification.ts
+
+3) Print the PUT handler exactly
+   sed -n '1,220p' src/app/api/org/custom-domain/route.ts
+
+4) Print Prisma selection/return mapping around update()
+   rg -n "prisma\\.organization\\.update\\(|select:|domainVerificationToken|verificationToken" src/app/api/org/custom-domain/route.ts -n
+
+B) Hypotheses to check (confirm which is true):
+- PUT route returns the wrong field (customDomain vs domainVerificationToken mismatch)
+- update() select is missing domainVerificationToken, causing undefined/truncated mapping
+- generateVerificationToken differs or is shadowed/mocked somewhere
+- response uses a sliced/truncated string or wrong variable (e.g., token.slice())
+You must identify the exact line(s) causing the 56-char token in PUT response.
+
+STEP 2 — PATCH
+Apply the minimal patch that guarantees:
+- generateVerificationToken() ALWAYS returns 64 hex chars
+- PUT returns the EXACT stored token from the DB (updated.domainVerificationToken)
+- if a generated token is not length 64, return 500 and do NOT write it to DB
+
+Implement these changes:
+
+A) src/lib/services/dnsVerification.ts
+- Confirm it uses Node crypto: randomBytes(32).toString("hex")
+- Add a guard:
+  - if token length !== 64 OR not /^[0-9a-f]{64}$/ then throw Error("invalid_token_length")
+
+B) src/app/api/org/custom-domain/route.ts (PUT)
+- After generating token, validate it before DB update.
+- Ensure prisma.organization.update includes:
+  - select: { customDomain: true, customDomainStatus: true, domainVerificationToken: true }
+- Ensure response returns:
+  - verificationToken: updated.domainVerificationToken
+
+C) Optional: src/app/api/org/custom-domain/rotate-token/route.ts
+- Ensure it selects domainVerificationToken and returns it consistently as verificationToken (already likely correct but confirm)
+
+Do NOT touch verify route logic unless needed.
+
+STEP 3 — QA PROOF (MUST PROVIDE OUTPUTS)
+Run these commands and paste outputs:
+
+1) Prisma client
+   pnpm prisma generate
+
+2) Typecheck
+   pnpm typecheck
+
+3) Build
+   pnpm build
+
+4) Token length DB verification after PUT
+Run this exact command and paste output:
+   node -e "const {PrismaClient}=require('@prisma/client'); const p=new PrismaClient(); p.organization.findFirst({orderBy:{id:'asc'},select:{domainVerificationToken:true}}).then(r=>{console.log(r); console.log('len=', r?.domainVerificationToken?.length);}).finally(()=>p.$disconnect());"
+
+Expected: len=64 (or null if domain cleared)
+
+5) Manual API smoke test (use curl)
+A) PUT set domain:
+   curl -s -X PUT http://localhost:3000/api/org/custom-domain -H "Content-Type: application/json" -d '{"customDomain":"chat.example.com"}'
+
+B) GET domain:
+   curl -s http://localhost:3000/api/org/custom-domain
+
+C) POST rotate token:
+   curl -s -X POST http://localhost:3000/api/org/custom-domain/rotate-token
+
+For each response, confirm:
+- verificationToken is 64 chars hex
+- token returned by PUT matches token stored in DB (Step 4)
+- rotate-token returns 64 chars hex
+
+STEP 4 — DOCS COPY (USER-FACING DNS INSTRUCTIONS)
+Update the UI text in:
+- src/app/app/settings/branding/CustomDomainSection.tsx
+
+Add a short “Provider tips” block (no links required) that explains:
+- TXT record:
+  Type: TXT
+  Host/Name: @ (root)
+  Value: tca-verify=<token>
+  TTL: 3600 or Auto
+- Propagation 5 minutes to 48 hours
+- If using subdomain chat.example.com and root TXT doesn’t work, try TXT host “chat” with same value
+- Mention Cloudflare / GoDaddy / Namecheap location names briefly:
+  - Cloudflare: DNS → Records → Add TXT
+  - GoDaddy: DNS → Records → Add TXT
+  - Namecheap: Advanced DNS → Add New Record → TXT
+
+STEP 5 — FINAL DELIVERABLE
+Reply with:
+1) The exact root cause you found (file + line)
+2) The exact code changes you made (diff summary)
+3) Outputs from all QA proof commands above
+4) Confirmation that PUT/GET/rotate-token all return 64-char tokens and match DB
+
+STOP AFTER THIS
+Do not proceed to Step 27 or any other step.

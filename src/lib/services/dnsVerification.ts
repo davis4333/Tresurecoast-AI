@@ -5,9 +5,23 @@ export type VerificationResult =
   | { success: true; verifiedAt: Date }
   | { success: false; reason: string };
 
+const TOKEN_REGEX = /^[0-9a-f]{64}$/;
+
 export function generateVerificationToken(): string {
   // 32 bytes => 64 hex chars
-  return randomBytes(32).toString("hex");
+  const token = randomBytes(32).toString("hex");
+  
+  // Safety guard: fail closed if token is invalid
+  if (token.length !== 64 || !TOKEN_REGEX.test(token)) {
+    throw new Error("invalid_token_length: generated token is not 64 hex characters");
+  }
+  
+  return token;
+}
+
+export function isValidVerificationToken(token: string | null | undefined): boolean {
+  if (!token) return false;
+  return token.length === 64 && TOKEN_REGEX.test(token);
 }
 
 /**

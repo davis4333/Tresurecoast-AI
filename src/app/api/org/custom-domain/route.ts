@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CustomDomainInputSchema } from "@/lib/validators/customDomain";
-import { generateVerificationToken } from "@/lib/services/dnsVerification";
+import { generateVerificationToken, isValidVerificationToken } from "@/lib/services/dnsVerification";
 import { getOrgContext } from "./_helpers";
 
 export const runtime = "nodejs";
@@ -57,6 +57,14 @@ export async function PUT(req: NextRequest) {
   }
 
   const token = customDomain ? generateVerificationToken() : null;
+
+  // Safety guard: fail closed if token generation produced invalid result
+  if (customDomain && !isValidVerificationToken(token)) {
+    return NextResponse.json(
+      { ok: false, error: "internal_error", message: "Failed to generate valid verification token" },
+      { status: 500 }
+    );
+  }
 
   const updated = await prisma.organization.update({
     where: { id: ctx.org.id },

@@ -208,6 +208,18 @@ export function CustomDomainSection() {
           </div>
 
           <p className="text-xs text-white/50">DNS can take minutes to 48 hours to propagate.</p>
+
+          <div className="mt-4 pt-3 border-t border-white/10">
+            <h5 className="text-xs font-medium text-white/70 mb-2">Provider Tips</h5>
+            <ul className="text-xs text-white/50 space-y-1">
+              <li><span className="text-white/70">Cloudflare:</span> DNS → Records → Add Record → TXT</li>
+              <li><span className="text-white/70">GoDaddy:</span> DNS → DNS Records → Add → TXT</li>
+              <li><span className="text-white/70">Namecheap:</span> Advanced DNS → Add New Record → TXT</li>
+            </ul>
+            <p className="text-xs text-white/50 mt-2">
+              For subdomains like chat.example.com, try setting Host to &quot;chat&quot; instead of &quot;@&quot;.
+            </p>
+          </div>
         </div>
       )}
 
