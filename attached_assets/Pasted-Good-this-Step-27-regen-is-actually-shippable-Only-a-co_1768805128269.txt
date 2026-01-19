@@ -1,0 +1,408 @@
+Good — this Step 27 regen is actually shippable. Only a couple last-mile guardrails, and then it’s ready to apply.
+
+Tiny QA notes (fix these while implementing)
+	1.	Dev bypass without bootstrap vars will 404
+
+	•	In dev bypass mode, if you don’t set DEV_BOOTSTRAP_CLERK_ORG_ID, getOrgContext() will look for "dev-org-bypass" and fail. That’s fine, but it can confuse you.
+	•	Best: treat bootstrap vars as required when bypass is enabled (I bake that into the prompt below).
+
+	2.	You must ensure Clerk org context exists in production
+
+	•	After Step 27, in production you’ll get 403 no_org_context unless the user is actively in a Clerk org (orgId present).
+	•	Best next micro-step after Step 27: add a Clerk OrganizationSwitcher in the app shell so the user can pick an org.
+
+⸻
+
+About giving me your Replit login
+
+No. Don’t do that. Never hand credentials to anyone/anything.
+The safe way is what you’re already doing: Replit agent applies prompts + you paste logs/screenshots/errors here. If you want, add me as a collaborator with the minimum permissions needed, but no passwords.
+
+⸻
+
+✅ REPLIT “APPLY STEP 27” PROMPT (copy/paste as-is)
+
+You are Replit Agent working in my existing Next.js 14 + Prisma + Clerk repo.
+
+GOAL (STEP 27)
+Implement REAL multi-tenant membership + org context with strict tenant isolation:
+- Add OrganizationMember model.
+- Add Organization.clerkOrganizationId mapping to Clerk orgs.
+- Add a single shared helper src/lib/auth/getOrgContext.ts that:
+  - In production: requires BOTH Clerk userId and orgId
+  - Maps Clerk orgId -> internal Organization by clerkOrganizationId
+  - Verifies membership for (organizationId, clerkUserId) via composite unique
+  - Returns role
+  - No “first org” or “first membership” fallbacks in production
+- Update existing org routes to use getOrgContext and enforce admin roles where appropriate.
+- Preserve Step 26 behavior (custom domain) but make it tenant-safe.
+
+NON-NEGOTIABLES
+- DO NOT rewrite prisma/schema.prisma. Only patch: add fields/model.
+- Keep Organization.id as Int autoincrement (do not change).
+- Keep runtime="nodejs" and dynamic="force-dynamic" on org routes.
+- Prisma import must remain: import { prisma } from "@/lib/prisma";
+- All org-scoped queries must filter by context.org.id (or organizationId = context.org.id).
+- Before finishing: run quality gates and paste outputs.
+
+------------------------------------------------------------
+1) PATCH prisma/schema.prisma (append-only)
+------------------------------------------------------------
+A) In model Organization, add these ONLY if missing:
+
+  clerkOrganizationId String? @unique
+  members OrganizationMember[]
+
+B) Append this NEW model at the end of the file:
+
+model OrganizationMember {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  clerkUserId    String
+  role           String   // AGENCY_OWNER | AGENCY_ADMIN | CLIENT
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, clerkUserId])
+  @@index([clerkUserId])
+  @@index([organizationId])
+}
+
+------------------------------------------------------------
+2) CREATE src/lib/auth/getOrgContext.ts
+------------------------------------------------------------
+Create this file EXACTLY:
+
+```ts
+import { prisma } from "@/lib/prisma";
+
+export type OrgRole = "AGENCY_OWNER" | "AGENCY_ADMIN" | "CLIENT";
+
+export type OrgContextResult =
+  | {
+      ok: true;
+      org: {
+        id: number;
+        name: string;
+        clerkOrganizationId: string | null;
+        [key: string]: any;
+      };
+      role: OrgRole;
+      userId: string;
+    }
+  | {
+      ok: false;
+      status: 401 | 403 | 404 | 500;
+      error: string;
+      message: string;
+    };
+
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const DEV_BYPASS_AUTH = process.env.DEV_BYPASS_AUTH === "true";
+const DEV_BOOTSTRAP_CLERK_USER_ID = process.env.DEV_BOOTSTRAP_CLERK_USER_ID;
+const DEV_BOOTSTRAP_CLERK_ORG_ID = process.env.DEV_BOOTSTRAP_CLERK_ORG_ID;
+
+export async function getOrgContext(explicitOrgId?: string): Promise<OrgContextResult> {
+  try {
+    let userId: string | null = null;
+    let clerkOrgId: string | null = null;
+
+    // Dev bypass (never allowed in production)
+    if (DEV_BYPASS_AUTH && !IS_PRODUCTION) {
+      // Require explicit bootstrap vars to prevent confusing 404s
+      if (!DEV_BOOTSTRAP_CLERK_USER_ID || !DEV_BOOTSTRAP_CLERK_ORG_ID) {
+        return {
+          ok: false,
+          status: 500,
+          error: "dev_bootstrap_missing",
+          message:
+            "DEV_BYPASS_AUTH=true requires DEV_BOOTSTRAP_CLERK_USER_ID and DEV_BOOTSTRAP_CLERK_ORG_ID in development.",
+        };
+      }
+
+      userId = DEV_BOOTSTRAP_CLERK_USER_ID;
+      clerkOrgId = explicitOrgId || DEV_BOOTSTRAP_CLERK_ORG_ID;
+
+      await bootstrapDevEnvironment(userId, clerkOrgId);
+    } else {
+      const { auth } = await import("@clerk/nextjs/server");
+      const clerkAuth = await auth();
+
+      userId = clerkAuth.userId;
+      clerkOrgId = explicitOrgId || (clerkAuth as any).orgId || null;
+
+      if (!userId) {
+        return { ok: false, status: 401, error: "unauthorized", message: "Authentication required" };
+      }
+      if (!clerkOrgId) {
+        return {
+          ok: false,
+          status: 403,
+          error: "no_org_context",
+          message: "No organization context. Please select an organization.",
+        };
+      }
+    }
+
+    // Map Clerk org -> internal Organization
+    const org = await prisma.organization.findUnique({
+      where: { clerkOrganizationId: clerkOrgId },
+    });
+
+    if (!org) {
+      return {
+        ok: false,
+        status: 404,
+        error: "org_not_found",
+        message: "Organization not found or not linked to Clerk organization",
+      };
+    }
+
+    // Verify membership for THIS org + user
+    const membership = await prisma.organizationMember.findUnique({
+      where: {
+        organizationId_clerkUserId: {
+          organizationId: org.id,
+          clerkUserId: userId!,
+        },
+      },
+    });
+
+    if (!membership) {
+      return {
+        ok: false,
+        status: 403,
+        error: "no_membership",
+        message: "You are not a member of this organization",
+      };
+    }
+
+    const validRoles: OrgRole[] = ["AGENCY_OWNER", "AGENCY_ADMIN", "CLIENT"];
+    if (!validRoles.includes(membership.role as OrgRole)) {
+      return {
+        ok: false,
+        status: 403,
+        error: "invalid_role",
+        message: "Invalid organization role",
+      };
+    }
+
+    return { ok: true, org, role: membership.role as OrgRole, userId: userId! };
+  } catch (error) {
+    console.error("[getOrgContext] Error:", error);
+    return { ok: false, status: 500, error: "internal_error", message: "Failed to resolve organization context" };
+  }
+}
+
+async function bootstrapDevEnvironment(clerkUserId: string, clerkOrgId: string): Promise<void> {
+  let org = await prisma.organization.findUnique({ where: { clerkOrganizationId: clerkOrgId } });
+
+  if (!org) {
+    org = await prisma.organization.create({
+      data: { name: "Dev Bootstrap Org", clerkOrganizationId: clerkOrgId },
+    });
+    console.log(`[DEV BOOTSTRAP] Created org ${org.id} for ${clerkOrgId}`);
+  }
+
+  const membership = await prisma.organizationMember.findUnique({
+    where: { organizationId_clerkUserId: { organizationId: org.id, clerkUserId } },
+  });
+
+  if (!membership) {
+    await prisma.organizationMember.create({
+      data: { organizationId: org.id, clerkUserId, role: "AGENCY_OWNER" },
+    });
+    console.log(`[DEV BOOTSTRAP] Created AGENCY_OWNER membership for ${clerkUserId} in org ${org.id}`);
+  }
+}
+
+export function isAdmin(role: OrgRole): boolean {
+  return role === "AGENCY_OWNER" || role === "AGENCY_ADMIN";
+}
+
+export function isOwner(role: OrgRole): boolean {
+  return role === "AGENCY_OWNER";
+}
+
+
+⸻
+
+	3.	CREATE src/lib/auth/getOrgContext.test.ts
+
+⸻
+
+Create EXACTLY:
+
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    organization: { findUnique: vi.fn(), create: vi.fn() },
+    organizationMember: { findUnique: vi.fn(), create: vi.fn() },
+  },
+}));
+
+const mockClerkAuth = vi.fn();
+vi.mock("@clerk/nextjs/server", () => ({ auth: mockClerkAuth }));
+
+import { getOrgContext, isAdmin, isOwner } from "./getOrgContext";
+import { prisma } from "@/lib/prisma";
+
+describe("getOrgContext", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env = { ...originalEnv, NODE_ENV: "production", DEV_BYPASS_AUTH: "false" };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("returns 401 when no userId", async () => {
+    mockClerkAuth.mockResolvedValue({ userId: null, orgId: null });
+    const result = await getOrgContext();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(401);
+  });
+
+  it("returns 403 when no orgId", async () => {
+    mockClerkAuth.mockResolvedValue({ userId: "user123", orgId: null });
+    const result = await getOrgContext();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("no_org_context");
+  });
+
+  it("returns 404 when org not found", async () => {
+    mockClerkAuth.mockResolvedValue({ userId: "user123", orgId: "org_456" });
+    vi.mocked(prisma.organization.findUnique).mockResolvedValue(null);
+    const result = await getOrgContext();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("org_not_found");
+  });
+
+  it("returns 403 when no membership", async () => {
+    mockClerkAuth.mockResolvedValue({ userId: "user123", orgId: "org_456" });
+    vi.mocked(prisma.organization.findUnique).mockResolvedValue({ id: 1, name: "Org", clerkOrganizationId: "org_456" } as any);
+    vi.mocked(prisma.organizationMember.findUnique).mockResolvedValue(null);
+    const result = await getOrgContext();
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("no_membership");
+  });
+
+  it("returns context when valid", async () => {
+    mockClerkAuth.mockResolvedValue({ userId: "user123", orgId: "org_456" });
+    vi.mocked(prisma.organization.findUnique).mockResolvedValue({ id: 1, name: "Org", clerkOrganizationId: "org_456" } as any);
+    vi.mocked(prisma.organizationMember.findUnique).mockResolvedValue({ role: "AGENCY_OWNER" } as any);
+    const result = await getOrgContext();
+    expect(result.ok).toBe(true);
+  });
+
+  it("role helpers", () => {
+    expect(isAdmin("AGENCY_OWNER")).toBe(true);
+    expect(isAdmin("AGENCY_ADMIN")).toBe(true);
+    expect(isAdmin("CLIENT")).toBe(false);
+    expect(isOwner("AGENCY_OWNER")).toBe(true);
+    expect(isOwner("AGENCY_ADMIN")).toBe(false);
+  });
+});
+
+
+⸻
+
+	4.	CREATE src/app/api/org/_test-helpers/mockOrgContext.ts
+
+⸻
+
+Create EXACTLY:
+
+import { vi } from "vitest";
+import type { OrgContextResult } from "@/lib/auth/getOrgContext";
+
+export function mockOrgContextSuccess(
+  orgId = 1,
+  role: "AGENCY_OWNER" | "AGENCY_ADMIN" | "CLIENT" = "AGENCY_OWNER"
+): () => Promise<OrgContextResult> {
+  return vi.fn().mockResolvedValue({
+    ok: true,
+    org: { id: orgId, name: "Test Org", clerkOrganizationId: "org_test123", customDomain: null },
+    role,
+    userId: "test-user-123",
+  });
+}
+
+
+⸻
+
+	5.	MODIFY ORG ROUTES TO USE getOrgContext (exact edits)
+
+⸻
+
+A) src/app/api/org/branding/route.ts
+	•	Replace its existing auth/org resolution with:
+	•	import { getOrgContext, isAdmin } from “@/lib/auth/getOrgContext”;
+	•	GET: allow any member
+	•	PUT: require isAdmin(role)
+	•	Always query org by where: { id: context.org.id }
+
+B) src/app/api/org/custom-domain/route.ts
+	•	Replace helper import usage with:
+	•	import { getOrgContext, isAdmin } from “@/lib/auth/getOrgContext”;
+	•	GET: allow any member, but only return verificationToken if isAdmin(role)
+	•	PUT: require isAdmin(role)
+	•	Always operate on org id = context.org.id
+
+C) src/app/api/org/custom-domain/verify/route.ts
+	•	Require isAdmin(role)
+	•	Verify/update the org by id = context.org.id
+
+D) src/app/api/org/custom-domain/rotate-token/route.ts
+	•	Require isAdmin(role)
+	•	Update org by id = context.org.id
+
+IMPORTANT:
+	•	Do not break Step 26 token safety guards (64-hex enforcement).
+	•	Keep runtime and dynamic exports as-is.
+
+⸻
+
+	6.	ENV SETUP (dev)
+
+⸻
+
+In .env.local (development) ensure:
+
+NODE_ENV=development
+DEV_BYPASS_AUTH=true
+DEV_BOOTSTRAP_CLERK_USER_ID=user_YOUR_CLERK_USER_ID
+DEV_BOOTSTRAP_CLERK_ORG_ID=org_YOUR_CLERK_ORG_ID
+
+Production:
+NODE_ENV=production
+DEV_BYPASS_AUTH=false
+
+⸻
+
+	7.	COMMANDS / QUALITY GATES (run and paste outputs)
+
+⸻
+
+pnpm prisma generate
+pnpm prisma migrate dev –name step27_org_membership
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm build
+
+Also paste:
+	•	find src -name “CustomDomainSection.tsx” -print
+	•	rg -n ‘first\(|findFirst\(’ src/app/api/org -S (to confirm we removed “first org” patterns)
+
+STOP when all gates pass and paste the command outputs.
+
+---
+
+When Replit finishes applying that, paste the **command outputs + any errors** here, and I’ll do the Step 27 QA evidence report the same way we did Step 26 (including tenant isolation proof + no cross-org leakage tests).

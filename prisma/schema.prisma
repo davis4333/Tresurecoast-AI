@@ -60,6 +60,9 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Step 27 — Clerk organization mapping
+  clerkOrganizationId String? @unique
+
   // White-label branding fields
   whiteLabelEnabled  Boolean @default(false)
   brandCompanyName   String?
@@ -81,6 +84,7 @@ model Organization {
   leads          Lead[]
   auditLogs      AuditLog[]
   dataEvents     DataEvent[]
+  members        OrganizationMember[]
 
   @@index([createdAt])
 }
@@ -283,4 +287,19 @@ model DataEvent {
   @@index([conversationId])
   @@index([type])
   @@index([createdAt])
+}
+
+model OrganizationMember {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  clerkUserId    String
+  role           String   // AGENCY_OWNER | AGENCY_ADMIN | CLIENT
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, clerkUserId])
+  @@index([clerkUserId])
+  @@index([organizationId])
 }
