@@ -85,6 +85,7 @@ model Organization {
   auditLogs      AuditLog[]
   dataEvents     DataEvent[]
   members        OrganizationMember[]
+  invites        OrganizationInvite[]
 
   @@index([createdAt])
 }
@@ -302,4 +303,22 @@ model OrganizationMember {
   @@unique([organizationId, clerkUserId])
   @@index([clerkUserId])
   @@index([organizationId])
+}
+
+model OrganizationInvite {
+  id                   Int       @id @default(autoincrement())
+  organizationId       Int
+  token                String    @unique
+  role                 String    // AGENCY_OWNER | AGENCY_ADMIN | CLIENT
+  createdByClerkUserId String
+  expiresAt            DateTime
+  usedAt               DateTime?
+  usedByClerkUserId    String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([token])
 }
