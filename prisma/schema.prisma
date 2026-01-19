@@ -78,14 +78,15 @@ model Organization {
   customDomainLastCheckedAt DateTime?
   customDomainFailureReason String?
 
-  workspaces     Workspace[]
-  bots           Bot[]
-  conversations  Conversation[]
-  leads          Lead[]
-  auditLogs      AuditLog[]
-  dataEvents     DataEvent[]
-  members        OrganizationMember[]
-  invites        OrganizationInvite[]
+  workspaces       Workspace[]
+  bots             Bot[]
+  conversations    Conversation[]
+  leads            Lead[]
+  auditLogs        AuditLog[]
+  dataEvents       DataEvent[]
+  members          OrganizationMember[]
+  invites          OrganizationInvite[]
+  knowledgeSources BotKnowledgeSource[]
 
   @@index([createdAt])
 }
@@ -134,11 +135,12 @@ model Bot {
   organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  links         BotLink[]
-  allowlist     BotDomainAllowlist[]
-  leads         Lead[]
-  conversations Conversation[]
-  dataEvents    DataEvent[]
+  links            BotLink[]
+  allowlist        BotDomainAllowlist[]
+  leads            Lead[]
+  conversations    Conversation[]
+  dataEvents       DataEvent[]
+  knowledgeSources BotKnowledgeSource[]
 
   @@index([organizationId])
   @@index([workspaceId])
@@ -321,4 +323,24 @@ model OrganizationInvite {
 
   @@index([organizationId])
   @@index([token])
+}
+
+model BotKnowledgeSource {
+  id             Int      @id @default(autoincrement())
+  botId          Int
+  organizationId Int
+
+  type        String   // "PASTE" | "URL"
+  title       String
+  content     String
+  contentHash String   @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bot          Bot          @relation(fields: [botId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([botId])
+  @@index([organizationId])
 }

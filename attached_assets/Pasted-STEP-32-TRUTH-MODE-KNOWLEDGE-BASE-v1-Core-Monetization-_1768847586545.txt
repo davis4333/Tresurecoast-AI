@@ -1,0 +1,90 @@
+STEP 32 — TRUTH MODE KNOWLEDGE BASE v1 (Core Monetization)
+
+Goal:
+Let an admin upload/paste business knowledge into a Bot Knowledge Base. Public chat must answer using ONLY that knowledge (Truth Mode), with citations. If not found, it must say it doesn’t know + offer lead capture.
+
+Non-negotiables:
+- Tenant isolation: org-scoped via getOrgContext for admin routes, and botOrgId binding via enforceTenantBinding for public routes.
+- No hallucinations: if retrieval confidence is low or no matches, return fallback response + lead prompt.
+- Quality gates must be green (lint/typecheck/vitest/e2e/build).
+
+A) DATA MODEL (Prisma)
+Add a BotKnowledgeSource table:
+- id Int @id @default(autoincrement())
+- botId Int
+- organizationId Int
+- type String  // "PASTE" | "URL" (URL can be placeholder for now)
+- title String
+- content String  // raw text
+- contentHash String @unique (sha256 of content)
+- createdAt, updatedAt
+Indexes:
+- @@index([botId])
+- @@index([organizationId])
+
+B) ADMIN API (org-scoped, admin-only)
+1) POST /api/org/bots/[botPublicKey]/knowledge
+- body: { title, content }
+- validate with zod: title 1-120, content 100-50k chars
+- compute sha256, upsert by contentHash (avoid duplicates)
+- returns list of sources for that bot
+
+2) GET /api/org/bots/[botPublicKey]/knowledge
+- returns sources (id,title,type,createdAt)
+
+3) DELETE /api/org/bots/[botPublicKey]/knowledge/[sourceId]
+- deletes only if orgId matches and bot matches
+
+C) RETRIEVAL (server-side)
+Implement lightweight retrieval without embeddings (v1):
+- Split each source into chunks (e.g., 800-1200 chars with overlap)
+- Rank by simple TF-IDF / keyword scoring (implement small in-code scoring; no external deps)
+- Return top 3 chunks + their source titles
+
+Add src/lib/truthMode/retrieve.ts:
+- retrieve(botId, orgId, question) -> { hits: [{text,title,sourceId,score}], hasEnoughEvidence:boolean }
+
+D) PUBLIC CHAT ENFORCEMENT
+Modify /api/public/chat to:
+- after bot lookup + tenant binding, call retrieve(...)
+- If hasEnoughEvidence:
+  - answer using ONLY hits, include citations like: (Source: <title>)
+- else:
+  - respond with: “I’m not 100% sure from the info I have.” + ask 1-2 clarifying Qs + offer lead capture CTA.
+
+E) UI (Admin)
+On bot detail page add a “Knowledge” section:
+- textarea paste
+- title input
+- save button
+- list existing sources with delete
+Use data-testid for E2E:
+- knowledge-title
+- knowledge-content
+- knowledge-save
+- knowledge-item
+- knowledge-delete
+
+F) TESTS
+Unit:
+- retrieval scoring returns best match for known questions
+- zod validation rejects short/too-long
+E2E:
+- go to /app/bots/[botPublicKey]
+- add a knowledge source
+- open /test/embed or widget page, ask a question that should be answered with citation
+- ask an unknown question and assert fallback truth-mode response appears
+
+G) MIGRATION
+Use prisma migrate dev. Commit migration.
+
+H) QUALITY GATES
+Run and paste verbatim:
+pnpm lint
+pnpm typecheck
+pnpm vitest run
+pnpm test:e2e
+pnpm build
+
+Deliverable:
+All code + tests + migrations + updated bot detail UI with Knowledge section. Green gates only.
