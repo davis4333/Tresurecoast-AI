@@ -8,3 +8,5 @@ export {
   getTemplateDefaults,
 } from "./applyTemplate";
 export type { TemplateApplicationInput, GeneratedKnowledgeSource } from "./applyTemplate";
+export { seedTemplateKnowledge, isTemplateKnowledgeTitle } from "./seedKnowledge";
+export type { SeedKnowledgeResult } from "./seedKnowledge";

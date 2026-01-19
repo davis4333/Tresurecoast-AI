@@ -4,6 +4,10 @@ import { requireClerkAdmin, handleClerkError } from "@/lib/admin/requireClerkAdm
 import { CreateClientSchema } from "@/lib/admin/clientSchemas";
 import { buildBotBlueprint } from "@/lib/onboarding/botBlueprint";
 import { getScriptEmbedSnippet, getIframeEmbedSnippet } from "@/lib/widget/embedSnippet";
+import {
+  applyTemplateToBlueprint,
+  seedTemplateKnowledge,
+} from "@/lib/templates";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
@@ -63,7 +67,17 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const blueprint = buildBotBlueprint({
+      const templateInput = {
+        businessName: input.businessName,
+        category: input.category,
+        phone: input.phone || undefined,
+        address: input.address || undefined,
+        hours: input.hours || undefined,
+        websiteUrl: input.websiteUrl || undefined,
+        bookingUrl: input.bookingUrl || undefined,
+      };
+
+      const baseBlueprint = buildBotBlueprint({
         businessName: input.businessName,
         category: input.category,
         brandVoice: input.tone,
@@ -74,6 +88,12 @@ export async function POST(req: NextRequest) {
         address: input.address || undefined,
         hours: input.hours || undefined,
       });
+
+      const blueprint = applyTemplateToBlueprint(
+        baseBlueprint,
+        input.templateKey,
+        templateInput
+      );
 
       const bot = await tx.bot.create({
         data: {
@@ -123,8 +143,15 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      return { org, bot };
+      return { org, bot, templateInput };
     });
+
+    await seedTemplateKnowledge(
+      result.bot.id,
+      result.org.id,
+      input.templateKey,
+      result.templateInput
+    );
 
     const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://127.0.0.1:3000";
     const embedSnippet = getScriptEmbedSnippet(appBaseUrl, result.bot.publicKey);

@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { TEMPLATE_KEYS } from "../templates";
 
 export const BrandVoice = z.enum(["professional", "friendly", "luxury", "bold", "chill"]);
 export type BrandVoice = z.infer<typeof BrandVoice>;
 
 export const PrimaryGoal = z.enum(["bookings", "leads", "faqs", "support"]);
 export type PrimaryGoal = z.infer<typeof PrimaryGoal>;
+
+export const TemplateKeySchema = z.enum(TEMPLATE_KEYS);
 
 export const CreateClientSchema = z.object({
   orgName: z.string().min(1, "Organization name is required").max(200),
@@ -19,6 +22,7 @@ export const CreateClientSchema = z.object({
   bookingUrl: z.string().url().optional().or(z.literal("")),
   tone: BrandVoice,
   primaryGoal: PrimaryGoal,
+  templateKey: TemplateKeySchema.optional().default("universal_blank"),
 });
 
 export type CreateClientInput = z.infer<typeof CreateClientSchema>;

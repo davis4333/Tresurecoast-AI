@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { getOrgContext, isAdmin, getTestUserId } from "@/lib/auth/getOrgContext";
 import { OnboardingFormSchema } from "@/lib/onboarding/schemas";
 import { buildBotBlueprint } from "@/lib/onboarding/botBlueprint";
+import {
+  applyTemplateToBlueprint,
+  seedTemplateKnowledge,
+} from "@/lib/templates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +53,23 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = parsed.data;
-    const blueprint = buildBotBlueprint(formData);
+    const baseBlueprint = buildBotBlueprint(formData);
+
+    const templateInput = {
+      businessName: formData.businessName,
+      category: formData.category,
+      phone: formData.phone || undefined,
+      address: formData.address || undefined,
+      hours: formData.hours || undefined,
+      websiteUrl: formData.websiteUrl || undefined,
+      bookingUrl: formData.bookingUrl || undefined,
+    };
+
+    const blueprint = applyTemplateToBlueprint(
+      baseBlueprint,
+      formData.templateKey,
+      templateInput
+    );
 
     let workspace = await prisma.workspace.findFirst({
       where: { organizationId: ctx.org.id },
@@ -154,6 +174,13 @@ export async function POST(request: NextRequest) {
         },
       });
     }
+
+    await seedTemplateKnowledge(
+      bot.id,
+      ctx.org.id,
+      formData.templateKey,
+      templateInput
+    );
 
     return NextResponse.json({
       ok: true,
