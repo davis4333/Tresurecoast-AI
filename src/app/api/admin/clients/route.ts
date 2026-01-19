@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
       };
 
       const baseBlueprint = buildBotBlueprint({
+        templateKey: input.templateKey || "universal_blank",
         businessName: input.businessName,
         category: input.category,
         brandVoice: input.tone,
