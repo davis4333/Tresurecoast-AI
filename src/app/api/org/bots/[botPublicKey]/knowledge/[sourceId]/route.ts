@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrgContext, isAdmin, getTestUserId } from "@/lib/auth/getOrgContext";
-import { isValidUuid } from "@/lib/public/uuid";
+import { isValidUUID } from "@/lib/public/uuid";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function getBotByPublicKey(botPublicKey: string, organizationId: number) {
-  if (!isValidUuid(botPublicKey)) {
+  if (!isValidUUID(botPublicKey)) {
     return null;
   }
   return prisma.bot.findFirst({

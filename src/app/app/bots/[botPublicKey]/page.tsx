@@ -48,6 +48,13 @@ interface Bot {
   workspaceName: string;
 }
 
+interface KnowledgeSource {
+  id: number;
+  title: string;
+  type: string;
+  createdAt: string;
+}
+
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 
 export default function BotDetailPage() {
@@ -71,6 +78,11 @@ export default function BotDetailPage() {
     services: [] as BotService[],
     links: [] as BotLink[],
   });
+
+  const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSource[]>([]);
+  const [knowledgeTitle, setKnowledgeTitle] = useState("");
+  const [knowledgeContent, setKnowledgeContent] = useState("");
+  const [isSavingKnowledge, setIsSavingKnowledge] = useState(false);
 
   const fetchBot = useCallback(async () => {
     if (!botPublicKey) return;
@@ -107,13 +119,76 @@ export default function BotDetailPage() {
     }
   }, [botPublicKey]);
 
+  const fetchKnowledgeSources = useCallback(async () => {
+    if (!botPublicKey) return;
+    try {
+      const res = await fetch(`/api/org/bots/${botPublicKey}/knowledge`);
+      const data = await res.json();
+      if (data.ok && data.sources) {
+        setKnowledgeSources(data.sources);
+      }
+    } catch {
+      console.error("Failed to fetch knowledge sources");
+    }
+  }, [botPublicKey]);
+
   useEffect(() => {
     fetchBot();
-  }, [fetchBot]);
+    fetchKnowledgeSources();
+  }, [fetchBot, fetchKnowledgeSources]);
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const saveKnowledgeSource = async () => {
+    if (!knowledgeTitle.trim() || knowledgeContent.length < 100) {
+      showToast("Title is required and content must be at least 100 characters", "error");
+      return;
+    }
+
+    setIsSavingKnowledge(true);
+    try {
+      const res = await fetch(`/api/org/bots/${botPublicKey}/knowledge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: knowledgeTitle.trim(),
+          content: knowledgeContent.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && data.sources) {
+        setKnowledgeSources(data.sources);
+        setKnowledgeTitle("");
+        setKnowledgeContent("");
+        showToast("Knowledge source saved", "success");
+      } else {
+        showToast(data.message || "Failed to save", "error");
+      }
+    } catch {
+      showToast("Network error", "error");
+    } finally {
+      setIsSavingKnowledge(false);
+    }
+  };
+
+  const deleteKnowledgeSource = async (sourceId: number) => {
+    try {
+      const res = await fetch(`/api/org/bots/${botPublicKey}/knowledge/${sourceId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setKnowledgeSources((prev) => prev.filter((s) => s.id !== sourceId));
+        showToast("Knowledge source deleted", "success");
+      } else {
+        showToast(data.message || "Failed to delete", "error");
+      }
+    } catch {
+      showToast("Network error", "error");
+    }
   };
 
   const handleSave = async () => {
@@ -522,6 +597,85 @@ export default function BotDetailPage() {
                       data-testid={`service-duration-${index}`}
                     />
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </TcaCardBody>
+      </TcaCard>
+
+      <TcaCard data-testid="knowledge-section">
+        <TcaCardHeader>
+          <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Knowledge Base</h3>
+        </TcaCardHeader>
+        <TcaCardBody className="space-y-4">
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Add business knowledge that the bot can use to answer questions. The bot will only answer using verified information from this knowledge base.
+          </p>
+
+          <div className="space-y-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-[var(--color-text-secondary)]">
+                Title
+              </label>
+              <input
+                type="text"
+                value={knowledgeTitle}
+                onChange={(e) => setKnowledgeTitle(e.target.value)}
+                className="tca-input"
+                placeholder="e.g., Services & Pricing"
+                data-testid="knowledge-title"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-[var(--color-text-secondary)]">
+                Content (min 100 characters)
+              </label>
+              <textarea
+                value={knowledgeContent}
+                onChange={(e) => setKnowledgeContent(e.target.value)}
+                className="tca-input min-h-[120px] resize-y"
+                placeholder="Paste your business information here..."
+                data-testid="knowledge-content"
+              />
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                {knowledgeContent.length} / 100 min characters
+              </p>
+            </div>
+            <TcaButton
+              onClick={saveKnowledgeSource}
+              disabled={isSavingKnowledge || knowledgeContent.length < 100 || !knowledgeTitle.trim()}
+              data-testid="knowledge-save"
+            >
+              {isSavingKnowledge ? "Saving..." : "Save Knowledge Source"}
+            </TcaButton>
+          </div>
+
+          {knowledgeSources.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-[var(--color-text-secondary)]">
+                Saved Sources ({knowledgeSources.length})
+              </h4>
+              {knowledgeSources.map((source) => (
+                <div
+                  key={source.id}
+                  className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
+                  data-testid="knowledge-item"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-[var(--color-text-primary)]">{source.title}</p>
+                    <p className="text-xs text-[var(--color-text-muted)]">
+                      {source.type} • {new Date(source.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <TcaButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deleteKnowledgeSource(source.id)}
+                    data-testid="knowledge-delete"
+                  >
+                    Delete
+                  </TcaButton>
                 </div>
               ))}
             </div>

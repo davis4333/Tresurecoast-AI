@@ -3,13 +3,13 @@ import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getOrgContext, isAdmin, getTestUserId } from "@/lib/auth/getOrgContext";
 import { CreateKnowledgeSourceSchema } from "@/lib/truthMode/schemas";
-import { isValidUuid } from "@/lib/public/uuid";
+import { isValidUUID } from "@/lib/public/uuid";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function getBotByPublicKey(botPublicKey: string, organizationId: number) {
-  if (!isValidUuid(botPublicKey)) {
+  if (!isValidUUID(botPublicKey)) {
     return null;
   }
   return prisma.bot.findFirst({
@@ -126,7 +126,12 @@ export async function POST(
     const contentHash = computeContentHash(content);
 
     await prisma.botKnowledgeSource.upsert({
-      where: { contentHash },
+      where: {
+        botId_contentHash: {
+          botId: bot.id,
+          contentHash,
+        },
+      },
       create: {
         botId: bot.id,
         organizationId: ctx.org.id,

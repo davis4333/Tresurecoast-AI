@@ -271,4 +271,104 @@ test.describe("Revenue Loop E2E", () => {
     const iframeSrc = await iframe.getAttribute("src");
     expect(iframeSrc).toContain(`/widget/${botPublicKey}`);
   });
+
+  test("knowledge base: add source and verify chat uses it", async ({ page, request }) => {
+    const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5000";
+    const testUserId = `e2e_kb_${Date.now()}`;
+
+    const org = await prisma.organization.findFirst({
+      where: { bots: { some: { publicKey: botPublicKey } } },
+      select: { id: true, publicId: true }
+    });
+
+    if (!org) {
+      throw new Error("No organization found for the test bot");
+    }
+
+    await prisma.organizationMember.create({
+      data: {
+        organizationId: org.id,
+        clerkUserId: testUserId,
+        role: "AGENCY_ADMIN"
+      }
+    });
+
+    const uniqueKeyword = `UNIQUEKB${Date.now()}`;
+    const knowledgeContent = `Our special service is ${uniqueKeyword}. We offer this premium package which includes consultation, implementation, and ongoing support. The price for ${uniqueKeyword} starts at $500 per month.`;
+
+    const addKnowledgeResponse = await request.post(
+      `${baseURL}/api/org/bots/${botPublicKey}/knowledge`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-Test-User-Id": testUserId,
+          "X-Org-Public-Id": org.publicId
+        },
+        data: {
+          title: "Premium Services Info",
+          content: knowledgeContent
+        }
+      }
+    );
+
+    expect(addKnowledgeResponse.ok()).toBeTruthy();
+    const addData = await addKnowledgeResponse.json();
+    expect(addData.ok).toBe(true);
+    expect(addData.sources.length).toBeGreaterThan(0);
+
+    const sourceId = addData.sources[0].id;
+
+    const chatResponseKnown = await request.post(`${baseURL}/api/public/chat`, {
+      headers: {
+        Host: "example.com",
+        "Content-Type": "application/json"
+      },
+      data: {
+        botPublicKey,
+        message: `Tell me about ${uniqueKeyword}`
+      }
+    });
+
+    expect(chatResponseKnown.ok()).toBeTruthy();
+    const chatDataKnown = await chatResponseKnown.json();
+    expect(chatDataKnown.ok).toBe(true);
+    expect(chatDataKnown.reply).toContain(uniqueKeyword);
+    expect(chatDataKnown.reply).toContain("Source:");
+    expect(chatDataKnown.usedKnowledgeBase).toBe(true);
+
+    const chatResponseUnknown = await request.post(`${baseURL}/api/public/chat`, {
+      headers: {
+        Host: "example.com",
+        "Content-Type": "application/json"
+      },
+      data: {
+        botPublicKey,
+        message: "What is the refund policy for cancelled appointments?"
+      }
+    });
+
+    expect(chatResponseUnknown.ok()).toBeTruthy();
+    const chatDataUnknown = await chatResponseUnknown.json();
+    expect(chatDataUnknown.ok).toBe(true);
+    expect(chatDataUnknown.usedKnowledgeBase).toBe(false);
+
+    await request.delete(
+      `${baseURL}/api/org/bots/${botPublicKey}/knowledge/${sourceId}`,
+      {
+        headers: {
+          "X-Test-User-Id": testUserId,
+          "X-Org-Public-Id": org.publicId
+        }
+      }
+    );
+
+    await prisma.organizationMember.delete({
+      where: {
+        organizationId_clerkUserId: {
+          organizationId: org.id,
+          clerkUserId: testUserId
+        }
+      }
+    });
+  });
 });

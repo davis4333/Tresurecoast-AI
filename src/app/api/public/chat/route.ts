@@ -5,6 +5,7 @@ import { ChatRequestSchema } from "@/lib/public/zodSchemas";
 import { runTruthEngine, type BotLinkData } from "@/lib/truth/truthEngine";
 import { detectTopic } from "@/lib/public/topicDetect";
 import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } from "@/lib/public/hostPolicy";
+import { retrieve, formatCitedAnswer } from "@/lib/truthMode/retrieve";
 
 export const runtime = "nodejs";
 
@@ -148,6 +149,8 @@ export async function POST(req: Request) {
 
     const topicResult = detectTopic(message);
 
+    const retrievalResult = await retrieve(bot.id, bot.organizationId, message);
+
     const truthResult = runTruthEngine({
       userMessage: message,
       bot: {
@@ -163,11 +166,32 @@ export async function POST(req: Request) {
       },
     });
 
+    let finalReply: string;
+    let usedKnowledgeBase = false;
+    let knowledgeSources: string[] = [];
+
+    if (retrievalResult.hasEnoughEvidence && retrievalResult.hits.length > 0) {
+      finalReply = formatCitedAnswer(
+        retrievalResult.hits,
+        bot.fallbackText || "I don't have that information."
+      );
+      usedKnowledgeBase = true;
+      knowledgeSources = [...new Set(retrievalResult.hits.map((h) => h.title))];
+    } else if (
+      retrievalResult.hits.length === 0 &&
+      truthResult.intent === "MISSING_DATA"
+    ) {
+      finalReply =
+        "I'm not 100% sure from the info I have. Could you tell me more about what you're looking for? I'd be happy to have someone follow up with you if you share your contact info.";
+    } else {
+      finalReply = truthResult.reply;
+    }
+
     await prisma.message.create({
       data: {
         conversationId: conversation.id,
         role: "assistant",
-        content: truthResult.reply,
+        content: finalReply,
       },
     });
 
@@ -264,15 +288,17 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       conversationPublicId: conversation.publicId,
-      reply: truthResult.reply,
+      reply: finalReply,
       intent: truthResult.intent,
       confidence: truthResult.confidence,
-      sourcedFrom: truthResult.sourcedFrom,
+      sourcedFrom: usedKnowledgeBase ? knowledgeSources : truthResult.sourcedFrom,
       requiresLeadCapture,
       missingFields: truthResult.missingFields,
       topic: truthResult.topic,
       suggestedActions: truthResult.suggestedActions,
       externalRedirectUrl,
+      usedKnowledgeBase,
+      knowledgeSources,
     });
   } catch (error) {
     console.error("[CHAT ERROR]", error);
