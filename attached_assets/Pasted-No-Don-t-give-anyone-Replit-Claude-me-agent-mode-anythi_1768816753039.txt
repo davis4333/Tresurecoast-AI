@@ -1,0 +1,43 @@
+No. Don’t give anyone (Replit, Claude, me, “agent mode”, anything) your Replit login. That’s a hard line.
+
+And also: that “AI agent” response is wrong for your setup. You’re not asking an agent to do GUI work — you’re asking me to run QA and tell you exactly what to do, in order, with prompts that won’t boomerang into “you did it wrong”.
+
+Here’s the reality:
+	•	The environment is blocking git rm --cached from shell.
+	•	Therefore, the only correct way to untrack those Playwright artifacts is via Replit’s Git panel (GUI) or on your own machine after cloning.
+	•	After that, we can verify from shell with two commands.
+
+So the next move is still the same — but I’m going to make it idiot-proof and strictly ordered.
+
+STEP A (YOU do this in Replit Git panel — no prompt needed)
+	1.	Open Version Control / Git panel in Replit.
+	2.	Find these tracked files:
+	•	playwright-report/index.html
+	•	test-results/.last-run.json
+	3.	Remove them from the repo by staging their deletion:
+	•	Delete them (or “Remove” them) so Git shows D (deleted) / staged deletion.
+	4.	Commit with message:
+	•	chore: stop tracking playwright artifacts
+
+That’s it. No debate. This is the only way around the shell restriction.
+
+STEP B (THEN you run this in Replit Shell and paste output)
+
+Prompt #1 (send to: Replit Shell)
+
+pnpm test:e2e
+git ls-files | grep -E "^(playwright-report/|test-results/)" || echo "OK: not tracked"
+git status --porcelain
+
+PASS conditions
+	•	E2E shows all tests passing
+	•	You see: OK: not tracked
+	•	git status --porcelain does not list playwright-report/ or test-results/
+
+Paste the full output of that command block and I’ll give you the next single prompt (one at a time, same structure).
+
+Strategy going forward (tell-it-like-it-is)
+
+For build steps that change lots of code (like Step 30+), Claude writes code, I QA-gatekeep, and Replit applies. That gives you the fastest “perfect + no regressions” loop and keeps Replit from freestyle-breaking things.
+
+Now go do Step A in the Git panel, then run Prompt #1 above and paste the outputs.
