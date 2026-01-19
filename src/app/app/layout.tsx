@@ -59,34 +59,52 @@ function NavIcon({ icon }: { icon: string }) {
   return iconMap[icon] || null;
 }
 
-const ClerkUserButton = dynamic(
-  () => import("@clerk/nextjs").then((mod) => {
-    const { UserButton, useAuth } = mod;
-    return function AuthUserButton() {
-      const { isLoaded, isSignedIn } = useAuth();
-      if (!isLoaded) {
-        return <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--color-surface-hover)]" />;
-      }
-      if (!isSignedIn) {
-        return null;
-      }
-      return (
-        <UserButton
-          afterSignOutUrl="/"
-          appearance={{
-            elements: {
-              avatarBox: "w-8 h-8",
-            },
-          }}
-        />
-      );
-    };
-  }),
-  {
-    ssr: false,
-    loading: () => <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--color-surface-hover)]" />,
+function DevBypassAvatar() {
+  return (
+    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-brand-primary)] text-xs font-bold text-white">
+      DEV
+    </div>
+  );
+}
+
+function ClerkUserButtonInner() {
+  const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  
+  if (!hasClerkKey) {
+    return <DevBypassAvatar />;
   }
-);
+
+  const ClerkUserButtonDynamic = dynamic(
+    () => import("@clerk/nextjs").then((mod) => {
+      const { UserButton, useAuth } = mod;
+      return function AuthUserButton() {
+        const { isLoaded, isSignedIn } = useAuth();
+        if (!isLoaded) {
+          return <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--color-surface-hover)]" />;
+        }
+        if (!isSignedIn) {
+          return null;
+        }
+        return (
+          <UserButton
+            afterSignOutUrl="/"
+            appearance={{
+              elements: {
+                avatarBox: "w-8 h-8",
+              },
+            }}
+          />
+        );
+      };
+    }),
+    {
+      ssr: false,
+      loading: () => <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--color-surface-hover)]" />,
+    }
+  );
+
+  return <ClerkUserButtonDynamic />;
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -139,7 +157,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-4">
             <TcaBadge>Foundation Build</TcaBadge>
-            <ClerkUserButton />
+            <ClerkUserButtonInner />
           </div>
         </header>
 
