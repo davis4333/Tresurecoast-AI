@@ -40,8 +40,11 @@ Preferred communication style: Simple, everyday language.
 |----------|---------|
 | `GET /api/health` | Service health check |
 | `POST /api/admin/seed` | Development data seeding (protected) |
+| `POST /api/admin/clients` | Create client org+bot+profile in atomic transaction |
+| `POST /api/admin/clients/[orgId]/invite` | Generate invite link for client |
 | `GET /api/public/bots/[botPublicKey]` | Fetch bot configuration for widgets |
 | `POST /api/public/chat` | Handle chat messages from widgets |
+| `POST /api/public/request-demo` | Store demo request from public site |
 
 ### Data Layer
 - **ORM**: Prisma with PostgreSQL
@@ -98,6 +101,13 @@ Preferred communication style: Simple, everyday language.
 - **Prisma**: ORM and migration management
 - **Schema Location**: `prisma/schema.prisma`
 
+### Public Site Architecture (Step 35)
+- **Route Group**: `src/app/(public)/` for landing, pricing, request-demo, demo pages
+- **Layout**: `PublicNav` (sticky header) + `PublicFooter` shared across public pages
+- **Demo Mode**: Uses `NEXT_PUBLIC_DEMO_BOT_KEY` env var; dev-only fallback to first ACTIVE bot
+- **Demo Key Resolver**: `src/lib/public/demoKey.ts` with `resolveDemoBotKey()` async function
+- **DemoRequest Model**: Stores name, email, businessName, phone from demo request form
+
 ### Environment Variables Required
 | Variable | Purpose |
 |----------|---------|
@@ -106,6 +116,7 @@ Preferred communication style: Simple, everyday language.
 | `NEXT_PUBLIC_APP_URL` | Base URL for server-side API calls (e.g., `http://127.0.0.1:3000`) |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk public key for client-side auth |
 | `CLERK_SECRET_KEY` | Clerk secret key for server-side auth |
+| `NEXT_PUBLIC_DEMO_BOT_KEY` | (Optional) UUID of demo bot for /demo page |
 
 ### Package Manager
 - **pnpm**: Version 9.15.0 specified in `packageManager` field
