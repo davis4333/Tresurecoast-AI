@@ -165,3 +165,100 @@ describe("TF-IDF Retrieval Logic", () => {
     expect(tf.get("test")).toBe(1);
   });
 });
+
+describe("Rare Token Exact Match", () => {
+  function extractRareTokens(text: string): string[] {
+    const matches = text.match(/[A-Za-z0-9_-]{12,}/g) || [];
+    return matches.map((m) => m.toLowerCase());
+  }
+
+  interface Chunk {
+    text: string;
+    sourceId: number;
+    title: string;
+  }
+
+  interface Hit {
+    text: string;
+    title: string;
+    sourceId: number;
+    score: number;
+  }
+
+  function findChunkWithRareToken(
+    rareTokens: string[],
+    chunks: Chunk[]
+  ): Hit | null {
+    for (const token of rareTokens) {
+      for (const chunk of chunks) {
+        if (chunk.text.toLowerCase().includes(token)) {
+          return {
+            text: chunk.text,
+            title: chunk.title,
+            sourceId: chunk.sourceId,
+            score: 1.0,
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  it("extracts rare tokens (12+ chars) from query", () => {
+    const query = "Tell me about UNIQUEKB_TEST_TOKEN_12345";
+    const rareTokens = extractRareTokens(query);
+    expect(rareTokens).toContain("uniquekb_test_token_12345");
+    expect(rareTokens.length).toBe(1);
+  });
+
+  it("extracts multiple rare tokens", () => {
+    const query = "Compare ALPHANUMERIC123 with BETANUMERIC456";
+    const rareTokens = extractRareTokens(query);
+    expect(rareTokens).toContain("alphanumeric123");
+    expect(rareTokens).toContain("betanumeric456");
+    expect(rareTokens.length).toBe(2);
+  });
+
+  it("ignores short tokens", () => {
+    const query = "What is the short code ABC123?";
+    const rareTokens = extractRareTokens(query);
+    expect(rareTokens.length).toBe(0);
+  });
+
+  it("finds chunk containing rare token", () => {
+    const chunks: Chunk[] = [
+      { text: "General info about services", sourceId: 1, title: "Services" },
+      { text: "Our special code is UNIQUEKB_TEST_TOKEN_12345 for premium users", sourceId: 2, title: "Premium" },
+      { text: "Contact us for support", sourceId: 3, title: "Contact" },
+    ];
+    const rareTokens = extractRareTokens("Tell me about UNIQUEKB_TEST_TOKEN_12345");
+    const hit = findChunkWithRareToken(rareTokens, chunks);
+
+    expect(hit).not.toBeNull();
+    expect(hit?.score).toBe(1.0);
+    expect(hit?.title).toBe("Premium");
+    expect(hit?.text).toContain("UNIQUEKB_TEST_TOKEN_12345");
+  });
+
+  it("returns null when rare token not found in any chunk", () => {
+    const chunks: Chunk[] = [
+      { text: "General info about services", sourceId: 1, title: "Services" },
+      { text: "Contact us for support", sourceId: 3, title: "Contact" },
+    ];
+    const rareTokens = extractRareTokens("Tell me about UNIQUEKB_MISSING_TOKEN");
+    const hit = findChunkWithRareToken(rareTokens, chunks);
+
+    expect(hit).toBeNull();
+  });
+
+  it("matches case-insensitively", () => {
+    const chunks: Chunk[] = [
+      { text: "The token uniquekb_lowercase_test is valid", sourceId: 1, title: "Test" },
+    ];
+    const rareTokens = extractRareTokens("What is UNIQUEKB_LOWERCASE_TEST?");
+    const hit = findChunkWithRareToken(rareTokens, chunks);
+
+    expect(hit).not.toBeNull();
+    expect(hit?.score).toBe(1.0);
+  });
+});

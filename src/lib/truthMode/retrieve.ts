@@ -6,6 +6,7 @@ const CHUNK_OVERLAP = 200;
 const MIN_SCORE_THRESHOLD = 0.1;
 const MIN_EVIDENCE_SCORE = 0.3;
 const TOP_K = 3;
+const RARE_TOKEN_MIN_LENGTH = 12;
 
 interface Chunk {
   text: string;
@@ -55,6 +56,30 @@ function tokenize(text: string): string[] {
     .filter((w) => w.length > 2);
 }
 
+function extractRareTokens(text: string): string[] {
+  const matches = text.match(/[A-Za-z0-9_-]{12,}/g) || [];
+  return matches.map((m) => m.toLowerCase());
+}
+
+function findChunkWithRareToken(
+  rareTokens: string[],
+  chunks: Chunk[]
+): RetrievalHit | null {
+  for (const token of rareTokens) {
+    for (const chunk of chunks) {
+      if (chunk.text.toLowerCase().includes(token)) {
+        return {
+          text: chunk.text,
+          title: chunk.title,
+          sourceId: chunk.sourceId,
+          score: 1.0,
+        };
+      }
+    }
+  }
+  return null;
+}
+
 function buildTermFrequency(tokens: string[]): Map<string, number> {
   const tf = new Map<string, number>();
   for (const token of tokens) {
@@ -88,6 +113,14 @@ function calculateTfIdfScore(queryTokens: string[], chunkTokens: string[]): numb
 }
 
 function scoreChunks(question: string, chunks: Chunk[]): RetrievalHit[] {
+  const rareTokens = extractRareTokens(question);
+  if (rareTokens.length > 0) {
+    const exactMatch = findChunkWithRareToken(rareTokens, chunks);
+    if (exactMatch) {
+      return [exactMatch];
+    }
+  }
+
   const queryTokens = tokenize(question);
   
   const scored: RetrievalHit[] = chunks.map((chunk) => {

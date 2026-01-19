@@ -1,0 +1,62 @@
+STEP 32 FIX — MAKE KB RETRIEVAL RELIABLY MATCH UNIQUE TOKENS (E2E MUST GO GREEN)
+
+ROLE
+You are the Principal Engineer + QA gatekeeper. Fix ONLY what is required to make the failing E2E pass for Truth Mode KB retrieval. Keep changes minimal and deterministic.
+
+CURRENT FAILURE
+Playwright failing test:
+Revenue Loop E2E › knowledge base: add source and verify chat uses it
+Expected reply to contain UNIQUEKB... but received Truth Engine fallback.
+This means KB retrieval did not trigger.
+
+ROOT CAUSE TARGETS (pick the real cause via code inspection, do not guess):
+- Tokenizer may be stripping digits/underscores causing UNIQUEKB123... to be ignored
+- Thresholds/score logic prevents strong exact-match queries from producing “sufficient evidence”
+- Chat integration may not include KB excerpt in reply even when KB hit exists (so reply won’t contain keyword)
+
+NON-NEGOTIABLE BEHAVIOR (Truth Mode)
+If the user’s message includes a “rare / unique token” (alphanumeric string length >= 12) AND that exact token exists in any KB chunk for this bot:
+- Retrieval must return a hit with strong evidence (>= evidence threshold)
+- /api/public/chat must respond using KB (usedKnowledgeBase=true)
+- Reply should include the matched token or the exact sentence containing it (so the E2E assertion can pass)
+
+IMPLEMENTATION REQUIREMENTS
+A) Retrieval hardening (src/lib/.../retrieve.ts or wherever retrieve() lives)
+1) Update tokenization so it preserves alphanumeric tokens with digits/underscores/hyphens (e.g., UNIQUEKB1768848724634).
+2) Add an “exact match short-circuit” BEFORE TF-IDF scoring:
+   - Detect rare tokens in the user query: regex like /[A-Za-z0-9_-]{12,}/g
+   - For each rare token, scan KB chunks (case-insensitive includes)
+   - If found, immediately return that chunk as top hit with:
+     - score = 1.0
+     - evidence = 1.0
+     - include title + snippet containing the token
+   - Ensure still bot-scoped (botId) and org-scoped safety unchanged.
+
+B) Chat integration guarantee (src/app/api/public/chat/route.ts)
+If retrieve() returns hits and evidence is sufficient:
+- Ensure the reply incorporates the KB snippet (or sentence) that contains the token.
+- Keep the existing citations behavior, but do not return a generic message that drops the keyword.
+
+C) Tests (must be added/updated)
+1) Add a unit test proving rare-token exact match works:
+   - Add KB content containing UNIQUEKB_TEST_TOKEN_12345
+   - Query message includes that token
+   - retrieve() returns hit, evidence >= threshold, includes token in snippet
+2) Fix/adjust the failing E2E only if necessary, but prefer fixing code to satisfy the existing test expectation.
+   - If you must adjust E2E, change assertion to check:
+     - usedKnowledgeBase === true
+     - reply contains the token OR knowledgeSources includes the KB title
+   Keep it strict and meaningful.
+
+QUALITY GATES (PASTE VERBATIM OUTPUTS)
+Run and paste:
+- pnpm lint
+- pnpm typecheck
+- pnpm vitest run
+- pnpm test:e2e
+Also paste the specific failing test output if it still fails.
+
+DELIVERABLES
+- File manifest (modified files)
+- Short explanation of exact cause + fix (2–6 bullets)
+STOP when all gates are green.
