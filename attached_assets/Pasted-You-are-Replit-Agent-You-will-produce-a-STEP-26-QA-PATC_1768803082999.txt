@@ -1,0 +1,180 @@
+You are Replit Agent. You will produce a “STEP 26 QA + PATCH EVIDENCE REPORT” for Custom Domain DNS Verification.
+
+GOALS
+1) Confirm Step 26 is implemented correctly (files, routes, runtime flags, UI wiring).
+2) Confirm the token length issue is impossible now:
+   - generateVerificationToken() must always return a 64-hex token
+   - routes must refuse to write invalid tokens
+   - DB must store 64-hex
+3) Collect hard evidence via commands + code excerpts + API smoke tests.
+4) Output a final PASS/FAIL with any issues + exact fixes.
+
+RULES
+- Do NOT change any code unless something fails.
+- If something fails, propose the exact minimal patch and STOP.
+- Print command outputs (or key lines) and cite file paths and line ranges.
+- Use the project’s existing Prisma import conventions (@/lib/prisma).
+
+========================================
+A) BASELINE: REPO + FILE PRESENCE
+========================================
+1) Print current branch and short log:
+   - git rev-parse --abbrev-ref HEAD
+   - git log -n 5 --oneline
+
+2) Check for duplicate CustomDomainSection files:
+   - find src -name "CustomDomainSection.tsx" -print
+
+3) Confirm all Step 26 API route files exist:
+   - find src/app/api/org/custom-domain -maxdepth 3 -type f -print
+   - ls -la src/app/api/org/custom-domain
+
+4) Quick grep for token field names & endpoints:
+   - rg -n "domainVerificationToken|customDomainStatus|customDomainVerifiedAt|customDomainLastCheckedAt|customDomainFailureReason" src/app/api/org/custom-domain src/lib/services src/lib/validators -S
+
+========================================
+B) ROUTE RUNTIME + DYNAMIC FLAGS (MUST BE NODE)
+========================================
+For each route:
+- src/app/api/org/custom-domain/route.ts
+- src/app/api/org/custom-domain/verify/route.ts
+- src/app/api/org/custom-domain/rotate-token/route.ts
+
+1) Print first 40 lines of each file (must show):
+   - export const runtime = "nodejs";
+   - export const dynamic = "force-dynamic";
+Commands:
+   - sed -n '1,60p' <path>
+
+2) Confirm _helpers.ts exists and matches Step 25 pattern:
+   - sed -n '1,220p' src/app/api/org/custom-domain/_helpers.ts
+
+========================================
+C) TOKEN GENERATION + GUARDS (PATCH VERIFICATION)
+========================================
+1) Print dnsVerification.ts and verify:
+   - TOKEN_REGEX exists and enforces /^[0-9a-f]{64}$/
+   - generateVerificationToken uses randomBytes(32).toString("hex")
+   - it throws if token invalid
+   - isValidVerificationToken is exported
+Commands:
+   - sed -n '1,200p' src/lib/services/dnsVerification.ts
+
+2) Confirm PUT route validates token before DB write:
+   - rg -n "isValidVerificationToken|generateVerificationToken" src/app/api/org/custom-domain/route.ts -n
+   - sed -n '1,220p' src/app/api/org/custom-domain/route.ts
+
+3) Confirm rotate-token route validates token before DB write:
+   - rg -n "isValidVerificationToken|generateVerificationToken" src/app/api/org/custom-domain/rotate-token/route.ts -n
+   - sed -n '1,220p' src/app/api/org/custom-domain/rotate-token/route.ts
+
+========================================
+D) UI WIRING CHECK
+========================================
+1) Confirm Branding page imports and renders CustomDomainSection:
+   - rg -n "CustomDomainSection" src/app/app/settings/branding/page.tsx
+   - sed -n '1,80p' src/app/app/settings/branding/page.tsx
+   - sed -n '220,320p' src/app/app/settings/branding/page.tsx
+
+2) Confirm CustomDomainSection includes “Provider Tips” and subdomain guidance:
+   - rg -n "Provider Tips|Cloudflare|GoDaddy|Namecheap|subdomain|@" src/app/app/settings/branding/CustomDomainSection.tsx -n
+   - sed -n '1,260p' src/app/app/settings/branding/CustomDomainSection.tsx
+   - sed -n '260,520p' src/app/app/settings/branding/CustomDomainSection.tsx
+
+========================================
+E) QUALITY GATES
+========================================
+Run and paste outputs:
+1) pnpm prisma generate
+2) pnpm typecheck
+3) pnpm build
+
+If tests exist:
+- pnpm test (if configured)
+- pnpm test:e2e (if configured) but note if pre-existing failures unrelated to Step 26.
+
+========================================
+F) DB TOKEN LENGTH PROOF (MUST BE 64)
+========================================
+Run a one-off node script (no code changes) to fetch the current org token and print its length:
+
+node - <<'NODE'
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+(async () => {
+  const org = await prisma.organization.findFirst({
+    orderBy: { id: "asc" },
+    select: { id: true, domainVerificationToken: true, customDomain: true, customDomainStatus: true },
+  });
+  console.log("ORG:", org);
+  const t = org?.domainVerificationToken || "";
+  console.log("TOKEN_LEN:", t.length);
+  console.log("TOKEN_IS_64_HEX:", /^[0-9a-f]{64}$/.test(t));
+  await prisma.$disconnect();
+})();
+NODE
+
+========================================
+G) LIVE API SMOKE TESTS
+========================================
+Start dev server in one shell:
+- pnpm dev --port 3000
+
+In another shell, run these curl calls (use localhost). If auth blocks, set DEV_BYPASS_AUTH=true for dev only and retry.
+
+1) PUT domain:
+curl -s -X PUT http://localhost:3000/api/org/custom-domain \
+  -H "Content-Type: application/json" \
+  --data '{"customDomain":"chat.example.com"}' | tee /tmp/put.json
+
+Then print token length from response:
+node - <<'NODE'
+const fs=require('fs');
+const j=JSON.parse(fs.readFileSync('/tmp/put.json','utf8'));
+const t=j?.domain?.verificationToken||"";
+console.log("PUT_TOKEN_LEN:", t.length);
+console.log("PUT_TOKEN_IS_64_HEX:", /^[0-9a-f]{64}$/.test(t));
+NODE
+
+2) GET domain:
+curl -s http://localhost:3000/api/org/custom-domain | tee /tmp/get.json
+node - <<'NODE'
+const fs=require('fs');
+const j=JSON.parse(fs.readFileSync('/tmp/get.json','utf8'));
+const t=j?.domain?.verificationToken||"";
+console.log("GET_TOKEN_LEN:", t.length);
+console.log("GET_TOKEN_IS_64_HEX:", /^[0-9a-f]{64}$/.test(t));
+NODE
+
+3) Rotate token:
+curl -s -X POST http://localhost:3000/api/org/custom-domain/rotate-token | tee /tmp/rot.json
+node - <<'NODE'
+const fs=require('fs');
+const j=JSON.parse(fs.readFileSync('/tmp/rot.json','utf8'));
+const t=j?.domain?.verificationToken||"";
+console.log("ROT_TOKEN_LEN:", t.length);
+console.log("ROT_TOKEN_IS_64_HEX:", /^[0-9a-f]{64}$/.test(t));
+NODE
+
+4) Verify (expected failure unless TXT exists):
+curl -s -X POST http://localhost:3000/api/org/custom-domain/verify | tee /tmp/ver.json
+cat /tmp/ver.json
+
+========================================
+H) FINAL REPORT FORMAT
+========================================
+Output a single report with these sections:
+
+1) Summary (PASS/FAIL)
+2) Root Cause (token-length issue explanation)
+3) File Presence + No Duplicates (command outputs)
+4) Route Runtime Flags (snippets proving nodejs + force-dynamic)
+5) Auth Helper Parity (_helpers.ts summary)
+6) Token Guard Proof (dnsVerification.ts + route guards)
+7) Quality Gates (prisma generate/typecheck/build outputs)
+8) DB Proof (token value + length + regex)
+9) API Proof (PUT/GET/ROTATE token lengths + verify response)
+10) Known Limitations (single-tenant “first org” pattern; any pre-existing e2e failures not related)
+11) If anything failed: exact minimal patch + exact commands to re-run
+
+STOP after producing the report. Do not proceed to Step 27.
