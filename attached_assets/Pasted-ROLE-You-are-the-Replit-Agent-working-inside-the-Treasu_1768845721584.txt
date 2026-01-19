@@ -1,0 +1,92 @@
+ROLE: You are the Replit Agent working inside the Treasure Coast AI platform repo. You MUST implement Step 31 exactly, run the required quality gates, and only claim success if all gates pass.
+
+STEP 31 — “AI Bot Onboarding Wizard v1” (Money Path)
+GOAL:
+Create a simple, reliable onboarding flow where an agency admin can enter a business profile and click “Generate Bot”. The system automatically creates/updates:
+1) Business Profile for the org (name, category, phone, address, hours, website, booking link, tone/voice)
+2) A Bot tied to that org with:
+   - name
+   - system prompt / persona prompt derived from business info
+   - default lead capture fields
+   - default widget settings (use existing embed kit + current widget UI)
+3) A deterministic output (no flaky AI). If LLM is available, use it; if not, implement a rules-based generator that still produces strong copy.
+
+NON-NEGOTIABLES:
+- Do NOT touch custom domain work in this step.
+- Must be multi-tenant safe: org-scoped creation using getOrgContext() (no “first org” patterns).
+- Must have server-side validation (zod) and strict typing.
+- Must include tests (unit) for the generator and route behavior.
+- Must include at least 1 E2E test proving the wizard can generate a bot and that the embed snippet is shown on the bot page.
+
+SCOPE DETAILS:
+A) DATA MODEL
+- Check if a BusinessProfile (or similar) model already exists.
+  - If exists: use it.
+  - If not: add a minimal BusinessProfile model linked to Organization (1:1).
+- Bot model already exists — use existing Bot creation patterns (admin seed or bots routes).
+
+B) NEW UI
+Create a new page:
+- /app/onboarding (Agency Admin only)
+Page contains a form:
+- Business Name (required)
+- Category/Niche (required)
+- Website URL (optional)
+- Booking URL (optional)
+- Phone (optional)
+- Address (optional)
+- Hours (optional text)
+- Brand voice (dropdown: Professional, Friendly, Luxury, Bold, Chill)
+- Primary goal (dropdown: Bookings, Leads, FAQs, Support)
+
+Buttons:
+- “Generate Bot” (primary)
+- On success: navigate to the created bot detail page (/app/bots/[botPublicKey]) and show a toast.
+
+C) API
+Create org-scoped API route:
+- POST /api/org/onboarding/generate
+Request body: the onboarding form data
+Behavior:
+- Resolve org context via getOrgContext()
+- Require isAdmin(ctx.role)
+- Upsert BusinessProfile (orgId unique)
+- Create a Bot (or update if already exists for org with same name)
+- Generate:
+  - bot display name (e.g., “<BusinessName> Assistant”)
+  - system prompt (Truth Mode: only answer from provided business profile + later KB; if unsure, ask clarifying questions; always offer booking link; capture leads politely)
+  - default lead capture questions (name, phone, email, intent)
+Return: { ok: true, botPublicKey }
+
+D) GENERATION LOGIC
+Add a shared generator:
+- src/lib/onboarding/botBlueprint.ts
+Exports:
+- buildBotBlueprint(input): { botName, systemPrompt, leadCaptureDefaults, recommendedFAQs[] }
+If LLM exists in the repo already (public chat route likely uses it), you may call it — BUT you must implement a safe fallback rules-based version so tests are deterministic.
+
+E) TESTING
+- Unit tests:
+  - botBlueprint.test.ts: ensures stable output for a fixed input
+  - route test (if you have route-test utilities) OR at minimum unit test the validation + admin gate logic
+- E2E test:
+  - Create/extend a Playwright test that:
+    1) logs in (or uses DEV_BYPASS_AUTH if project test harness does)
+    2) visits /app/onboarding
+    3) fills form
+    4) clicks Generate
+    5) lands on bot detail page and sees “Install” section (embed snippet) + bot name visible
+
+F) QUALITY GATES (MUST RUN AND PASTE OUTPUTS)
+Run these commands in order and paste the full outputs:
+1) pnpm lint
+2) pnpm typecheck
+3) pnpm vitest run
+4) pnpm test:e2e
+5) pnpm build
+
+DELIVERABLES:
+- File manifest with all files created/modified
+- Brief explanation of data model choice (existing vs new)
+- The full command outputs from the quality gates
+Stop after completion and do not start Step 32.
