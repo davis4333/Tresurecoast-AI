@@ -26,3 +26,8 @@ pnpm-debug.log*
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# playwright test artifacts
+playwright-report/
+test-results/
+.playwright/
