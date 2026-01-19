@@ -1,0 +1,68 @@
+Good — this is almost a clean PASS. You proved Node runtime + build + prisma generate. That’s the big stuff.
+
+But I’m flagging two real issues that can bite you later:
+
+PASS/FAIL
+
+Conditional PASS ✅ (with 2 fixes recommended).
+If you want me to certify “production-safe,” patch the two items below.
+
+⸻
+
+Issue 1 — Prisma import path mismatch
+
+Your routes and helper import:
+	•	import { prisma } from "@/lib/prisma";
+
+Earlier Step 25 (your repo scan) referenced @/lib/db (and my older draft used that too). If your codebase standard is @/lib/prisma, you’re fine — but if some files still use @/lib/db, you’ll eventually get inconsistencies or duplicate clients.
+
+What I need to see to confirm:
+Run and paste:
+
+rg -n "from \"@/lib/(db|prisma)\"" src/lib src/app/api | head -n 80
+ls -la src/lib | rg "db|prisma"
+
+Fix (if mixed): pick one canonical export (usually src/lib/prisma.ts) and update all imports to that.
+
+⸻
+
+Issue 2 — Auth/org resolution is not tenant-safe
+
+Your _helpers.ts always selects the first organization:
+
+prisma.organization.findFirst({ orderBy: { id: "asc" } })
+
+That matches Step 25, yes — but it means:
+	•	In multi-tenant reality, any logged-in user (or dev bypass) is operating on the first org in the database.
+	•	Step 26 domain verification is now tied to that same behavior, which can cause cross-org collisions once you have multiple orgs.
+
+If you’re still in single-org mode, fine. If you’re planning multi-tenant (you are), this must be fixed soon.
+
+What I need to see to assess readiness:
+Search schema for any user/org linkage fields:
+
+rg -n "clerkOrganizationId|clerkUserId|owner|userId|workspace|organizationId" prisma/schema.prisma
+
+If there’s no linkage yet, then yes, “first org” is all you can do right now — but call it what it is: single-tenant placeholder.
+
+⸻
+
+One more quick QA ask (proof the UI is wired)
+
+You showed the file exists, but not that it’s imported/rendered.
+
+Run and paste:
+
+rg -n "CustomDomainSection" src/app/app/settings/branding/page.tsx
+sed -n '1,120p' src/app/app/settings/branding/page.tsx
+sed -n '200,320p' src/app/app/settings/branding/page.tsx
+
+
+⸻
+
+Bottom line
+	•	DNS routes: correct (Node runtime, force-dynamic, builds).
+	•	Prisma client generation: correct.
+	•	Biggest risk: org selection + tenant isolation.
+
+Send me the 3 command outputs above and I’ll tell you final PASS or the exact patch to lock it down.
