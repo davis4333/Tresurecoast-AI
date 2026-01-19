@@ -1,44 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
+import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } from "@/lib/public/hostPolicy";
 
 export const runtime = "nodejs";
-
-function isHostAllowed(
-  allowlist: string[],
-  origin: string | null,
-  host: string | null
-): boolean {
-  if (allowlist.length === 0) return true;
-
-  let hostname: string | null = null;
-
-  if (origin) {
-    try {
-      hostname = new URL(origin).hostname;
-    } catch {
-      // ignore invalid origin
-    }
-  }
-
-  if (!hostname && host) {
-    hostname = host.split(":")[0] || null;
-  }
-
-  if (!hostname) return false;
-
-  hostname = hostname.toLowerCase();
-
-  for (const allowed of allowlist) {
-    const normalizedAllowed = allowed.trim().toLowerCase();
-    if (!normalizedAllowed) continue;
-
-    if (hostname === normalizedAllowed) return true;
-    if (hostname.endsWith("." + normalizedAllowed)) return true;
-  }
-
-  return false;
-}
 
 function methodNotAllowed() {
   return NextResponse.json(
@@ -75,12 +40,12 @@ export async function GET(
   }
 
   try {
-    // 1) Fetch bot (existence + ACTIVE + allowlist)
     const bot = await prisma.bot.findUnique({
       where: { publicKey: botPublicKey },
       select: {
         id: true,
         status: true,
+        organizationId: true,
         allowlist: { select: { domain: true } }
       }
     });
@@ -93,17 +58,24 @@ export async function GET(
       return NextResponse.json({ ok: false, error: "Bot not active" }, { status: 404 });
     }
 
-    // 2) Enforce domain allowlist BEFORE conversation lookup
     const allowlistDomains = bot.allowlist.map((a) => a.domain);
     const origin = req.headers.get("origin");
-    const host = req.headers.get("host");
+    const originHost = getOriginHost(req);
+    const host = getRequestHost(req);
 
-    if (!isHostAllowed(allowlistDomains, origin, host)) {
+    if (!isHostAllowed(allowlistDomains, originHost ?? origin, host)) {
       console.error("[DOMAIN FORBIDDEN]", botPublicKey, host || origin || "unknown");
       return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
-    // 3) Fetch conversation by publicId + botId
+    const bind = await enforceTenantBinding({ req, botOrgId: bot.organizationId });
+    if (!bind.ok) {
+      return NextResponse.json(
+        { ok: false, error: bind.error, message: bind.message },
+        { status: bind.status }
+      );
+    }
+
     const conversation = await prisma.conversation.findFirst({
       where: {
         publicId: conversationPublicId,
@@ -119,7 +91,6 @@ export async function GET(
       );
     }
 
-    // 4) Fetch last 200 messages, return oldest -> newest
     const dbMessages = await prisma.message.findMany({
       where: { conversationId: conversation.id },
       select: {

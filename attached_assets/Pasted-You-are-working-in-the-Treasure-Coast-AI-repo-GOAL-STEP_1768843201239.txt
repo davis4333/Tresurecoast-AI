@@ -1,0 +1,143 @@
+You are working in the Treasure Coast AI repo.
+
+GOAL (STEP 30): Custom Domain “Activation”
+Implement secure Host-based tenant binding for ALL public API routes used by the widget/chat/leads system. This must:
+1) Prevent cross-tenant leaks when a request comes in via a verified custom domain (Host header).
+2) Block requests for claimed-but-not-verified domains.
+3) Deduplicate the repeated isHostAllowed logic into a single shared helper.
+4) Keep existing allowlist/origin behavior intact (do NOT break embedding/CORS logic).
+5) Add tests proving tenant binding + non-verified domain blocking.
+6) All quality gates must pass.
+
+------------------------------------------------------------
+A) FILE MANIFEST
+CREATE:
+1) src/lib/public/hostPolicy.ts
+
+MODIFY (replace duplicated isHostAllowed implementations with shared helper + enforce custom-domain binding):
+2) src/app/api/public/widget-config/route.ts
+3) src/app/api/public/chat/route.ts
+4) src/app/api/public/leads/route.ts
+5) src/app/api/public/leads/status/route.ts
+6) src/app/api/public/leads/recent/route.ts
+7) src/app/api/public/leads/[leadPublicId]/route.ts
+8) src/app/api/public/conversations/[conversationPublicId]/messages/route.ts
+
+CREATE TESTS (vitest):
+9) tests/unit/hostPolicy.test.ts
+
+OPTIONAL (if you prefer testing via E2E):
+- You may also add 1-2 Playwright tests, but unit tests are REQUIRED.
+
+------------------------------------------------------------
+B) IMPLEMENTATION DETAILS (MUST FOLLOW)
+
+B1) Create shared helper: src/lib/public/hostPolicy.ts
+
+It must export:
+
+type HostPolicyResult =
+  | { ok: true; mode: "platform" | "custom_domain"; host: string; orgId?: number }
+  | { ok: false; status: 400|403|500; error: string; message: string };
+
+function getRequestHost(req: Request): string | null
+- Prefer x-forwarded-host if present; else host.
+- Normalize: lowercase; strip port; trim.
+- Return null if missing.
+
+function getOriginHost(req: Request): string | null
+- Read Origin header; parse URL; return hostname lowercase.
+- If invalid, return null.
+
+async function resolveHostPolicy(req: Request): Promise<HostPolicyResult>
+- host = getRequestHost(req); if null -> {ok:false,status:400,error:"missing_host"}
+- Query DB for org by customDomain == host (case-insensitive match by normalized lowercase stored value; assume stored normalized).
+  Use prisma.organization.findFirst({ where: { customDomain: host }, select: { id:true, customDomainStatus:true } })
+- If no org found: return { ok:true, mode:"platform", host }
+- If org found AND customDomainStatus !== "verified":
+  return { ok:false, status:403, error:"custom_domain_not_verified", message:"Custom domain is not verified yet" }
+- If org found AND customDomainStatus === "verified":
+  return { ok:true, mode:"custom_domain", host, orgId: org.id }
+
+function isHostAllowed(allowlistDomains: string[] | null | undefined, origin: string | null, host: string | null): boolean
+- Move the CURRENT duplicated behavior into this helper (do not change semantics).
+- It must behave exactly like existing routes today to avoid regressions.
+
+async function enforceTenantBinding(opts: {
+  req: Request;
+  botOrgId: number;
+}): Promise<HostPolicyResult>
+- policy = await resolveHostPolicy(req)
+- If policy.ok === false -> return policy
+- If policy.mode === "platform" -> return policy (no tenant-binding enforcement)
+- If policy.mode === "custom_domain":
+    if policy.orgId !== botOrgId:
+      return { ok:false, status:403, error:"cross_tenant_host", message:"Host is bound to a different organization" }
+    else return policy
+
+NOTE: We only enforce tenant binding when the host is a claimed domain. Platform hosts keep existing behavior.
+
+------------------------------------------------------------
+C) ROUTE MODIFICATIONS (MUST FOLLOW)
+
+For each listed public API route:
+1) Delete the local duplicated isHostAllowed implementation.
+2) Import from hostPolicy:
+   - isHostAllowed
+   - enforceTenantBinding
+   - getRequestHost (if needed for existing logic)
+   - getOriginHost (if needed)
+
+3) Keep existing allowlist check behavior:
+   - Determine allowlistDomains exactly as before (whatever source: bot.allowlistDomains, etc.).
+   - originHost = getOriginHost(req) OR existing origin parsing logic.
+   - host = getRequestHost(req) OR existing host parsing logic.
+   - If (!isHostAllowed(allowlistDomains, originHost ?? originHeader, host)) -> return same error/status as today.
+
+4) After you load the Bot (via botPublicKey) and you know its organizationId:
+   - call: const bind = await enforceTenantBinding({ req, botOrgId: bot.organizationId });
+   - if (!bind.ok) return NextResponse.json({ ok:false, error: bind.error, message: bind.message }, { status: bind.status });
+
+5) For routes that load a Lead/Conversation instead of Bot first:
+   - You must derive botOrgId through the relations you already have:
+     e.g. lead -> bot -> organizationId, conversation -> bot -> organizationId.
+   - Then enforceTenantBinding the same way.
+
+------------------------------------------------------------
+D) TESTS (REQUIRED)
+
+Create tests/unit/hostPolicy.test.ts using vitest.
+Mock prisma.organization.findFirst results.
+Test cases REQUIRED:
+1) No Host header -> returns missing_host (400)
+2) Host not found in DB -> ok platform
+3) Host found but status pending/failed/none -> 403 custom_domain_not_verified
+4) Host found verified -> ok custom_domain + orgId
+5) enforceTenantBinding platform -> ok
+6) enforceTenantBinding custom_domain org mismatch -> 403 cross_tenant_host
+7) enforceTenantBinding custom_domain org match -> ok
+
+(You can mock prisma via vi.mock("@/lib/prisma") pattern used elsewhere.)
+
+------------------------------------------------------------
+E) COMMANDS / PROOF OUTPUTS (MUST RUN AND PASTE)
+
+After code changes, run and paste outputs in order:
+
+1) pnpm lint
+2) pnpm typecheck
+3) pnpm vitest run
+4) pnpm test:e2e
+5) pnpm build
+
+Also paste:
+- rg -n "function isHostAllowed" src/app/api/public -S
+  (should show ZERO duplicates in routes; only the shared helper should contain the function)
+- rg -n "enforceTenantBinding" src/app/api/public -S
+  (should show it used in all relevant routes)
+
+STOP CONDITIONS:
+- If any gate fails, fix and re-run until all pass.
+- Do not proceed to any new steps after Step 30 is green.
+
+Return: (1) file diff summary, (2) test outputs, (3) the two rg proofs.

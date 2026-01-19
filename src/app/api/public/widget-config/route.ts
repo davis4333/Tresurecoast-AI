@@ -1,44 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
+import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } from "@/lib/public/hostPolicy";
 
 export const runtime = "nodejs";
-
-function isHostAllowed(
-  allowlist: string[],
-  origin: string | null,
-  host: string | null
-): boolean {
-  if (allowlist.length === 0) return true;
-
-  let hostname: string | null = null;
-
-  if (origin) {
-    try {
-      hostname = new URL(origin).hostname;
-    } catch {
-      // ignore invalid origin
-    }
-  }
-
-  if (!hostname && host) {
-    hostname = host.split(":")[0] || null;
-  }
-
-  if (!hostname) return false;
-
-  hostname = hostname.toLowerCase();
-
-  for (const allowed of allowlist) {
-    const normalizedAllowed = allowed.trim().toLowerCase();
-    if (!normalizedAllowed) continue;
-
-    if (hostname === normalizedAllowed) return true;
-    if (hostname.endsWith("." + normalizedAllowed)) return true;
-  }
-
-  return false;
-}
 
 function methodNotAllowed() {
   return NextResponse.json(
@@ -67,6 +32,7 @@ export async function GET(req: Request) {
         name: true,
         greeting: true,
         fallbackText: true,
+        organizationId: true,
         allowlist: { select: { domain: true } },
         organization: {
           select: {
@@ -94,15 +60,15 @@ export async function GET(req: Request) {
       );
     }
 
-    // Enforce allowlist before returning config
     const allowlistDomains = bot.allowlist
       .map((a) => a.domain)
       .filter((d): d is string => typeof d === "string" && d.trim().length > 0);
 
     const origin = req.headers.get("origin");
-    const host = req.headers.get("host");
+    const originHost = getOriginHost(req);
+    const host = getRequestHost(req);
 
-    if (!isHostAllowed(allowlistDomains, origin, host)) {
+    if (!isHostAllowed(allowlistDomains, originHost ?? origin, host)) {
       console.error(
         "[DOMAIN FORBIDDEN]",
         botPublicKey,
@@ -111,6 +77,14 @@ export async function GET(req: Request) {
       return NextResponse.json(
         { ok: false, error: "Forbidden" },
         { status: 403 }
+      );
+    }
+
+    const bind = await enforceTenantBinding({ req, botOrgId: bot.organizationId });
+    if (!bind.ok) {
+      return NextResponse.json(
+        { ok: false, error: bind.error, message: bind.message },
+        { status: bind.status }
       );
     }
 

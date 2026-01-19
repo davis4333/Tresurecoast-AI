@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
+import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } from "@/lib/public/hostPolicy";
 
 export const runtime = "nodejs";
-
-function isHostAllowed(
-  allowlist: string[],
-  host: string | null
-): boolean {
-  const filtered = allowlist
-    .map((d) => d.trim().toLowerCase())
-    .filter((d) => d.length > 0);
-  if (filtered.length === 0) return true;
-  if (!host) return false;
-  const normalizedHost = host.toLowerCase();
-  return filtered.some(
-    (d) => normalizedHost === d || normalizedHost.endsWith(`.${d}`)
-  );
-}
 
 interface RouteContext {
   params: Promise<{ leadPublicId: string }>;
@@ -28,7 +14,6 @@ export async function GET(
   context: RouteContext
 ): Promise<NextResponse> {
   try {
-    const host = request.headers.get("host")?.split(":")[0] || null;
     const { searchParams } = new URL(request.url);
     const botPublicKey = searchParams.get("botPublicKey");
 
@@ -53,6 +38,7 @@ export async function GET(
       select: {
         id: true,
         status: true,
+        organizationId: true,
         allowlist: { select: { domain: true } },
       },
     });
@@ -75,10 +61,22 @@ export async function GET(
       .map((a) => a.domain)
       .filter((d): d is string => typeof d === "string" && d.length > 0);
 
-    if (!isHostAllowed(allowlistDomains, host)) {
+    const origin = request.headers.get("origin");
+    const originHost = getOriginHost(request);
+    const host = getRequestHost(request);
+
+    if (!isHostAllowed(allowlistDomains, originHost ?? origin, host)) {
       return NextResponse.json(
         { ok: false, error: "Origin not allowed" },
         { status: 403 }
+      );
+    }
+
+    const bind = await enforceTenantBinding({ req: request, botOrgId: bot.organizationId });
+    if (!bind.ok) {
+      return NextResponse.json(
+        { ok: false, error: bind.error, message: bind.message },
+        { status: bind.status }
       );
     }
 
