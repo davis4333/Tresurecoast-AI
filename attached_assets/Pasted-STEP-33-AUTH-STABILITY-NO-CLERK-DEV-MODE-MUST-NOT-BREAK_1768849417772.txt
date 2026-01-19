@@ -1,0 +1,78 @@
+STEP 33 — AUTH STABILITY + NO-CLERK DEV MODE (MUST NOT BREAK PROD SECURITY)
+
+CONTEXT (CURRENT PROBLEM)
+Dashboard /app errors because Clerk keys aren’t configured (or Clerk init is happening even when dev bypass is intended).
+We need /app to load cleanly in development without Clerk, while production stays locked down.
+
+GOAL
+Implement a strict, deterministic auth-mode system:
+A) DEV BYPASS MODE (development only)
+- If DEV_BYPASS_AUTH=true AND NODE_ENV !== "production":
+  - /app loads without Clerk keys
+  - /api/org/* routes work using existing getOrgContext dev/test logic
+  - NO runtime crashes, NO Clerk initialization required
+
+B) NORMAL MODE (development when bypass off)
+- If NODE_ENV !== "production" and DEV_BYPASS_AUTH is false/unset:
+  - /app should not crash even if Clerk keys are missing
+  - show a friendly page telling user to enable dev bypass or add Clerk keys
+  - /api/org/* should return 401/403 appropriately (no hard crash)
+
+C) PRODUCTION MODE (never bypass)
+- If NODE_ENV === "production":
+  - bypass is ALWAYS disabled (even if env var exists)
+  - /app requires Clerk auth and redirects to /sign-in
+  - /api/org/* returns 401 when unauthenticated
+  - must not expose test override headers in production
+
+NON-NEGOTIABLE CONSTRAINTS
+- Do NOT weaken production security.
+- Do NOT remove Clerk integration; just guard it correctly.
+- Keep all existing tests passing, and add tests if needed.
+
+WORK PLAN
+1) AUDIT
+- Identify every place Clerk is imported/used in app routes/layout/providers/middleware.
+- Identify where the crash occurs when Clerk keys are missing.
+
+2) FIX CLIENT SIDE FIRST (most common crash source)
+- In /app layout/provider layer, if NEXT_PUBLIC_DEV_BYPASS_AUTH === "true", DO NOT render ClerkProvider / SignedIn / SignedOut components and DO NOT call Clerk hooks.
+- Instead render the app shell normally.
+
+3) FIX SERVER/MIDDLEWARE
+- Update src/middleware.ts to protect /app and /api routes correctly:
+  - In production: enforce Clerk as currently intended.
+  - In development with bypass: allow /app and org APIs through without requiring Clerk middleware.
+  - In development without bypass: allow navigation but route to a friendly "Auth not configured" screen for /app.
+
+4) FRIENDLY UX PAGE
+- Create a page at /auth-error (or reuse existing) with clear instructions:
+  - If in dev and Clerk missing: “Set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY + CLERK_SECRET_KEY or set DEV_BYPASS_AUTH=true”
+  - If in prod: “Sign in required” + link to /sign-in
+
+5) ADD PROOF TESTS
+- Add at least 2 unit tests:
+  - production mode ignores dev bypass
+  - dev bypass disables Clerk-required rendering path
+- If E2E is easy, add 1 E2E smoke:
+  - with bypass env, /app loads and shows dashboard shell (data-testid presence)
+
+QUALITY GATES (PASTE OUTPUTS)
+Run and paste:
+- pnpm lint
+- pnpm typecheck
+- pnpm vitest run
+- pnpm test:e2e
+- pnpm build
+
+MANUAL PROOF (PASTE RESULTS)
+Provide a short table:
+Scenario | Env | Expected | Actual
+1) Dev bypass ON | NODE_ENV=development, DEV_BYPASS_AUTH=true, NEXT_PUBLIC_DEV_BYPASS_AUTH=true, Clerk keys missing | /app loads | (confirm)
+2) Dev bypass OFF, keys missing | NODE_ENV=development, DEV_BYPASS_AUTH=false, keys missing | /app shows friendly auth error | (confirm)
+3) Production, bypass “on” | NODE_ENV=production, DEV_BYPASS_AUTH=true | bypass ignored, /app blocked/redirect | (confirm)
+
+DELIVERABLE
+- File manifest
+- What changed and why
+STOP when done and all gates are green.
