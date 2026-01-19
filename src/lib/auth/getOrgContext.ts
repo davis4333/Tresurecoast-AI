@@ -26,14 +26,23 @@ const DEV_BYPASS_AUTH = process.env.DEV_BYPASS_AUTH === "true";
 const DEV_BOOTSTRAP_CLERK_USER_ID = process.env.DEV_BOOTSTRAP_CLERK_USER_ID;
 const DEV_BOOTSTRAP_CLERK_ORG_ID = process.env.DEV_BOOTSTRAP_CLERK_ORG_ID;
 
-export async function getOrgContext(explicitOrgId?: string): Promise<OrgContextResult> {
+export interface GetOrgContextOptions {
+  explicitOrgId?: string;
+  testUserId?: string;
+}
+
+export async function getOrgContext(options?: GetOrgContextOptions | string): Promise<OrgContextResult> {
+  const opts: GetOrgContextOptions = typeof options === "string" ? { explicitOrgId: options } : options || {};
+  const { explicitOrgId, testUserId } = opts;
+
   try {
     let userId: string | null = null;
     let clerkOrgId: string | null = null;
     let useMembershipLookup = false;
 
     if (DEV_BYPASS_AUTH && !IS_PRODUCTION) {
-      if (!DEV_BOOTSTRAP_CLERK_USER_ID) {
+      const effectiveUserId = testUserId || DEV_BOOTSTRAP_CLERK_USER_ID;
+      if (!effectiveUserId) {
         return {
           ok: false,
           status: 500,
@@ -42,7 +51,7 @@ export async function getOrgContext(explicitOrgId?: string): Promise<OrgContextR
         };
       }
 
-      userId = DEV_BOOTSTRAP_CLERK_USER_ID;
+      userId = effectiveUserId;
       clerkOrgId = explicitOrgId || DEV_BOOTSTRAP_CLERK_ORG_ID || null;
 
       if (clerkOrgId) {
@@ -165,4 +174,11 @@ export function isAdmin(role: OrgRole): boolean {
 
 export function isOwner(role: OrgRole): boolean {
   return role === "AGENCY_OWNER";
+}
+
+export function getTestUserId(request: Request): string | undefined {
+  if (!DEV_BYPASS_AUTH || IS_PRODUCTION) {
+    return undefined;
+  }
+  return request.headers.get("X-Test-User-Id") || undefined;
 }

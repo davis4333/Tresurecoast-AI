@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CustomDomainInputSchema } from "@/lib/validators/customDomain";
 import { generateVerificationToken, isValidVerificationToken } from "@/lib/services/dnsVerification";
-import { getOrgContext, isAdmin } from "@/lib/auth/getOrgContext";
+import { getOrgContext, isAdmin, getTestUserId } from "@/lib/auth/getOrgContext";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: NextRequest) {
-  const ctx = await getOrgContext();
+export async function GET(req: NextRequest) {
+  const ctx = await getOrgContext({ testUserId: getTestUserId(req) });
   if (!ctx.ok) {
     return NextResponse.json({ ok: false, error: ctx.error, message: ctx.message }, { status: ctx.status });
   }
@@ -43,7 +43,7 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const ctx = await getOrgContext();
+  const ctx = await getOrgContext({ testUserId: getTestUserId(req) });
   if (!ctx.ok) {
     return NextResponse.json({ ok: false, error: ctx.error, message: ctx.message }, { status: ctx.status });
   }

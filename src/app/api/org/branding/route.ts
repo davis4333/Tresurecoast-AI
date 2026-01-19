@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { BrandingSchema } from "@/lib/validators/branding";
 import { prisma } from "@/lib/prisma";
-import { getOrgContext, isAdmin } from "@/lib/auth/getOrgContext";
+import { getOrgContext, isAdmin, getTestUserId } from "@/lib/auth/getOrgContext";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,10 +11,10 @@ function jsonError(requestId: string, status: number, error: string, message: st
   return NextResponse.json({ ok: false, requestId, error, message, details }, { status });
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const requestId = crypto.randomUUID();
   try {
-    const ctx = await getOrgContext();
+    const ctx = await getOrgContext({ testUserId: getTestUserId(req) });
     if (!ctx.ok) {
       return jsonError(requestId, ctx.status, ctx.error, ctx.message);
     }
@@ -54,7 +54,7 @@ export async function GET(_req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const requestId = crypto.randomUUID();
   try {
-    const ctx = await getOrgContext();
+    const ctx = await getOrgContext({ testUserId: getTestUserId(req) });
     if (!ctx.ok) {
       return jsonError(requestId, ctx.status, ctx.error, ctx.message);
     }

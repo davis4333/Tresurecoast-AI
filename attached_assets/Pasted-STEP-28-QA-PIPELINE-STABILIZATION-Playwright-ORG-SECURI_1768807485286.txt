@@ -1,0 +1,85 @@
+STEP 28 — QA PIPELINE STABILIZATION (Playwright) + ORG SECURITY E2E TESTS
+
+GOAL:
+1) Fix the pre-existing failing Playwright test:
+   revenue-loop.spec.ts: widget UI smoke test
+   expect(locator('[data-testid="chat-input"]')).toBeVisible() failed
+2) Add 2 new E2E tests proving Step 27 security:
+   - CLIENT cannot see domain verification token
+   - CLIENT gets 403 on admin-only endpoints
+
+RULES:
+- Do NOT “disable” or “skip” tests.
+- Do NOT weaken assertions to make tests pass incorrectly.
+- Prefer fixing UI selector/testid wiring if that’s the real bug.
+- Provide VERBATIM command outputs at the end.
+
+A) REPRO THE FAILURE (verbatim)
+1) Run:
+pnpm test:e2e -- --reporter=line
+
+2) Paste the failing stack + test name + line number(s).
+
+B) ROOT CAUSE ANALYSIS
+Investigate why [data-testid="chat-input"] is not visible.
+Check:
+- Is the widget page route correct?
+- Does ChatBox render an input with data-testid="chat-input"?
+- Was test expecting a selector that changed?
+- Is it an iframe timing issue?
+- Is the widget not loading due to auth/env/config?
+
+You must identify the exact reason with evidence:
+- Show the component that should render the chat input
+- Show what the page actually renders during the test (Playwright debug screenshot or HTML snippet)
+
+C) IMPLEMENT THE FIX (minimal + correct)
+Fix should be one of:
+1) UI fix: ensure chat input exists with stable data-testid="chat-input" and is visible when widget loads.
+OR
+2) Test fix: if UI is correct but selector is wrong/outdated, update the test to the correct stable selector/testid.
+OR
+3) Timing fix: wait for widget boot readiness properly (NOT arbitrary sleeps). Use Playwright’s built-in waiting.
+
+Constraints:
+- If you add/modify data-testid attributes, they must be stable and documented.
+- If widget is in an iframe, use frameLocator correctly.
+- No flaky waits.
+
+D) ADD NEW STEP 27 SECURITY E2E TESTS (2 tests)
+Create a new file:
+tests/e2e/org-security.spec.ts
+
+Test 1: CLIENT cannot see verification token
+- Arrange: seed Org A with OWNER + CLIENT, set customDomain + token as OWNER (via API or direct DB seed)
+- Act: call GET /api/org/custom-domain as CLIENT context
+- Assert: response ok=true AND verificationToken is null
+
+Test 2: CLIENT forbidden on admin endpoints
+- Act: PUT /api/org/custom-domain as CLIENT
+- Assert: 403 and error="forbidden"
+- Act: POST /api/org/custom-domain/verify as CLIENT
+- Assert: 403 and error="forbidden"
+
+IMPORTANT: Since dev uses DEV_BYPASS_AUTH + DEV_BOOTSTRAP_CLERK_USER_ID,
+you must build a test helper to run requests as specific users.
+Options:
+- Use process.env override per test (restore after)
+- Or implement a test-only header (e.g. X-Dev-UserId) that is only honored when NODE_ENV !== production AND DEV_BYPASS_AUTH=true.
+Pick the cleanest + least risky option and justify it.
+If you add a test-only header, it MUST be behind the same non-production guard and never usable in production builds.
+
+E) QUALITY GATES (verbatim outputs)
+Run and paste:
+pnpm typecheck
+pnpm build
+pnpm test:e2e -- --reporter=line
+
+F) DELIVERABLES
+Return:
+1) The root cause explanation
+2) Exact files changed (list)
+3) The patch (code)
+4) Verbatim outputs of the commands in (E)
+
+STOP after returning results.
