@@ -30,22 +30,26 @@ export async function getOrgContext(explicitOrgId?: string): Promise<OrgContextR
   try {
     let userId: string | null = null;
     let clerkOrgId: string | null = null;
+    let useMembershipLookup = false;
 
     if (DEV_BYPASS_AUTH && !IS_PRODUCTION) {
-      if (!DEV_BOOTSTRAP_CLERK_USER_ID || !DEV_BOOTSTRAP_CLERK_ORG_ID) {
+      if (!DEV_BOOTSTRAP_CLERK_USER_ID) {
         return {
           ok: false,
           status: 500,
           error: "dev_bootstrap_missing",
-          message:
-            "DEV_BYPASS_AUTH=true requires DEV_BOOTSTRAP_CLERK_USER_ID and DEV_BOOTSTRAP_CLERK_ORG_ID in development.",
+          message: "DEV_BYPASS_AUTH=true requires DEV_BOOTSTRAP_CLERK_USER_ID in development.",
         };
       }
 
       userId = DEV_BOOTSTRAP_CLERK_USER_ID;
-      clerkOrgId = explicitOrgId || DEV_BOOTSTRAP_CLERK_ORG_ID;
+      clerkOrgId = explicitOrgId || DEV_BOOTSTRAP_CLERK_ORG_ID || null;
 
-      await bootstrapDevEnvironment(userId, clerkOrgId);
+      if (clerkOrgId) {
+        await bootstrapDevEnvironment(userId, clerkOrgId);
+      } else {
+        useMembershipLookup = true;
+      }
     } else {
       const { auth } = await import("@clerk/nextjs/server");
       const clerkAuth = await auth();
@@ -57,17 +61,36 @@ export async function getOrgContext(explicitOrgId?: string): Promise<OrgContextR
         return { ok: false, status: 401, error: "unauthorized", message: "Authentication required" };
       }
       if (!clerkOrgId) {
-        return {
-          ok: false,
-          status: 403,
-          error: "no_org_context",
-          message: "No organization context. Please select an organization.",
-        };
+        useMembershipLookup = true;
       }
     }
 
+    if (useMembershipLookup) {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { clerkUserId: userId! },
+        include: { organization: true },
+        orderBy: { organizationId: "asc" },
+      });
+
+      if (!membership) {
+        return {
+          ok: false,
+          status: 403,
+          error: "no_membership",
+          message: "You are not a member of any organization",
+        };
+      }
+
+      const validRoles: OrgRole[] = ["AGENCY_OWNER", "AGENCY_ADMIN", "CLIENT"];
+      if (!validRoles.includes(membership.role as OrgRole)) {
+        return { ok: false, status: 403, error: "invalid_role", message: "Invalid organization role" };
+      }
+
+      return { ok: true, org: membership.organization, role: membership.role as OrgRole, userId: userId! };
+    }
+
     const org = await prisma.organization.findUnique({
-      where: { clerkOrganizationId: clerkOrgId },
+      where: { clerkOrganizationId: clerkOrgId! },
     });
 
     if (!org) {

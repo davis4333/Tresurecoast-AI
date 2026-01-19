@@ -60,5 +60,4 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL = "/app"
 [userenv.development]
 DEV_BYPASS_AUTH = "true"
 NEXT_PUBLIC_DEV_BYPASS_AUTH = "true"
-DEV_BOOTSTRAP_CLERK_USER_ID = "user_dev_bootstrap"
-DEV_BOOTSTRAP_CLERK_ORG_ID = "org_dev_bootstrap"
+DEV_BOOTSTRAP_CLERK_USER_ID = "user_b_admin"

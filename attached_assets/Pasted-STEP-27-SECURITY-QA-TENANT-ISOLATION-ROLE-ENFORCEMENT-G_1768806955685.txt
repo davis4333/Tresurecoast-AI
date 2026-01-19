@@ -1,0 +1,133 @@
+STEP 27 SECURITY QA — TENANT ISOLATION + ROLE ENFORCEMENT
+
+GOAL:
+Prove Step 27 is REAL multi-tenant:
+- Requests resolve org strictly via OrganizationMember for the authenticated user (or dev bootstrap user)
+- Admin-only routes reject CLIENT role
+- No route leaks data across orgs
+- No legacy "first org" fallbacks remain
+
+A) STATIC CHECKS (must be zero)
+1) Ensure no findFirst(orderBy: {id:"asc"}) “first org” exists in org routes:
+rg -n 'organization\.findFirst\(\s*\{[^}]*orderBy:\s*\{\s*id:\s*"asc"\s*\}' src/app/api/org src/lib/auth -S || true
+rg -n '"AGENCY_OWNER"\s+as\s+const.*first org|first org|orderBy:\s*\{\s*id:\s*"asc"' src/app/api/org src/lib/auth -S || true
+
+2) Ensure org routes import ONLY from the new helper:
+rg -n 'from "@/lib/auth/getOrgContext"|getOrgContext\(' src/app/api/org -S
+rg -n '_helpers' src || true
+
+B) DB SEED (2 orgs, 2 users, 3 memberships)
+We will NOT rely on Clerk during this test. We’ll use DEV_BYPASS_AUTH with explicit user id.
+
+1) Set env for dev server (Replit secrets / .env):
+NODE_ENV=development
+DEV_BYPASS_AUTH=true
+DEV_BOOTSTRAP_CLERK_USER_ID=user_a_owner
+
+2) Seed data (idempotent-ish):
+pnpm prisma db execute --stdin <<'SQL'
+-- Ensure at least 2 orgs exist
+INSERT INTO "Organization" ("name")
+SELECT 'Org A'
+WHERE NOT EXISTS (SELECT 1 FROM "Organization" WHERE "name"='Org A');
+
+INSERT INTO "Organization" ("name")
+SELECT 'Org B'
+WHERE NOT EXISTS (SELECT 1 FROM "Organization" WHERE "name"='Org B');
+
+-- Grab org ids
+WITH oa AS (SELECT "id" FROM "Organization" WHERE "name"='Org A' LIMIT 1),
+     ob AS (SELECT "id" FROM "Organization" WHERE "name"='Org B' LIMIT 1)
+-- Owner in Org A
+INSERT INTO "OrganizationMember" ("organizationId","clerkUserId","role","createdAt","updatedAt")
+SELECT oa.id, 'user_a_owner', 'AGENCY_OWNER', NOW(), NOW() FROM oa
+ON CONFLICT ("organizationId","clerkUserId") DO UPDATE SET "role"=EXCLUDED."role", "updatedAt"=NOW();
+
+WITH oa AS (SELECT "id" FROM "Organization" WHERE "name"='Org A' LIMIT 1)
+-- Client in Org A
+INSERT INTO "OrganizationMember" ("organizationId","clerkUserId","role","createdAt","updatedAt")
+SELECT oa.id, 'user_a_client', 'CLIENT', NOW(), NOW() FROM oa
+ON CONFLICT ("organizationId","clerkUserId") DO UPDATE SET "role"=EXCLUDED."role", "updatedAt"=NOW();
+
+WITH ob AS (SELECT "id" FROM "Organization" WHERE "name"='Org B' LIMIT 1)
+-- Admin in Org B
+INSERT INTO "OrganizationMember" ("organizationId","clerkUserId","role","createdAt","updatedAt")
+SELECT ob.id, 'user_b_admin', 'AGENCY_ADMIN', NOW(), NOW() FROM ob
+ON CONFLICT ("organizationId","clerkUserId") DO UPDATE SET "role"=EXCLUDED."role", "updatedAt"=NOW();
+SQL
+
+3) Show proof:
+pnpm prisma db execute --stdin <<'SQL'
+SELECT o.id, o.name, m."clerkUserId", m.role
+FROM "OrganizationMember" m
+JOIN "Organization" o ON o.id = m."organizationId"
+ORDER BY o.id, m."clerkUserId";
+SQL
+
+C) RUNTIME API TESTS (3 users)
+We will flip DEV_BOOTSTRAP_CLERK_USER_ID between users and hit endpoints.
+Start dev server:
+pnpm dev
+(keep it running)
+
+In a SECOND shell (or Replit shell tab), run each block:
+
+1) As Org A OWNER (should be admin)
+export DEV_BOOTSTRAP_CLERK_USER_ID=user_a_owner
+curl -sS http://localhost:3000/api/org/branding | jq
+curl -sS http://localhost:3000/api/org/custom-domain | jq
+
+Try admin-only write (should succeed / 200):
+curl -sS -X PUT http://localhost:3000/api/org/custom-domain \
+  -H "Content-Type: application/json" \
+  -d '{"customDomain":"chat-orga.example.com"}' | jq
+
+2) As Org A CLIENT (should be forbidden for admin-only)
+export DEV_BOOTSTRAP_CLERK_USER_ID=user_a_client
+
+Read branding (should succeed / 200):
+curl -sS http://localhost:3000/api/org/branding | jq
+
+Read custom-domain (token should be null if CLIENT):
+curl -sS http://localhost:3000/api/org/custom-domain | jq
+
+Try admin-only write (must be 403):
+curl -sS -X PUT http://localhost:3000/api/org/custom-domain \
+  -H "Content-Type: application/json" \
+  -d '{"customDomain":"chat-client-should-fail.example.com"}' | jq
+
+Try verify (must be 403):
+curl -sS -X POST http://localhost:3000/api/org/custom-domain/verify | jq
+
+3) As Org B ADMIN (should operate on Org B, not Org A)
+export DEV_BOOTSTRAP_CLERK_USER_ID=user_b_admin
+
+Read custom-domain (should show Org B state, likely null/none initially):
+curl -sS http://localhost:3000/api/org/custom-domain | jq
+
+Set Org B domain (should succeed, and MUST NOT overwrite Org A):
+curl -sS -X PUT http://localhost:3000/api/org/custom-domain \
+  -H "Content-Type: application/json" \
+  -d '{"customDomain":"chat-orgb.example.com"}' | jq
+
+D) CROSS-TENANT LEAK CHECK (DB proof)
+After tests, prove each org has its own domain value:
+pnpm prisma db execute --stdin <<'SQL'
+SELECT id, name, "customDomain", "customDomainStatus"
+FROM "Organization"
+WHERE name IN ('Org A','Org B')
+ORDER BY id;
+SQL
+
+E) QUALITY GATES (again, quick)
+pnpm typecheck
+pnpm build
+
+RETURN TO ME (verbatim):
+- Output of section A (all commands)
+- Output of the seed proof query in B3
+- All curl + jq outputs in section C
+- The final DB proof query in D
+- Outputs of typecheck + build
+
+STOP after returning outputs.
