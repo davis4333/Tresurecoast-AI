@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, use } from "react";
 import Link from "next/link";
 import { TcaCard, TcaCardBody, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaButton } from "@/components/tca/TcaButton";
+import { getScriptEmbedSnippet, getIframeEmbedSnippet } from "@/lib/widget/embedSnippet";
 
 interface BotLink {
   id?: number;
@@ -524,6 +525,91 @@ export default function BotDetailPage({ params }: { params: Promise<{ botPublicK
               ))}
             </div>
           )}
+        </TcaCardBody>
+      </TcaCard>
+
+      <TcaCard>
+        <TcaCardHeader>
+          <h3 className="text-base font-semibold text-[var(--color-text-primary)]">Install Widget</h3>
+        </TcaCardHeader>
+        <TcaCardBody className="space-y-6">
+          <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-4">
+            <p className="text-sm text-green-400">
+              Copy one of the snippets below and paste it into your website. Works with WordPress, Wix, Squarespace, and any HTML site.
+            </p>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-sm font-medium text-[var(--color-text-secondary)]">
+                Script Embed (Recommended)
+              </label>
+              <TcaButton
+                variant="ghost"
+                size="sm"
+                data-testid="copy-script-embed"
+                onClick={() => {
+                  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+                  const snippet = getScriptEmbedSnippet(baseUrl, botPublicKey);
+                  navigator.clipboard.writeText(snippet);
+                  showToast("Script snippet copied!", "success");
+                }}
+              >
+                Copy
+              </TcaButton>
+            </div>
+            <textarea
+              readOnly
+              value={typeof window !== "undefined" ? getScriptEmbedSnippet(window.location.origin, botPublicKey) : ""}
+              className="tca-input h-20 resize-none font-mono text-xs"
+              data-testid="script-embed-snippet"
+            />
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              Paste in {"<head>"} or before {"</body>"}. Creates a floating chat button.
+            </p>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-sm font-medium text-[var(--color-text-secondary)]">
+                Iframe Embed (Fallback)
+              </label>
+              <TcaButton
+                variant="ghost"
+                size="sm"
+                data-testid="copy-iframe-embed"
+                onClick={() => {
+                  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+                  const snippet = getIframeEmbedSnippet(baseUrl, botPublicKey);
+                  navigator.clipboard.writeText(snippet);
+                  showToast("Iframe snippet copied!", "success");
+                }}
+              >
+                Copy
+              </TcaButton>
+            </div>
+            <textarea
+              readOnly
+              value={typeof window !== "undefined" ? getIframeEmbedSnippet(window.location.origin, botPublicKey) : ""}
+              className="tca-input h-20 resize-none font-mono text-xs"
+              data-testid="iframe-embed-snippet"
+            />
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              Use if the script embed doesn&apos;t work on your platform.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <a
+              href={`/widget/${botPublicKey}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-[var(--color-brand-primary)] hover:underline"
+              data-testid="link-preview-widget"
+            >
+              Open widget preview in new tab
+            </a>
+          </div>
         </TcaCardBody>
       </TcaCard>
     </div>

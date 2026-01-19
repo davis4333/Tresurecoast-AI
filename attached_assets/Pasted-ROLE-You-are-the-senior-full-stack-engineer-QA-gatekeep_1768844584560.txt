@@ -1,0 +1,102 @@
+ROLE
+You are the senior full-stack engineer + QA gatekeeper for Treasure Coast AI (Next.js 14 App Router, TypeScript strict, Prisma). Your job is to implement “Widget Install Kit v1” so the agency can copy/paste a snippet and clients can embed the chatbot instantly.
+
+CONTEXT / DECISION
+- Custom domains are NOT a priority right now. Do not add/modify any custom-domain routing. Leave Step 26 as-is.
+- Focus on core money path: create bot → get install snippet → embed on client site → lead capture works → client dashboard shows leads/conversations.
+
+STEP 31 — WIDGET INSTALL KIT v1 (NO CUSTOM DOMAINS)
+
+OUTCOME (Definition of Done)
+1) In the app dashboard for a bot, there is a new “Install” section/tab that shows:
+   - Copyable “Script Embed” snippet (recommended)
+   - Copyable “Iframe Embed” snippet (fallback)
+   - A live preview link to /widget/[botPublicKey]
+   - A checklist: “Works on WordPress/Wix/Squarespace/HTML”
+2) The Script Embed loads a tiny JS file from our app (same origin) that:
+   - Injects an iframe pointing to /widget/[botPublicKey]
+   - Supports basic config via data-attributes (position, accent color, openByDefault)
+   - Fails gracefully (no throw, console error only once)
+3) Security: embed must continue to respect existing host policy enforcement for public endpoints (do NOT weaken it).
+4) QA: add tests so we don’t regress.
+
+NON-NEGOTIABLE RULES
+- No new paid services.
+- No custom domains work.
+- Keep changes minimal and clean.
+- No “first org” hacks in org routes. Use existing org context helper.
+- No secrets in client-side code.
+- TypeScript strict must stay green.
+
+FILES
+A) CREATE
+1) src/app/embed/[botPublicKey]/route.ts
+   - Serves JS (Content-Type: application/javascript)
+   - Runtime must be nodejs, dynamic force-dynamic
+   - Returns a minified-ish string (no build tooling needed) that:
+     - Reads dataset from <script> tag: data-bot, data-position, data-accent, data-open
+     - Creates a container div and iframe to `${origin}/widget/${botPublicKey}`
+     - Passes config through query params to widget page (position/accent/open)
+     - Adds a small “launcher button” if position != "inline"
+2) src/lib/widget/embedSnippet.ts
+   - Helper that generates both snippets given:
+     - appBaseUrl (use env NEXT_PUBLIC_APP_URL if present else window.location.origin in client)
+     - botPublicKey
+     - defaults for position/accent/open
+   - Export: getScriptEmbedSnippet(), getIframeEmbedSnippet()
+
+B) MODIFY (UI)
+3) src/app/app/bots/[botPublicKey]/page.tsx (or wherever bot detail page lives)
+   - Add an “Install” section with:
+     - Script snippet textarea + Copy button
+     - Iframe snippet textarea + Copy button
+     - Link to open widget in new tab
+     - Notes: “Paste in <head> or before </body>”
+   - Use existing UI components/styles (shadcn if present). No new design system.
+
+C) MODIFY (Widget page)
+4) src/app/widget/[botPublicKey]/ChatBox.tsx (or widget page)
+   - Read optional query params: position/accent/open
+   - Apply accent color to UI if provided (safe validate hex)
+   - If open=true, start opened
+   - Ensure existing data-testid attributes remain (chat-input, chat-send, etc.)
+   - Fix the ESLint warning: replace <img> with next/image where applicable (ONLY for the specific warning line; do not refactor the whole component).
+
+TESTS / QA
+D) CREATE/UPDATE TESTS
+5) Add a unit test for embed snippet generator:
+   - tests/unit/embedSnippet.test.ts
+   - Verify script snippet includes /embed/{botPublicKey} and data-bot attribute
+   - Verify iframe snippet includes /widget/{botPublicKey}
+6) Add/Update E2E:
+   - tests/e2e/revenue-loop.spec.ts
+   - Add a test: visit a dummy “host page” route (create a simple test page under /test/embed if needed) that includes the script snippet and assert iframe loads and chat input visible.
+   - Keep tests stable.
+
+RUNTIME FLAGS
+- New route(s) must include:
+  export const runtime = "nodejs";
+  export const dynamic = "force-dynamic";
+
+COMMANDS YOU MUST RUN AND PASTE OUTPUTS FOR
+1) pnpm lint
+2) pnpm typecheck
+3) pnpm vitest run
+4) pnpm test:e2e
+5) pnpm build
+
+ALSO PASTE
+- rg -n "embed/\\[botPublicKey\\]" -S src/app
+- A screenshot or raw HTML snippet output from the Install section showing both snippets exactly as a user would copy them.
+
+IMPORTANT IMPLEMENTATION NOTES
+- The embed script must not require npm packages.
+- Keep CSP-safe: no eval/new Function.
+- The script must be idempotent (if pasted twice, do not create two widgets).
+- Use request host/origin carefully: for JS route, return script that uses window.location.origin by default unless the snippet explicitly points to a base URL.
+- Don’t relax host policy checks in public API routes.
+
+DELIVERABLE
+- Implement Step 31 with the files above
+- Paste all required command outputs and greps
+- Provide the final copy/paste embed snippets exactly as they appear in the UI

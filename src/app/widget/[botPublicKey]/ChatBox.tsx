@@ -257,6 +257,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
       >
         <div className="flex items-center gap-3">
           {showLogo && (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={branding.brandLogoUrl!}
               alt="Logo"

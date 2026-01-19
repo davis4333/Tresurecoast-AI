@@ -24,7 +24,6 @@ test.describe("Revenue Loop E2E", () => {
   }) => {
     const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5000";
 
-    // Step 1: Create conversation with question (triggers lead capture)
     const chatResponse = await request.post(`${baseURL}/api/public/chat`, {
       headers: {
         Host: "example.com",
@@ -46,7 +45,6 @@ test.describe("Revenue Loop E2E", () => {
 
     const conversationPublicId = chatData.conversationPublicId;
 
-    // Step 2: Submit lead
     const leadResponse = await request.post(`${baseURL}/api/public/leads`, {
       headers: {
         Host: "example.com",
@@ -69,7 +67,6 @@ test.describe("Revenue Loop E2E", () => {
 
     const leadPublicId = leadData.leadPublicId;
 
-    // Step 3: Verify lead appears in recent leads
     const recentResponse = await request.get(
       `${baseURL}/api/public/leads/recent?botPublicKey=${botPublicKey}&limit=50`,
       {
@@ -83,7 +80,7 @@ test.describe("Revenue Loop E2E", () => {
     expect(Array.isArray(recentData.leads)).toBe(true);
 
     const foundLead = recentData.leads.find(
-      (l: any) => l.leadPublicId === leadPublicId
+      (l: { leadPublicId: string }) => l.leadPublicId === leadPublicId
     );
     expect(foundLead).toBeDefined();
     expect(foundLead.status).toBe("NEW");
@@ -93,7 +90,6 @@ test.describe("Revenue Loop E2E", () => {
     expect(foundLead.score).toBeLessThanOrEqual(100);
     expect(["HOT", "WARM", "COLD"]).toContain(foundLead.temperature);
 
-    // Step 4: Update lead status
     const statusResponse = await request.patch(
       `${baseURL}/api/public/leads/status`,
       {
@@ -113,7 +109,6 @@ test.describe("Revenue Loop E2E", () => {
     const statusData = await statusResponse.json();
     expect(statusData.ok).toBe(true);
 
-    // Step 5: Fetch lead detail and verify status update
     const detailResponse = await request.get(
       `${baseURL}/api/public/leads/${leadPublicId}?botPublicKey=${botPublicKey}`,
       {
@@ -139,7 +134,6 @@ test.describe("Revenue Loop E2E", () => {
     expect(["HOT", "WARM", "COLD"]).toContain(detailData.lead.temperature);
     expect(Array.isArray(detailData.lead.scoreReasons)).toBe(true);
 
-    // Step 6: Fetch conversation messages
     const messagesResponse = await request.get(
       `${baseURL}/api/public/conversations/${conversationPublicId}/messages?botPublicKey=${botPublicKey}`,
       {
@@ -153,14 +147,12 @@ test.describe("Revenue Loop E2E", () => {
     expect(Array.isArray(messagesData.messages)).toBe(true);
     expect(messagesData.messages.length).toBeGreaterThanOrEqual(2);
 
-    // Verify message ordering (oldest → newest)
     for (let i = 1; i < messagesData.messages.length; i++) {
       const prev = new Date(messagesData.messages[i - 1].timestamp);
       const curr = new Date(messagesData.messages[i].timestamp);
       expect(curr.getTime()).toBeGreaterThanOrEqual(prev.getTime());
     }
 
-    // Verify only user/assistant roles
     for (const msg of messagesData.messages) {
       expect(["user", "assistant"]).toContain(msg.role);
       expect(typeof msg.content).toBe("string");
@@ -168,7 +160,6 @@ test.describe("Revenue Loop E2E", () => {
       expect(new Date(msg.timestamp).toISOString()).toBe(msg.timestamp);
     }
 
-    // Verify first message is user's question
     expect(messagesData.messages[0].role).toBe("user");
     expect(messagesData.messages[0].content).toBe("What's the price?");
   });
@@ -185,5 +176,30 @@ test.describe("Revenue Loop E2E", () => {
 
     await chatInput.fill("Test message");
     await expect(sendButton).toBeEnabled();
+  });
+
+  test("embed script loads widget iframe", async ({ page }) => {
+    await page.goto(`/test/embed?botPublicKey=${botPublicKey}`);
+
+    await expect(page.locator('[data-testid="embed-test-title"]')).toBeVisible();
+
+    await page.waitForSelector("#tca-widget-container", { timeout: 10000 });
+
+    const container = page.locator("#tca-widget-container");
+    await expect(container).toBeVisible();
+
+    const launcher = page.locator("#tca-launcher");
+    await expect(launcher).toBeVisible();
+
+    await launcher.click();
+
+    const chatFrame = page.locator("#tca-chat-frame");
+    await expect(chatFrame).toBeVisible();
+
+    const iframe = chatFrame.locator("iframe");
+    await expect(iframe).toBeVisible();
+
+    const iframeSrc = await iframe.getAttribute("src");
+    expect(iframeSrc).toContain(`/widget/${botPublicKey}`);
   });
 });
