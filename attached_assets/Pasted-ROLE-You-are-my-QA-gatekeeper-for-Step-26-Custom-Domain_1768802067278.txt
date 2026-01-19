@@ -1,0 +1,54 @@
+ROLE: You are my QA gatekeeper for Step 26 (Custom Domain DNS Verification). Do NOT modify any code unless I explicitly ask. Your job is to PROVE Step 26 is correct by running commands and pasting outputs verbatim.
+
+TASK: Collect and paste the following evidence in order.
+
+1) DUPLICATE FILE CHECK
+Run:
+  find src -name "CustomDomainSection.tsx" -print
+Paste the full output.
+
+2) ROUTE RUNTIME CHECK (Node runtime required)
+For each file below, print the first 40 lines so we can verify it includes:
+  export const runtime = "nodejs";
+  export const dynamic = "force-dynamic";
+
+Files:
+- src/app/api/org/custom-domain/route.ts
+- src/app/api/org/custom-domain/verify/route.ts
+- src/app/api/org/custom-domain/rotate-token/route.ts
+
+Commands (run one by one and paste output):
+  sed -n '1,40p' src/app/api/org/custom-domain/route.ts
+  sed -n '1,40p' src/app/api/org/custom-domain/verify/route.ts
+  sed -n '1,40p' src/app/api/org/custom-domain/rotate-token/route.ts
+
+3) AUTH/ORG HELPER PARITY CHECK (must match Step 25 pattern)
+Print the full contents of:
+  src/app/api/org/custom-domain/_helpers.ts
+Command:
+  sed -n '1,220p' src/app/api/org/custom-domain/_helpers.ts
+Paste output.
+
+4) API SHAPE CHECK (make sure routes compile & exist)
+List the directory:
+  ls -la src/app/api/org/custom-domain
+Paste output.
+
+5) QUICK STATIC GREP (ensure expected endpoints & functions exist)
+Run:
+  rg -n "GET\\s*\\(|PUT\\s*\\(|export const runtime|force-dynamic|domainVerificationToken|customDomainStatus|verifyDomainOwnership|generateVerificationToken" src/app/api/org/custom-domain src/lib/services/dnsVerification.ts src/lib/validators/customDomain.ts
+Paste output.
+
+6) QUALITY GATES (must be real)
+Run and paste outputs (including exit status if shown):
+  pnpm prisma generate
+  pnpm typecheck
+  pnpm build
+
+If any command fails, STOP and paste the full error output. Do NOT attempt fixes.
+
+DELIVERABLE:
+Reply with a single message containing:
+- Section headers 1–6
+- Raw command outputs under each header
+- No commentary, no summaries, no edits.
