@@ -1,0 +1,181 @@
+You are working inside the existing Treasure Coast AI platform repo. Implement Step 37: Industry Templates v1.
+
+GOAL (NON-NEGOTIABLE)
+
+Keep the core platform universal. Templates must be optional, additive initializers used during bot/client creation to generate:
+	•	Bot defaults (name, greeting, fallback, tone settings)
+	•	Starter Knowledge Base sources (Truth Mode KB) tailored to the selected template and the provided business data
+	•	Optional lead-intake suggestions (if you already support lead intake prompts/fields)
+
+Do NOT bake any industry logic into core models like Organization/Bot beyond a generic template selector. Templates are “starter kits,” not schema identity.
+
+HARD RULES
+	1.	No “barber-only” core logic. Templates must be a separate module/registry.
+	2.	Prefer code-managed templates (version-controlled) for v1.
+	3.	Avoid DB schema changes unless absolutely necessary. If you add a template key to Bot, it must be generic (e.g. templateKey String?) and must include a proper Prisma migration + tests.
+	4.	Must not break current flows:
+	•	Admin client creation flow (Step 34+)
+	•	Onboarding wizard flow (Step 31+)
+	•	Widget embed + demo pages
+	•	Truth Mode KB retrieval and citations
+	5.	All quality gates must pass (lint/typecheck/unit/e2e/build).
+
+⸻
+
+IMPLEMENTATION REQUIREMENTS
+
+A) Template Registry (NEW)
+
+Create a templates module that exports:
+	•	TEMPLATE_KEYS (string literal union)
+	•	getTemplate(key)
+	•	listTemplates() (for UI dropdown)
+	•	Each template defines:
+	•	key, label, industry
+	•	defaultBrandVoice (existing enum/value set you already use)
+	•	defaultPrimaryGoal (existing)
+	•	botNamePattern (e.g. "{BusinessName} Assistant")
+	•	greetingTemplate + fallbackTemplate with placeholders
+	•	starterKnowledge[]: array of { title, contentTemplate } (contentTemplate uses placeholders)
+	•	Optional: recommendedLinks[] (booking/payments) if you support links
+
+Required Templates v1 (at least 6 + universal)
+	•	universal_blank (minimal, no assumptions)
+	•	barber_shop
+	•	nail_salon
+	•	fitness_gym
+	•	dentist
+	•	sober_living
+	•	epoxy_flooring
+
+Keep the content short but strong. The goal is “multi-million-dollar agency feel,” not a wall of text.
+
+⸻
+
+B) Placeholder Engine (NEW helper)
+
+Implement a small safe placeholder replacer:
+	•	Placeholders: {BusinessName}, {Category}, {Phone}, {Address}, {Hours}, {Website}, {BookingUrl}, {PaymentsUrl}, {ServiceArea}
+	•	Missing values should degrade gracefully (remove line or substitute empty string without ugly “undefined”).
+
+⸻
+
+C) Wire Templates into Bot Creation Paths
+
+1) Onboarding Wizard (existing /app/onboarding + /api/org/onboarding/generate)
+	•	Add a required dropdown field templateKey with the templates list
+	•	Default selection: universal_blank
+	•	Pass templateKey to the API
+	•	Update OnboardingFormSchema to include templateKey
+	•	Update buildBotBlueprint() to:
+	•	Pull template defaults
+	•	Apply template-based botName/greeting/fallback
+	•	Generate starter KB sources with placeholder replacement
+	•	In the onboarding generate API:
+	•	After bot create/update, upsert starter KB sources into BotKnowledgeSource
+	•	Must be dedup-safe per bot using existing (botId, contentHash) logic
+	•	Use titles like: Template: Services & Pricing, Template: Policies, etc.
+	•	Do not overwrite user-added KB sources; only upsert template ones by title prefix or add-if-missing.
+
+2) Admin Client Creation (existing POST /api/admin/clients)
+	•	Add optional templateKey to the admin create-client request schema/UI
+	•	Default: universal_blank
+	•	Ensure admin create flow creates:
+	•	org + member + workspace + bot + business profile + starter KB
+	•	Use the same template engine and KB creation logic as onboarding (single shared helper).
+
+Important: Both onboarding and admin create-client must use the SAME core helper functions so logic doesn’t drift.
+
+⸻
+
+D) UI Updates
+	1.	Onboarding page:
+
+	•	Add Template dropdown with short “what it does” helper copy.
+
+	2.	Admin Clients page:
+
+	•	Add template selection when creating a client.
+	•	Show selected template in the client list (even if only in UI state; if you persist it, show from DB).
+
+⸻
+
+E) Tests (MANDATORY)
+
+Unit Tests (Vitest)
+
+Add a new test file like:
+	•	tests/unit/templates.test.ts
+Cover:
+	•	listTemplates() returns required keys
+	•	Placeholder replacement works with missing fields
+	•	Template KB generation produces content containing unique injected value
+	•	Template application changes blueprint fields as expected
+
+E2E Tests (Playwright)
+
+Add at least 2 E2E tests:
+	1.	Onboarding template flow:
+	•	Select a non-blank template
+	•	Submit onboarding
+	•	Go to bot detail page
+	•	Add a KB source or rely on template source
+	•	Chat query contains a unique token and should return KB-based answer (use existing “rare token” path if needed)
+	2.	Admin create-client template flow:
+	•	Create client with template
+	•	Verify bot exists
+	•	Verify knowledge sources exist
+	•	Verify chat uses KB (simple assertion)
+
+Make assertions deterministic. If TF-IDF is flaky, use the existing “rare token exact-match short-circuit” approach.
+
+⸻
+
+FILE MANIFEST (EXPECTED)
+
+You may adjust file names, but structure should look like:
+
+NEW
+	•	src/lib/templates/registry.ts
+	•	src/lib/templates/types.ts
+	•	src/lib/templates/placeholders.ts
+	•	src/lib/templates/applyTemplate.ts (shared helper)
+	•	tests/unit/templates.test.ts
+
+MODIFY
+	•	src/lib/onboarding/schemas.ts (add templateKey)
+	•	src/lib/onboarding/botBlueprint.ts (apply templates)
+	•	src/app/app/onboarding/page.tsx (template dropdown)
+	•	src/app/api/org/onboarding/generate/route.ts (create template KB sources)
+	•	src/app/api/admin/clients/route.ts (templateKey support + KB seeding)
+	•	src/app/app/admin/clients/page.tsx (template select)
+
+If you decide to persist templateKey:
+	•	Update Prisma schema + migration + tests (only if truly needed).
+
+⸻
+
+QUALITY GATES (RUN IN THIS EXACT ORDER)
+
+After implementation, run and paste verbatim outputs for:
+	1.	pnpm lint
+	2.	pnpm typecheck
+	3.	pnpm vitest run
+	4.	pnpm test:e2e
+	5.	pnpm build
+	6.	git status --porcelain
+	7.	rg -n "barber|salon|gym|dentist|sober|epoxy" src/lib/templates -S (should find template content ONLY inside templates module, not sprinkled across core routes)
+	8.	rg -n "barber|salon|gym|dentist|sober|epoxy" src/app/api src/lib -S (should NOT show industry strings outside templates except tests)
+
+⸻
+
+DELIVERABLE
+
+When done:
+	•	Provide a concise “Step 37 Summary” with:
+	•	What templates are included
+	•	Where templateKey flows through UI → API → bot/KB seeding
+	•	How KB dedup/upsert works
+	•	Paste the required command outputs (items 1–8 above)
+
+DO NOT proceed to Step 38.
