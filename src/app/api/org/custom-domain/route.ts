@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CustomDomainInputSchema } from "@/lib/validators/customDomain";
 import { generateVerificationToken, isValidVerificationToken } from "@/lib/services/dnsVerification";
-import { getOrgContext } from "./_helpers";
+import { getOrgContext, isAdmin } from "@/lib/auth/getOrgContext";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,15 +13,31 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ ok: false, error: ctx.error, message: ctx.message }, { status: ctx.status });
   }
 
+  const org = await prisma.organization.findUnique({
+    where: { id: ctx.org.id },
+    select: {
+      customDomain: true,
+      customDomainStatus: true,
+      customDomainVerifiedAt: true,
+      customDomainLastCheckedAt: true,
+      customDomainFailureReason: true,
+      domainVerificationToken: true,
+    },
+  });
+
+  if (!org) {
+    return NextResponse.json({ ok: false, error: "not_found", message: "Organization not found" }, { status: 404 });
+  }
+
   return NextResponse.json({
     ok: true,
     domain: {
-      customDomain: ctx.org.customDomain,
-      status: ctx.org.customDomainStatus,
-      verifiedAt: ctx.org.customDomainVerifiedAt,
-      lastCheckedAt: ctx.org.customDomainLastCheckedAt,
-      failureReason: ctx.org.customDomainFailureReason,
-      verificationToken: ctx.org.domainVerificationToken,
+      customDomain: org.customDomain,
+      status: org.customDomainStatus,
+      verifiedAt: org.customDomainVerifiedAt,
+      lastCheckedAt: org.customDomainLastCheckedAt,
+      failureReason: org.customDomainFailureReason,
+      verificationToken: isAdmin(ctx.role) ? org.domainVerificationToken : null,
     },
   });
 }
@@ -30,6 +46,13 @@ export async function PUT(req: NextRequest) {
   const ctx = await getOrgContext();
   if (!ctx.ok) {
     return NextResponse.json({ ok: false, error: ctx.error, message: ctx.message }, { status: ctx.status });
+  }
+
+  if (!isAdmin(ctx.role)) {
+    return NextResponse.json(
+      { ok: false, error: "forbidden", message: "Only organization owners/admins can update custom domain" },
+      { status: 403 }
+    );
   }
 
   const body = await req.json().catch(() => ({}));
@@ -41,7 +64,7 @@ export async function PUT(req: NextRequest) {
     );
   }
 
-  const customDomain = parsed.data.customDomain; // string|null
+  const customDomain = parsed.data.customDomain;
 
   if (customDomain) {
     const existing = await prisma.organization.findFirst({
@@ -58,7 +81,6 @@ export async function PUT(req: NextRequest) {
 
   const token = customDomain ? generateVerificationToken() : null;
 
-  // Safety guard: fail closed if token generation produced invalid result
   if (customDomain && !isValidVerificationToken(token)) {
     return NextResponse.json(
       { ok: false, error: "internal_error", message: "Failed to generate valid verification token" },

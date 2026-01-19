@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { BrandingSchema } from "@/lib/validators/branding";
 import { prisma } from "@/lib/prisma";
+import { getOrgContext, isAdmin } from "@/lib/auth/getOrgContext";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,25 +11,17 @@ function jsonError(requestId: string, status: number, error: string, message: st
   return NextResponse.json({ ok: false, requestId, error, message, details }, { status });
 }
 
-function isDevBypass(): boolean {
-  return process.env.DEV_BYPASS_AUTH === "true" && process.env.NODE_ENV !== "production";
-}
-
-async function getClerkAuth(): Promise<{ userId: string | null }> {
+export async function GET(_req: NextRequest) {
+  const requestId = crypto.randomUUID();
   try {
-    const { auth } = await import("@clerk/nextjs/server");
-    return await auth();
-  } catch {
-    return { userId: null };
-  }
-}
+    const ctx = await getOrgContext();
+    if (!ctx.ok) {
+      return jsonError(requestId, ctx.status, ctx.error, ctx.message);
+    }
 
-async function getOrganizationForUser(userId: string | null) {
-  if (isDevBypass()) {
-    const org = await prisma.organization.findFirst({
-      orderBy: { id: "asc" },
+    const org = await prisma.organization.findUnique({
+      where: { id: ctx.org.id },
       select: {
-        id: true,
         whiteLabelEnabled: true,
         brandCompanyName: true,
         brandLogoUrl: true,
@@ -37,46 +30,11 @@ async function getOrganizationForUser(userId: string | null) {
         customDomain: true,
       },
     });
-    return org ? { organization: org, role: "AGENCY_OWNER" as const } : null;
-  }
 
-  if (!userId) return null;
-
-  const org = await prisma.organization.findFirst({
-    orderBy: { id: "asc" },
-    select: {
-      id: true,
-      whiteLabelEnabled: true,
-      brandCompanyName: true,
-      brandLogoUrl: true,
-      brandPrimaryColor: true,
-      showPoweredBy: true,
-      customDomain: true,
-    },
-  });
-
-  return org ? { organization: org, role: "AGENCY_OWNER" as const } : null;
-}
-
-function canEdit(role: string) {
-  return role === "AGENCY_OWNER" || role === "AGENCY_ADMIN";
-}
-
-export async function GET(req: NextRequest) {
-  const requestId = crypto.randomUUID();
-  try {
-    const { userId } = await getClerkAuth();
-    
-    if (!isDevBypass() && !userId) {
-      return jsonError(requestId, 401, "unauthorized", "Authentication required");
-    }
-
-    const result = await getOrganizationForUser(userId);
-    if (!result) {
+    if (!org) {
       return jsonError(requestId, 404, "not_found", "Organization not found");
     }
 
-    const org = result.organization;
     return NextResponse.json({
       ok: true,
       branding: {
@@ -96,18 +54,12 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const requestId = crypto.randomUUID();
   try {
-    const { userId } = await getClerkAuth();
-    
-    if (!isDevBypass() && !userId) {
-      return jsonError(requestId, 401, "unauthorized", "Authentication required");
+    const ctx = await getOrgContext();
+    if (!ctx.ok) {
+      return jsonError(requestId, ctx.status, ctx.error, ctx.message);
     }
 
-    const result = await getOrganizationForUser(userId);
-    if (!result) {
-      return jsonError(requestId, 404, "not_found", "Organization not found");
-    }
-
-    if (!canEdit(result.role)) {
+    if (!isAdmin(ctx.role)) {
       return jsonError(requestId, 403, "forbidden", "Only organization owners/admins can update branding");
     }
 
@@ -123,18 +75,18 @@ export async function PUT(req: NextRequest) {
       customDomain: validated.customDomain || null,
     };
 
-    if (normalized.customDomain && normalized.customDomain !== result.organization.customDomain) {
+    if (normalized.customDomain) {
       const existing = await prisma.organization.findUnique({
         where: { customDomain: normalized.customDomain },
         select: { id: true },
       });
-      if (existing && existing.id !== result.organization.id) {
+      if (existing && existing.id !== ctx.org.id) {
         return jsonError(requestId, 409, "domain_taken", "This custom domain is already in use by another organization");
       }
     }
 
     const updated = await prisma.organization.update({
-      where: { id: result.organization.id },
+      where: { id: ctx.org.id },
       data: normalized,
       select: {
         whiteLabelEnabled: true,

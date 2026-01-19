@@ -67,42 +67,40 @@ function DevBypassAvatar() {
   );
 }
 
+const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+const ClerkUserButtonDynamic = hasClerkKey
+  ? dynamic(
+      () => import("@clerk/nextjs").then((mod) => {
+        const { UserButton, useAuth } = mod;
+        return function AuthUserButton() {
+          const { isLoaded, isSignedIn } = useAuth();
+          if (!isLoaded) {
+            return <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--color-surface-hover)]" />;
+          }
+          if (!isSignedIn) {
+            return null;
+          }
+          return (
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{
+                elements: {
+                  avatarBox: "w-8 h-8",
+                },
+              }}
+            />
+          );
+        };
+      }),
+      {
+        ssr: false,
+        loading: () => <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--color-surface-hover)]" />,
+      }
+    )
+  : DevBypassAvatar;
+
 function ClerkUserButtonInner() {
-  const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  
-  if (!hasClerkKey) {
-    return <DevBypassAvatar />;
-  }
-
-  const ClerkUserButtonDynamic = dynamic(
-    () => import("@clerk/nextjs").then((mod) => {
-      const { UserButton, useAuth } = mod;
-      return function AuthUserButton() {
-        const { isLoaded, isSignedIn } = useAuth();
-        if (!isLoaded) {
-          return <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--color-surface-hover)]" />;
-        }
-        if (!isSignedIn) {
-          return null;
-        }
-        return (
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{
-              elements: {
-                avatarBox: "w-8 h-8",
-              },
-            }}
-          />
-        );
-      };
-    }),
-    {
-      ssr: false,
-      loading: () => <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--color-surface-hover)]" />,
-    }
-  );
-
   return <ClerkUserButtonDynamic />;
 }
 

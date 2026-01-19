@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyDomainOwnership, getVerificationErrorMessage } from "@/lib/services/dnsVerification";
-import { getOrgContext } from "../_helpers";
+import { getOrgContext, isAdmin } from "@/lib/auth/getOrgContext";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +12,25 @@ export async function POST(_req: NextRequest) {
     return NextResponse.json({ ok: false, error: ctx.error, message: ctx.message }, { status: ctx.status });
   }
 
-  const org = ctx.org;
+  if (!isAdmin(ctx.role)) {
+    return NextResponse.json(
+      { ok: false, error: "forbidden", message: "Only organization owners/admins can verify domains" },
+      { status: 403 }
+    );
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: ctx.org.id },
+    select: {
+      id: true,
+      customDomain: true,
+      domainVerificationToken: true,
+    },
+  });
+
+  if (!org) {
+    return NextResponse.json({ ok: false, error: "not_found", message: "Organization not found" }, { status: 404 });
+  }
 
   if (!org.customDomain) {
     return NextResponse.json({ ok: false, error: "validation_error", message: "No custom domain configured" }, { status: 400 });
