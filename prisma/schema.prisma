@@ -368,3 +368,15 @@ model BusinessProfile {
 
   @@index([organizationId])
 }
+
+model DemoRequest {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String
+  businessName String
+  phone        String?
+  createdAt    DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+}

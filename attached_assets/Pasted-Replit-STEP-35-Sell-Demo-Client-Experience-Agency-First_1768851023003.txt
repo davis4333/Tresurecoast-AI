@@ -1,0 +1,77 @@
+Replit — STEP 35: “Sell + Demo + Client Experience” (Agency-First, No Self-Serve)
+
+GOAL
+Make the platform “sellable”:
+- A clean public site (landing/pricing/request demo)
+- A working demo flow (so prospects can try the widget instantly)
+- A polished client dashboard experience (so clients feel it’s premium)
+Keep all quality gates green.
+
+NON-NEGOTIABLES
+- No public signup / no self-serve onboarding.
+- Agency-first: admin creates clients/bots.
+- Demo must NOT require Clerk in development (works with DEV_BYPASS_AUTH).
+- Production behavior must remain secure: DEV_BYPASS_AUTH ignored in production.
+- No scope creep. Keep it tight and shippable.
+
+DELIVERABLES
+
+A) PUBLIC PAGES (polish, premium)
+1) / (Landing)
+   - Clear hero, bullets, “Book a demo”, “See live demo”, “Sign in”
+   - Sections: How it works, Proof (features), Security (Truth Mode), FAQ
+2) /pricing
+   - Simple agency pricing framing (even if numbers are placeholders)
+3) /request-demo
+   - Form that posts to an API route:
+     POST /api/public/request-demo
+     Store in DB table DemoRequest { id, name, email, businessName, phone?, createdAt }
+     (No external email provider required yet.)
+4) Ensure navigation + footer across public pages.
+
+B) DEMO MODE (must be impressive)
+1) /demo
+   - Shows a live embedded widget using a seeded demo botPublicKey
+   - Includes “What to ask” suggestion chips
+2) Provide a single source of truth for the demo bot key:
+   - env: NEXT_PUBLIC_DEMO_BOT_KEY (preferred)
+   - fallback in dev: use first ACTIVE bot from the first org (dev only) if env missing
+   - NEVER do “first org” fallback in production
+
+C) CLIENT DASHBOARD FIRST IMPRESSION PASS
+1) /app should be stable with real Clerk in prod and dev bypass in dev
+2) Client user role should only see:
+   - Leads
+   - Conversations
+   - Install snippet page
+   - Basic settings (branding optional)
+   Block admin-only actions.
+3) Add a “Getting Started” card for clients:
+   - Step 1: Install widget
+   - Step 2: Test message
+   - Step 3: Check leads
+
+D) TESTS + GATES
+1) Unit tests:
+   - demo key resolver behavior (dev vs prod)
+   - request-demo schema validation
+2) E2E tests:
+   - Public nav: landing -> pricing -> request-demo
+   - Submit demo request -> success state
+   - Demo page loads widget (script embed) and chat input visible
+   - Client role cannot access /app/admin/* (403 or redirect)
+3) Required gates (paste verbatim outputs):
+   - pnpm prisma validate
+   - pnpm prisma migrate status (only if schema changed)
+   - pnpm lint
+   - pnpm typecheck
+   - pnpm vitest run
+   - pnpm test:e2e
+   - pnpm build
+
+REPORT FORMAT (required)
+1) What changed + why (short)
+2) File manifest (new/modified)
+3) Verbatim gate outputs
+4) Manual smoke checklist (exact URLs + what to click)
+STOP after Step 35.
