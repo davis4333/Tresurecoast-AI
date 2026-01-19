@@ -4,6 +4,16 @@ import { useState } from "react";
 import { TcaCard, TcaCardBody, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaButton } from "@/components/tca/TcaButton";
 
+const TEMPLATE_OPTIONS = [
+  { value: "universal_blank", label: "Universal (Blank)", description: "Start fresh with no preset content" },
+  { value: "barber_shop", label: "Barber Shop", description: "Pre-filled for barbering services" },
+  { value: "nail_salon", label: "Nail Salon", description: "Pre-filled for nail services" },
+  { value: "fitness_gym", label: "Fitness / Gym", description: "Pre-filled for fitness businesses" },
+  { value: "dentist", label: "Dental Practice", description: "Pre-filled for dental offices" },
+  { value: "sober_living", label: "Sober Living", description: "Pre-filled for recovery facilities" },
+  { value: "epoxy_flooring", label: "Epoxy Flooring", description: "Pre-filled for flooring services" },
+];
+
 const BRAND_VOICE_OPTIONS = [
   { value: "professional", label: "Professional" },
   { value: "friendly", label: "Friendly" },
@@ -25,6 +35,7 @@ export default function OnboardingPage() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const [formData, setFormData] = useState({
+    templateKey: "universal_blank",
     businessName: "",
     category: "",
     websiteUrl: "",
@@ -66,6 +77,7 @@ export default function OnboardingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          templateKey: formData.templateKey,
           businessName: formData.businessName.trim(),
           category: formData.category.trim(),
           websiteUrl: formData.websiteUrl.trim() || undefined,
@@ -116,6 +128,36 @@ export default function OnboardingPage() {
 
       <form onSubmit={handleSubmit}>
         <TcaCard>
+          <TcaCardHeader>
+            <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
+              Industry Template
+            </h3>
+          </TcaCardHeader>
+          <TcaCardBody>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-[var(--color-text-secondary)]">
+                Choose a Template
+              </label>
+              <select
+                value={formData.templateKey}
+                onChange={(e) => updateField("templateKey", e.target.value)}
+                className="tca-input"
+                data-testid="select-template"
+              >
+                {TEMPLATE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">
+                Templates pre-fill your bot with industry-specific greetings and knowledge base content
+              </p>
+            </div>
+          </TcaCardBody>
+        </TcaCard>
+
+        <TcaCard className="mt-6">
           <TcaCardHeader>
             <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
               Business Information

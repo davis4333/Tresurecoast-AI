@@ -39,6 +39,16 @@ const GOAL_OPTIONS = [
   { value: "support", label: "Customer Support" },
 ];
 
+const TEMPLATE_OPTIONS = [
+  { value: "universal_blank", label: "Universal (Blank)" },
+  { value: "barber_shop", label: "Barber Shop" },
+  { value: "nail_salon", label: "Nail Salon" },
+  { value: "fitness_gym", label: "Fitness / Gym" },
+  { value: "dentist", label: "Dental Practice" },
+  { value: "sober_living", label: "Sober Living" },
+  { value: "epoxy_flooring", label: "Epoxy Flooring" },
+];
+
 export default function AdminClientsPage() {
   const [clients, setClients] = useState<ClientData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +68,7 @@ export default function AdminClientsPage() {
     bookingUrl: "",
     tone: "friendly",
     primaryGoal: "leads",
+    templateKey: "universal_blank",
   });
 
   useEffect(() => {
@@ -111,6 +122,7 @@ export default function AdminClientsPage() {
         bookingUrl: "",
         tone: "friendly",
         primaryGoal: "leads",
+        templateKey: "universal_blank",
       });
       fetchClients();
     } catch {
@@ -205,6 +217,28 @@ export default function AdminClientsPage() {
                   data-testid="input-category"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                Industry Template
+              </label>
+              <select
+                name="templateKey"
+                value={formData.templateKey}
+                onChange={handleChange}
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-brand-primary)] focus:outline-none"
+                data-testid="select-template"
+              >
+                {TEMPLATE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                Templates pre-fill the bot with industry-specific content
+              </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
