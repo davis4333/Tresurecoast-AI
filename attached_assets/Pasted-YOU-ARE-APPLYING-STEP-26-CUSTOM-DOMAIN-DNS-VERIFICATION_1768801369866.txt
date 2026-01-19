@@ -1,0 +1,678 @@
+YOU ARE APPLYING STEP 26 (CUSTOM DOMAIN DNS VERIFICATION) TO THIS REPO.
+
+NON-NEGOTIABLE RULES:
+- DO NOT change prisma/schema.prisma (Step 26 fields already exist).
+- DO NOT create a second CustomDomainSection component in a different folder.
+- MUST match Step 25 auth/org pattern:
+  - use DEV_BYPASS_AUTH env flag AND NODE_ENV !== "production"
+  - dynamic import Clerk auth in try/catch
+  - org selection uses the same “first org” logic as Step 25 (no OrganizationMember lookups)
+  - export const runtime="nodejs" and dynamic="force-dynamic"
+
+APPLY THESE EXACT FILES:
+
+========================================
+FILE: src/lib/validators/customDomain.ts
+========================================
+import { z } from "zod";
+
+/**
+ * Domain validation regex:
+ * - allows subdomains
+ * - disallows protocol, paths, ports
+ */
+const DOMAIN_REGEX =
+  /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+
+export function normalizeDomain(input: unknown): string | null {
+  if (input == null) return null;
+  if (typeof input !== "string") return null;
+
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  let normalized = trimmed.toLowerCase();
+
+  // Remove protocol
+  normalized = normalized.replace(/^https?:\/\//, "");
+
+  // Remove path/query/hash
+  normalized = normalized.split("/")[0];
+  normalized = normalized.split("?")[0];
+  normalized = normalized.split("#")[0];
+
+  // Remove port
+  normalized = normalized.split(":")[0];
+
+  // Remove trailing dot
+  normalized = normalized.replace(/\.$/, "");
+
+  return normalized || null;
+}
+
+export function isValidDomain(domain: string | null): boolean {
+  if (!domain) return false;
+  if (domain.length > 253) return false;
+  return DOMAIN_REGEX.test(domain);
+}
+
+export const CustomDomainInputSchema = z.object({
+  customDomain: z
+    .union([z.string(), z.null(), z.undefined()])
+    .transform(normalizeDomain)
+    .refine(
+      (val) => val == null || isValidDomain(val),
+      "Invalid domain format. Use: example.com or chat.example.com (no protocol, no paths, no ports)"
+    ),
+});
+
+export type CustomDomainInput = z.infer<typeof CustomDomainInputSchema>;
+
+==========================================
+FILE: src/lib/services/dnsVerification.ts
+==========================================
+import { randomBytes } from "crypto";
+import { resolveTxt } from "dns/promises";
+
+export type VerificationResult =
+  | { success: true; verifiedAt: Date }
+  | { success: false; reason: string };
+
+export function generateVerificationToken(): string {
+  // 32 bytes => 64 hex chars
+  return randomBytes(32).toString("hex");
+}
+
+/**
+ * Looks for a TXT record that starts with: tca-verify=<token>
+ */
+export async function verifyDomainOwnership(
+  domain: string,
+  expectedToken: string
+): Promise<VerificationResult> {
+  try {
+    const txtRecords = await resolveTxt(domain);
+    const flat = txtRecords.map((parts) => parts.join(""));
+
+    const record = flat.find((r) => r.startsWith("tca-verify="));
+    if (!record) return { success: false, reason: "txt_missing" };
+
+    const actualToken = record.replace("tca-verify=", "").trim();
+    if (actualToken !== expectedToken) {
+      return { success: false, reason: "token_mismatch" };
+    }
+
+    return { success: true, verifiedAt: new Date() };
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code || "unknown";
+    const reasonMap: Record<string, string> = {
+      ENOTFOUND: "domain_not_found",
+      ENODATA: "txt_missing",
+      ETIMEOUT: "lookup_timeout",
+      ESERVFAIL: "dns_server_error",
+      ECONNREFUSED: "dns_server_error",
+    };
+    return { success: false, reason: reasonMap[code] || "dns_lookup_failed" };
+  }
+}
+
+export function getVerificationErrorMessage(reason: string): string {
+  const messages: Record<string, string> = {
+    txt_missing:
+      "No TXT record found. Add the verification TXT record and wait for DNS propagation.",
+    token_mismatch:
+      "TXT record found but the token doesn't match. Double-check the TXT value.",
+    domain_not_found:
+      "Domain not found. Make sure the domain exists and DNS is configured.",
+    lookup_timeout:
+      "DNS lookup timed out. Try again in a few minutes.",
+    dns_server_error:
+      "DNS server error. Verify your nameservers are working.",
+    dns_lookup_failed:
+      "DNS lookup failed. Check your DNS configuration and try again.",
+  };
+  return messages[reason] || "Verification failed. Please try again.";
+}
+
+================================================
+FILE: src/app/api/org/custom-domain/_helpers.ts
+================================================
+import { prisma } from "@/lib/db";
+
+/**
+ * MATCH STEP 25 PATTERN EXACTLY.
+ */
+function isDevBypass(): boolean {
+  return process.env.DEV_BYPASS_AUTH === "true" && process.env.NODE_ENV !== "production";
+}
+
+async function getClerkAuth(): Promise<{ userId: string | null }> {
+  try {
+    const { auth } = await import("@clerk/nextjs/server");
+    return await auth();
+  } catch {
+    return { userId: null };
+  }
+}
+
+/**
+ * MATCH STEP 25 ORG RESOLUTION:
+ * - No OrganizationMember table
+ * - Just grabs the first org (orderBy id asc)
+ * - Returns role as AGENCY_OWNER (same as Step 25)
+ */
+export async function getOrgContext() {
+  const { userId } = await getClerkAuth();
+
+  if (!isDevBypass() && !userId) {
+    return { ok: false as const, status: 401 as const, error: "unauthorized", message: "Authentication required" };
+  }
+
+  const org = await prisma.organization.findFirst({
+    orderBy: { id: "asc" },
+    select: {
+      id: true,
+      customDomain: true,
+      domainVerificationToken: true,
+      customDomainStatus: true,
+      customDomainVerifiedAt: true,
+      customDomainLastCheckedAt: true,
+      customDomainFailureReason: true,
+    },
+  });
+
+  if (!org) {
+    return { ok: false as const, status: 404 as const, error: "not_found", message: "Organization not found" };
+  }
+
+  return { ok: true as const, org, role: "AGENCY_OWNER" as const };
+}
+
+================================================
+FILE: src/app/api/org/custom-domain/route.ts
+================================================
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { CustomDomainInputSchema } from "@/lib/validators/customDomain";
+import { generateVerificationToken } from "@/lib/services/dnsVerification";
+import { getOrgContext } from "./_helpers";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET(_req: NextRequest) {
+  const ctx = await getOrgContext();
+  if (!ctx.ok) {
+    return NextResponse.json({ ok: false, error: ctx.error, message: ctx.message }, { status: ctx.status });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    domain: {
+      customDomain: ctx.org.customDomain,
+      status: ctx.org.customDomainStatus,
+      verifiedAt: ctx.org.customDomainVerifiedAt,
+      lastCheckedAt: ctx.org.customDomainLastCheckedAt,
+      failureReason: ctx.org.customDomainFailureReason,
+      verificationToken: ctx.org.domainVerificationToken,
+    },
+  });
+}
+
+export async function PUT(req: NextRequest) {
+  const ctx = await getOrgContext();
+  if (!ctx.ok) {
+    return NextResponse.json({ ok: false, error: ctx.error, message: ctx.message }, { status: ctx.status });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const parsed = CustomDomainInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { ok: false, error: "validation_error", message: parsed.error.errors[0]?.message || "Invalid input" },
+      { status: 400 }
+    );
+  }
+
+  const customDomain = parsed.data.customDomain; // string|null
+
+  if (customDomain) {
+    const existing = await prisma.organization.findFirst({
+      where: { customDomain, id: { not: ctx.org.id } },
+      select: { id: true },
+    });
+    if (existing) {
+      return NextResponse.json(
+        { ok: false, error: "domain_taken", message: "This domain is already registered to another organization" },
+        { status: 409 }
+      );
+    }
+  }
+
+  const token = customDomain ? generateVerificationToken() : null;
+
+  const updated = await prisma.organization.update({
+    where: { id: ctx.org.id },
+    data: {
+      customDomain: customDomain,
+      domainVerificationToken: token,
+      customDomainStatus: customDomain ? "pending" : "none",
+      customDomainVerifiedAt: null,
+      customDomainLastCheckedAt: null,
+      customDomainFailureReason: null,
+    },
+    select: {
+      customDomain: true,
+      domainVerificationToken: true,
+      customDomainStatus: true,
+    },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    domain: {
+      customDomain: updated.customDomain,
+      status: updated.customDomainStatus,
+      verificationToken: updated.domainVerificationToken,
+    },
+  });
+}
+
+=====================================================
+FILE: src/app/api/org/custom-domain/verify/route.ts
+=====================================================
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { verifyDomainOwnership, getVerificationErrorMessage } from "@/lib/services/dnsVerification";
+import { getOrgContext } from "../_helpers";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function POST(_req: NextRequest) {
+  const ctx = await getOrgContext();
+  if (!ctx.ok) {
+    return NextResponse.json({ ok: false, error: ctx.error, message: ctx.message }, { status: ctx.status });
+  }
+
+  const org = ctx.org;
+
+  if (!org.customDomain) {
+    return NextResponse.json({ ok: false, error: "validation_error", message: "No custom domain configured" }, { status: 400 });
+  }
+  if (!org.domainVerificationToken) {
+    return NextResponse.json({ ok: false, error: "validation_error", message: "No verification token found. Save your domain again." }, { status: 400 });
+  }
+
+  const result = await verifyDomainOwnership(org.customDomain, org.domainVerificationToken);
+
+  if (result.success) {
+    const updated = await prisma.organization.update({
+      where: { id: org.id },
+      data: {
+        customDomainStatus: "verified",
+        customDomainVerifiedAt: result.verifiedAt,
+        customDomainLastCheckedAt: new Date(),
+        customDomainFailureReason: null,
+      },
+      select: {
+        customDomain: true,
+        customDomainStatus: true,
+        customDomainVerifiedAt: true,
+        customDomainLastCheckedAt: true,
+        customDomainFailureReason: true,
+        domainVerificationToken: true,
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      verified: true,
+      domain: {
+        customDomain: updated.customDomain,
+        status: updated.customDomainStatus,
+        verifiedAt: updated.customDomainVerifiedAt,
+        lastCheckedAt: updated.customDomainLastCheckedAt,
+      },
+    });
+  }
+
+  await prisma.organization.update({
+    where: { id: org.id },
+    data: {
+      customDomainStatus: "failed",
+      customDomainLastCheckedAt: new Date(),
+      customDomainFailureReason: result.reason,
+    },
+  });
+
+  return NextResponse.json(
+    {
+      ok: false,
+      verified: false,
+      error: "verification_failed",
+      message: getVerificationErrorMessage(result.reason),
+      reason: result.reason,
+    },
+    { status: 400 }
+  );
+}
+
+=========================================================
+FILE: src/app/api/org/custom-domain/rotate-token/route.ts
+=========================================================
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { generateVerificationToken } from "@/lib/services/dnsVerification";
+import { getOrgContext } from "../_helpers";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function POST(_req: NextRequest) {
+  const ctx = await getOrgContext();
+  if (!ctx.ok) {
+    return NextResponse.json({ ok: false, error: ctx.error, message: ctx.message }, { status: ctx.status });
+  }
+
+  const org = ctx.org;
+
+  if (!org.customDomain) {
+    return NextResponse.json({ ok: false, error: "validation_error", message: "No custom domain configured" }, { status: 400 });
+  }
+
+  const newToken = generateVerificationToken();
+
+  const updated = await prisma.organization.update({
+    where: { id: org.id },
+    data: {
+      domainVerificationToken: newToken,
+      customDomainStatus: "pending",
+      customDomainVerifiedAt: null,
+      customDomainFailureReason: null,
+    },
+    select: {
+      customDomain: true,
+      domainVerificationToken: true,
+      customDomainStatus: true,
+    },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    domain: {
+      customDomain: updated.customDomain,
+      status: updated.customDomainStatus,
+      verificationToken: updated.domainVerificationToken,
+    },
+  });
+}
+
+==========================================================
+UPDATE EXISTING FILE (DO NOT CREATE NEW):
+src/app/app/settings/branding/CustomDomainSection.tsx
+==========================================================
+Replace its contents with this implementation (or merge if you already have additional UI).
+IMPORTANT: Only parse JSON once. Do not call res.json() twice.
+
+--- BEGIN FILE ---
+"use client";
+
+import { useEffect, useState } from "react";
+
+type DomainStatus = "none" | "pending" | "verified" | "failed";
+
+type DomainData = {
+  customDomain: string | null;
+  status: DomainStatus;
+  verifiedAt: string | null;
+  lastCheckedAt: string | null;
+  failureReason: string | null;
+  verificationToken: string | null;
+};
+
+export function CustomDomainSection() {
+  const [data, setData] = useState<DomainData | null>(null);
+  const [inputValue, setInputValue] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    void loadDomainInfo();
+  }, []);
+
+  async function loadDomainInfo() {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/org/custom-domain", { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) throw new Error(json?.message || "Failed to load domain info");
+
+      setData(json.domain);
+      setInputValue(json.domain?.customDomain || "");
+    } catch (e: any) {
+      setMessage({ type: "error", text: e?.message || "Failed to load domain info" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/org/custom-domain", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customDomain: inputValue }),
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) throw new Error(json?.message || "Failed to save domain");
+
+      setData(json.domain);
+      setMessage({ type: "success", text: "Domain saved. Add TXT record, then click Verify." });
+    } catch (e: any) {
+      setMessage({ type: "error", text: e?.message || "Failed to save domain" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleVerify() {
+    setVerifying(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/org/custom-domain/verify", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+
+      if (json?.verified) {
+        setMessage({ type: "success", text: "✓ Domain verified!" });
+      } else {
+        setMessage({ type: "error", text: json?.message || "Verification failed" });
+      }
+
+      await loadDomainInfo();
+    } catch (e: any) {
+      setMessage({ type: "error", text: e?.message || "Verification request failed" });
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  async function handleRotateToken() {
+    if (!confirm("Generate a new verification token? You must update your DNS TXT record.")) return;
+
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/org/custom-domain/rotate-token", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) throw new Error(json?.message || "Failed to rotate token");
+
+      setData(json.domain);
+      setMessage({ type: "success", text: "New token generated. Update your DNS TXT record." });
+    } catch (e: any) {
+      setMessage({ type: "error", text: e?.message || "Failed to rotate token" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function copyToClipboard(text: string) {
+    await navigator.clipboard.writeText(text);
+    setMessage({ type: "success", text: "✓ Copied!" });
+    setTimeout(() => setMessage(null), 1500);
+  }
+
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/5 p-6">
+        <div className="text-white/60">Loading domain information...</div>
+      </div>
+    );
+  }
+
+  const statusBadgeColor: Record<DomainStatus, string> = {
+    none: "bg-gray-500/20 text-gray-300",
+    pending: "bg-yellow-500/20 text-yellow-300",
+    verified: "bg-green-500/20 text-green-300",
+    failed: "bg-red-500/20 text-red-300",
+  };
+
+  const statusLabel: Record<DomainStatus, string> = {
+    none: "Not Configured",
+    pending: "Pending Verification",
+    verified: "Verified",
+    failed: "Verification Failed",
+  };
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold">Custom Domain</h3>
+          <p className="text-sm text-white/60 mt-1">
+            Use your own domain for the chat widget (e.g., chat.yourbrand.com)
+          </p>
+        </div>
+        {data && (
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadgeColor[data.status]}`}>
+            {statusLabel[data.status]}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Domain Name</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            className="flex-1 rounded-lg bg-black/30 border border-white/10 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/20"
+            placeholder="chat.yourdomain.com"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            disabled={saving || verifying}
+          />
+          <button
+            className="px-4 py-2 rounded-lg bg-white text-black font-medium text-sm hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleSave}
+            disabled={saving || verifying}
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+        <p className="text-xs text-white/50">No protocol, no paths, no ports.</p>
+      </div>
+
+      {data?.customDomain && data?.verificationToken && (
+        <div className="rounded-lg border border-white/10 bg-black/20 p-4 space-y-3">
+          <h4 className="font-medium text-sm">DNS Verification</h4>
+          <p className="text-sm text-white/70">Add this TXT record:</p>
+
+          <div className="bg-black/40 rounded-lg p-4 space-y-3">
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <div><div className="text-white/50 text-xs mb-1">Type</div><code className="text-xs">TXT</code></div>
+              <div><div className="text-white/50 text-xs mb-1">Host/Name</div><code className="text-xs">@</code></div>
+              <div><div className="text-white/50 text-xs mb-1">TTL</div><code className="text-xs">3600</code></div>
+            </div>
+
+            <div>
+              <div className="text-white/50 text-xs mb-1">Value</div>
+              <div className="flex gap-2">
+                <code className="flex-1 bg-black/60 border border-white/10 rounded px-3 py-2 text-xs break-all">
+                  tca-verify={data.verificationToken}
+                </code>
+                <button
+                  className="px-3 py-2 rounded-lg bg-white/10 border border-white/10 text-xs font-medium hover:bg-white/20"
+                  onClick={() => copyToClipboard(`tca-verify=${data.verificationToken}`)}
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-white/50">DNS can take minutes to 48 hours to propagate.</p>
+        </div>
+      )}
+
+      {data?.customDomain && (
+        <div className="flex gap-2 flex-wrap">
+          <button
+            className="px-4 py-2 rounded-lg bg-green-500 text-black font-medium text-sm hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleVerify}
+            disabled={verifying || saving || data.status === "verified"}
+          >
+            {verifying ? "Verifying..." : "Verify Domain"}
+          </button>
+
+          {data.status !== "verified" && (
+            <button
+              className="px-4 py-2 rounded-lg bg-white/10 border border-white/10 font-medium text-sm hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleRotateToken}
+              disabled={saving || verifying}
+            >
+              Regenerate Token
+            </button>
+          )}
+        </div>
+      )}
+
+      {data?.verifiedAt && <p className="text-xs text-white/50">Verified: {new Date(data.verifiedAt).toLocaleString()}</p>}
+      {data?.lastCheckedAt && <p className="text-xs text-white/50">Last checked: {new Date(data.lastCheckedAt).toLocaleString()}</p>}
+
+      {data?.status === "failed" && data.failureReason && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+          <strong>Verification failed:</strong> {data.failureReason}
+        </div>
+      )}
+
+      {message && (
+        <div
+          className={`rounded-lg border p-3 text-sm ${
+            message.type === "success"
+              ? "border-green-500/30 bg-green-500/10 text-green-200"
+              : "border-red-500/30 bg-red-500/10 text-red-200"
+          }`}
+        >
+          {message.text}
+        </div>
+      )}
+    </div>
+  );
+}
+--- END FILE ---
+
+COMMANDS (run and paste outputs if anything fails):
+pnpm prisma generate
+pnpm typecheck
+pnpm build
+pnpm dev
+
+STOP AFTER STEP 26. DO NOT PROCEED.

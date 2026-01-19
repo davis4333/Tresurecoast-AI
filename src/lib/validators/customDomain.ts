@@ -1,41 +1,53 @@
 import { z } from "zod";
 
+/**
+ * Domain validation regex:
+ * - allows subdomains
+ * - disallows protocol, paths, ports
+ */
 const DOMAIN_REGEX =
-  /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/i;
+  /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 
-export function normalizeDomainOrNull(input: unknown): string | null {
+export function normalizeDomain(input: unknown): string | null {
   if (input == null) return null;
   if (typeof input !== "string") return null;
 
-  const raw = input.trim();
-  if (!raw) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
 
-  if (raw.includes("/") || raw.includes("?") || raw.includes("#")) {
-    throw new Error("Invalid domain format. Do not include paths.");
-  }
+  let normalized = trimmed.toLowerCase();
 
-  let v = raw.toLowerCase();
+  // Remove protocol
+  normalized = normalized.replace(/^https?:\/\//, "");
 
-  v = v.replace(/^https?:\/\//, "");
-  v = v.replace(/\/$/, "");
+  // Remove path/query/hash
+  normalized = normalized.split("/")[0] ?? "";
+  normalized = normalized.split("?")[0] ?? "";
+  normalized = normalized.split("#")[0] ?? "";
 
-  if (v.includes(":")) {
-    throw new Error("Invalid domain format. Do not include ports.");
-  }
+  // Remove port
+  normalized = normalized.split(":")[0] ?? "";
 
-  v = v.replace(/\.$/, "");
+  // Remove trailing dot
+  normalized = normalized.replace(/\.$/, "");
 
-  if (!DOMAIN_REGEX.test(v)) {
-    throw new Error("Invalid domain format. Use: example.com or chat.example.com");
-  }
+  return normalized || null;
+}
 
-  return v;
+export function isValidDomain(domain: string | null): boolean {
+  if (!domain) return false;
+  if (domain.length > 253) return false;
+  return DOMAIN_REGEX.test(domain);
 }
 
 export const CustomDomainInputSchema = z.object({
-  customDomain: z.union([z.string(), z.null(), z.undefined()]).transform((val) => {
-    return normalizeDomainOrNull(val);
-  }),
+  customDomain: z
+    .union([z.string(), z.null(), z.undefined()])
+    .transform(normalizeDomain)
+    .refine(
+      (val) => val == null || isValidDomain(val),
+      "Invalid domain format. Use: example.com or chat.example.com (no protocol, no paths, no ports)"
+    ),
 });
 
 export type CustomDomainInput = z.infer<typeof CustomDomainInputSchema>;

@@ -1,215 +1,232 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type DomainStatus = "none" | "pending" | "verified" | "failed";
 
-type DomainPayload = {
+type DomainData = {
   customDomain: string | null;
   status: DomainStatus;
   verifiedAt: string | null;
   lastCheckedAt: string | null;
   failureReason: string | null;
   verificationToken: string | null;
-  canEdit: boolean;
 };
 
 export function CustomDomainSection() {
-  const [data, setData] = useState<DomainPayload | null>(null);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  const badge = useMemo(() => {
-    const s = data?.status ?? "none";
-    const map: Record<DomainStatus, string> = {
-      none: "bg-zinc-200 text-zinc-800",
-      pending: "bg-amber-200 text-amber-900",
-      verified: "bg-emerald-200 text-emerald-900",
-      failed: "bg-rose-200 text-rose-900",
-    };
-    return map[s];
-  }, [data?.status]);
-
-  async function refresh() {
-    setErr(null);
-    const r = await fetch("/api/org/custom-domain");
-    const j = await r.json();
-    if (!r.ok) throw new Error(j?.message || "Failed to load");
-    setData(j.domain);
-    setInput(j.domain?.customDomain || "");
-  }
+  const [data, setData] = useState<DomainData | null>(null);
+  const [inputValue, setInputValue] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
-    refresh().catch((e) => setErr(e.message));
+    void loadDomainInfo();
   }, []);
 
-  async function save() {
-    setBusy(true);
-    setMsg(null);
-    setErr(null);
+  async function loadDomainInfo() {
+    setLoading(true);
+    setMessage(null);
     try {
-      const r = await fetch("/api/org/custom-domain", {
+      const res = await fetch("/api/org/custom-domain", { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) throw new Error(json?.message || "Failed to load domain info");
+
+      setData(json.domain);
+      setInputValue(json.domain?.customDomain || "");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to load domain info";
+      setMessage({ type: "error", text: message });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/org/custom-domain", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customDomain: input }),
+        body: JSON.stringify({ customDomain: inputValue }),
       });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.message || "Failed to save");
-      setData(j.domain);
-      setMsg("Saved. Add the TXT record below, then click Verify.");
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) throw new Error(json?.message || "Failed to save domain");
+
+      setData(json.domain);
+      setMessage({ type: "success", text: "Domain saved. Add TXT record, then click Verify." });
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Failed";
-      setErr(message);
+      const message = e instanceof Error ? e.message : "Failed to save domain";
+      setMessage({ type: "error", text: message });
     } finally {
-      setBusy(false);
+      setSaving(false);
     }
   }
 
-  async function verify() {
-    setBusy(true);
-    setMsg(null);
-    setErr(null);
+  async function handleVerify() {
+    setVerifying(true);
+    setMessage(null);
     try {
-      const r = await fetch("/api/org/custom-domain/verify", { method: "POST" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.message || "Verification failed");
-      setMsg("Verified successfully!");
-      await refresh();
+      const res = await fetch("/api/org/custom-domain/verify", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+
+      if (json?.verified) {
+        setMessage({ type: "success", text: "Domain verified!" });
+      } else {
+        setMessage({ type: "error", text: json?.message || "Verification failed" });
+      }
+
+      await loadDomainInfo();
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Verification failed";
-      setErr(message);
-      await refresh().catch(() => null);
+      const message = e instanceof Error ? e.message : "Verification request failed";
+      setMessage({ type: "error", text: message });
     } finally {
-      setBusy(false);
+      setVerifying(false);
     }
   }
 
-  async function rotate() {
-    if (!confirm("Generate a new verification token?")) return;
-    setBusy(true);
-    setMsg(null);
-    setErr(null);
+  async function handleRotateToken() {
+    if (!confirm("Generate a new verification token? You must update your DNS TXT record.")) return;
+
+    setSaving(true);
+    setMessage(null);
     try {
-      const r = await fetch("/api/org/custom-domain/rotate-token", { method: "POST" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.message || "Failed to rotate token");
-      setData(j.domain);
-      setMsg("New token generated. Update your TXT record.");
+      const res = await fetch("/api/org/custom-domain/rotate-token", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) throw new Error(json?.message || "Failed to rotate token");
+
+      setData(json.domain);
+      setMessage({ type: "success", text: "New token generated. Update your DNS TXT record." });
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Failed";
-      setErr(message);
+      const message = e instanceof Error ? e.message : "Failed to rotate token";
+      setMessage({ type: "error", text: message });
     } finally {
-      setBusy(false);
+      setSaving(false);
     }
   }
 
-  async function copy(v: string) {
-    await navigator.clipboard.writeText(v);
-    setMsg("Copied!");
-    setTimeout(() => setMsg(null), 1500);
+  async function copyToClipboard(text: string) {
+    await navigator.clipboard.writeText(text);
+    setMessage({ type: "success", text: "Copied!" });
+    setTimeout(() => setMessage(null), 1500);
   }
+
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/5 p-6">
+        <div className="text-white/60">Loading domain information...</div>
+      </div>
+    );
+  }
+
+  const statusBadgeColor: Record<DomainStatus, string> = {
+    none: "bg-gray-500/20 text-gray-300",
+    pending: "bg-yellow-500/20 text-yellow-300",
+    verified: "bg-green-500/20 text-green-300",
+    failed: "bg-red-500/20 text-red-300",
+  };
+
+  const statusLabel: Record<DomainStatus, string> = {
+    none: "Not Configured",
+    pending: "Pending Verification",
+    verified: "Verified",
+    failed: "Verification Failed",
+  };
 
   return (
-    <section
-      className="rounded-xl border border-white/10 bg-white/5 p-4 md:p-6 space-y-4"
-      data-testid="section-custom-domain"
-    >
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-6">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold">Custom Domain</h2>
-          <p className="text-sm text-white/60">
-            Use your own domain for the widget (e.g. chat.yourbrand.com). Verification is done via DNS TXT record.
+          <h3 className="text-lg font-semibold">Custom Domain</h3>
+          <p className="text-sm text-white/60 mt-1">
+            Use your own domain for the chat widget (e.g., chat.yourbrand.com)
           </p>
         </div>
-        <span className={`px-2 py-1 rounded text-xs font-medium ${badge}`} data-testid="badge-domain-status">
-          {data?.status ?? "none"}
-        </span>
+        {data && (
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadgeColor[data.status]}`}>
+            {statusLabel[data.status]}
+          </span>
+        )}
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Domain</label>
+        <label className="text-sm font-medium">Domain Name</label>
         <div className="flex gap-2">
           <input
-            className="flex-1 rounded-md bg-black/30 border border-white/10 px-3 py-2 text-sm"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="chat.example.com"
-            disabled={busy || !data?.canEdit}
+            type="text"
+            className="flex-1 rounded-lg bg-black/30 border border-white/10 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/20"
+            placeholder="chat.yourdomain.com"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            disabled={saving || verifying}
             data-testid="input-custom-domain"
           />
           <button
-            className="rounded-md px-3 py-2 text-sm font-semibold bg-white text-black disabled:opacity-50"
-            onClick={save}
-            disabled={busy || !data?.canEdit}
+            className="px-4 py-2 rounded-lg bg-white text-black font-medium text-sm hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleSave}
+            disabled={saving || verifying}
             data-testid="button-save-domain"
           >
-            Save
+            {saving ? "Saving..." : "Save"}
           </button>
         </div>
-        {!data?.canEdit && (
-          <p className="text-xs text-white/50">You can view status but only agency admins can edit.</p>
-        )}
+        <p className="text-xs text-white/50">No protocol, no paths, no ports.</p>
       </div>
 
       {data?.customDomain && data?.verificationToken && (
         <div className="rounded-lg border border-white/10 bg-black/20 p-4 space-y-3">
-          <div className="text-sm font-semibold">DNS TXT Record</div>
-          <div className="grid md:grid-cols-3 gap-2 text-sm">
-            <div>
-              <div className="text-white/60 text-xs">Type</div>
-              <div className="font-mono">TXT</div>
+          <h4 className="font-medium text-sm">DNS Verification</h4>
+          <p className="text-sm text-white/70">Add this TXT record:</p>
+
+          <div className="bg-black/40 rounded-lg p-4 space-y-3">
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <div><div className="text-white/50 text-xs mb-1">Type</div><code className="text-xs">TXT</code></div>
+              <div><div className="text-white/50 text-xs mb-1">Host/Name</div><code className="text-xs">@</code></div>
+              <div><div className="text-white/50 text-xs mb-1">TTL</div><code className="text-xs">3600</code></div>
             </div>
+
             <div>
-              <div className="text-white/60 text-xs">Host</div>
-              <div className="font-mono">@</div>
-            </div>
-            <div>
-              <div className="text-white/60 text-xs">TTL</div>
-              <div className="font-mono">3600</div>
+              <div className="text-white/50 text-xs mb-1">Value</div>
+              <div className="flex gap-2">
+                <code className="flex-1 bg-black/60 border border-white/10 rounded px-3 py-2 text-xs break-all" data-testid="code-verification-token">
+                  tca-verify={data.verificationToken}
+                </code>
+                <button
+                  className="px-3 py-2 rounded-lg bg-white/10 border border-white/10 text-xs font-medium hover:bg-white/20"
+                  onClick={() => copyToClipboard(`tca-verify=${data.verificationToken}`)}
+                  data-testid="button-copy-token"
+                >
+                  Copy
+                </button>
+              </div>
             </div>
           </div>
-          <div>
-            <div className="text-white/60 text-xs">Value</div>
-            <div className="flex gap-2 items-center">
-              <code
-                className="flex-1 rounded bg-black/40 border border-white/10 px-3 py-2 text-xs break-all"
-                data-testid="code-verification-token"
-              >
-                tca-verify={data.verificationToken}
-              </code>
-              <button
-                className="rounded-md px-3 py-2 text-xs font-semibold bg-white/10 border border-white/10"
-                onClick={() => copy(`tca-verify=${data.verificationToken}`)}
-                data-testid="button-copy-token"
-              >
-                Copy
-              </button>
-            </div>
-          </div>
-          <p className="text-xs text-white/50">
-            DNS propagation can take time. After adding the record, click Verify.
-          </p>
+
+          <p className="text-xs text-white/50">DNS can take minutes to 48 hours to propagate.</p>
         </div>
       )}
 
       {data?.customDomain && (
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
-            className="rounded-md px-3 py-2 text-sm font-semibold bg-emerald-400 text-black disabled:opacity-50"
-            onClick={verify}
-            disabled={busy || !data?.canEdit || data.status === "verified"}
+            className="px-4 py-2 rounded-lg bg-green-500 text-black font-medium text-sm hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleVerify}
+            disabled={verifying || saving || data.status === "verified"}
             data-testid="button-verify-domain"
           >
-            Verify
+            {verifying ? "Verifying..." : "Verify Domain"}
           </button>
 
-          {data?.canEdit && data?.verificationToken && (
+          {data.status !== "verified" && (
             <button
-              className="rounded-md px-3 py-2 text-sm font-semibold bg-white/10 border border-white/10 disabled:opacity-50"
-              onClick={rotate}
-              disabled={busy}
+              className="px-4 py-2 rounded-lg bg-white/10 border border-white/10 font-medium text-sm hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleRotateToken}
+              disabled={saving || verifying}
               data-testid="button-rotate-token"
             >
               Regenerate Token
@@ -218,27 +235,27 @@ export function CustomDomainSection() {
         </div>
       )}
 
-      {data?.verifiedAt && (
-        <div className="text-xs text-white/50" data-testid="text-verified-at">
-          Verified: {new Date(data.verifiedAt).toLocaleString()}
-        </div>
-      )}
-      {data?.lastCheckedAt && (
-        <div className="text-xs text-white/50" data-testid="text-last-checked">
-          Last checked: {new Date(data.lastCheckedAt).toLocaleString()}
+      {data?.verifiedAt && <p className="text-xs text-white/50">Verified: {new Date(data.verifiedAt).toLocaleString()}</p>}
+      {data?.lastCheckedAt && <p className="text-xs text-white/50">Last checked: {new Date(data.lastCheckedAt).toLocaleString()}</p>}
+
+      {data?.status === "failed" && data.failureReason && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+          <strong>Verification failed:</strong> {data.failureReason}
         </div>
       )}
 
-      {msg && (
-        <div className="text-sm text-emerald-400" data-testid="text-success-message">
-          {msg}
+      {message && (
+        <div
+          className={`rounded-lg border p-3 text-sm ${
+            message.type === "success"
+              ? "border-green-500/30 bg-green-500/10 text-green-200"
+              : "border-red-500/30 bg-red-500/10 text-red-200"
+          }`}
+          data-testid={message.type === "success" ? "text-success-message" : "text-error-message"}
+        >
+          {message.text}
         </div>
       )}
-      {err && (
-        <div className="text-sm text-rose-400" data-testid="text-error-message">
-          {err}
-        </div>
-      )}
-    </section>
+    </div>
   );
 }
