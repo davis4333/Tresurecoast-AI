@@ -1,0 +1,76 @@
+STEP 29B — ORG SELECTION + USER ORG ENDPOINTS (NO UI YET)
+
+NON-NEGOTIABLES
+- Reuse existing Organization.publicId (UUID). Do NOT change it.
+- Tenant isolation must be enforced: user can only select orgs they belong to.
+- Selection storage: httpOnly cookie (NOT localStorage).
+- getOrgContext must accept selected org publicId from cookie/header via request.
+- Keep existing Playwright test override gates intact (NODE_ENV != production + DEV_BYPASS_AUTH + PLAYWRIGHT_TEST).
+
+WHAT TO BUILD
+
+1) NEW FILE: src/lib/auth/orgSelection.ts
+- Cookie name: tca_selected_org
+- Header name: x-org-public-id
+- Functions:
+  - getSelectedOrgPublicId(request?: Request): string | null
+    * If request provided: check header first
+    * Then cookie (next/headers cookies())
+  - setSelectedOrgPublicId(publicId: string): void
+    * httpOnly: true
+    * secure: NODE_ENV === "production"
+    * sameSite: "lax"
+    * path: "/"
+    * maxAge: 30 days
+  - clearSelectedOrgPublicId(): void
+
+2) MODIFY: src/lib/auth/getOrgContext.ts
+- Add support for explicit org selection:
+  - Read selected publicId from orgSelection when request is provided.
+  - Also allow explicit override via options.explicitOrgPublicId (string) with highest priority.
+- REQUIRED behavior:
+  A) Resolve userId exactly as current Step 28.1 does (keep test override security gates unchanged).
+  B) Determine selectedOrgPublicId priority:
+     options.explicitOrgPublicId > orgSelection header/cookie > fallback (first membership by createdAt asc)
+  C) If selectedOrgPublicId is present:
+     - Load organization by publicId
+     - Then verify membership exists for (org.id, userId) using organizationId_clerkUserId unique
+     - If not a member => 403 not_member
+  D) Return { ok:true, org, role, userId }
+- Add helper export:
+  export async function listUserOrgs(userId: string): Promise<Array<{ publicId: string; id: number; name: string; role: OrgRole }>>
+  * Query OrganizationMember where clerkUserId=userId include organization select id, publicId, name
+  * orderBy createdAt asc
+
+3) NEW ROUTE: src/app/api/user/orgs/route.ts
+- GET /api/user/orgs
+- runtime="nodejs", dynamic="force-dynamic"
+- Uses getOrgContext({ testUserId: getTestUserId(req), request: req }) to get current org
+- For listing orgs:
+  - determine userId the SAME way getOrgContext does (do NOT duplicate auth logic poorly)
+  - easiest: call getOrgContext first; if ok then use ctx.userId for listUserOrgs(ctx.userId)
+- Response:
+  { ok:true, currentOrg:{publicId,id,name,role}, orgs:[{publicId,id,name,role}...] }
+
+4) NEW ROUTE: src/app/api/user/switch-org/route.ts
+- POST /api/user/switch-org
+- Body: { orgPublicId: string }
+- Validate:
+  - non-empty string
+  - max len 64
+  - pattern uuid-ish OR allow [a-f0-9-]{36} since your publicId is UUID
+- Must verify caller is a member of that org before setting cookie:
+  - Use getOrgContext to get userId (ctx.userId)
+  - Find org by publicId
+  - Check OrganizationMember unique for (org.id, ctx.userId)
+  - If not member: 403
+- If ok: setSelectedOrgPublicId(orgPublicId) and return { ok:true }
+
+5) STATIC PROOFS REQUIRED
+Run and paste verbatim:
+- pnpm typecheck
+- pnpm build
+- rg -n "tca_selected_org|x-org-public-id|getSelectedOrgPublicId|setSelectedOrgPublicId" src/lib/auth
+- find src/app/api/user -maxdepth 3 -type f -print
+
+STOP after pasting outputs.

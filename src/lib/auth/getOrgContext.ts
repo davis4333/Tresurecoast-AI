@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getSelectedOrgPublicId } from "./orgSelection";
 
 export type OrgRole = "AGENCY_OWNER" | "AGENCY_ADMIN" | "CLIENT";
 
@@ -7,6 +8,7 @@ export type OrgContextResult =
       ok: true;
       org: {
         id: number;
+        publicId: string;
         name: string;
         clerkOrganizationId: string | null;
         [key: string]: unknown;
@@ -28,17 +30,18 @@ const DEV_BOOTSTRAP_CLERK_ORG_ID = process.env.DEV_BOOTSTRAP_CLERK_ORG_ID;
 
 export interface GetOrgContextOptions {
   explicitOrgId?: string;
+  explicitOrgPublicId?: string;
   testUserId?: string;
+  request?: Request;
 }
 
 export async function getOrgContext(options?: GetOrgContextOptions | string): Promise<OrgContextResult> {
   const opts: GetOrgContextOptions = typeof options === "string" ? { explicitOrgId: options } : options || {};
-  const { explicitOrgId, testUserId } = opts;
+  const { explicitOrgId, explicitOrgPublicId, testUserId, request } = opts;
 
   try {
     let userId: string | null = null;
     let clerkOrgId: string | null = null;
-    let useMembershipLookup = false;
 
     if (DEV_BYPASS_AUTH && !IS_PRODUCTION) {
       const effectiveUserId = testUserId || DEV_BOOTSTRAP_CLERK_USER_ID;
@@ -54,10 +57,8 @@ export async function getOrgContext(options?: GetOrgContextOptions | string): Pr
       userId = effectiveUserId;
       clerkOrgId = explicitOrgId || DEV_BOOTSTRAP_CLERK_ORG_ID || null;
 
-      if (clerkOrgId) {
+      if (clerkOrgId && !explicitOrgPublicId) {
         await bootstrapDevEnvironment(userId, clerkOrgId);
-      } else {
-        useMembershipLookup = true;
       }
     } else {
       const { auth } = await import("@clerk/nextjs/server");
@@ -69,24 +70,39 @@ export async function getOrgContext(options?: GetOrgContextOptions | string): Pr
       if (!userId) {
         return { ok: false, status: 401, error: "unauthorized", message: "Authentication required" };
       }
-      if (!clerkOrgId) {
-        useMembershipLookup = true;
-      }
     }
 
-    if (useMembershipLookup) {
-      const membership = await prisma.organizationMember.findFirst({
-        where: { clerkUserId: userId! },
-        include: { organization: true },
-        orderBy: { organizationId: "asc" },
+    const selectedOrgPublicId = explicitOrgPublicId || getSelectedOrgPublicId(request) || null;
+
+    if (selectedOrgPublicId) {
+      const org = await prisma.organization.findUnique({
+        where: { publicId: selectedOrgPublicId },
+      });
+
+      if (!org) {
+        return {
+          ok: false,
+          status: 404,
+          error: "org_not_found",
+          message: "Selected organization not found",
+        };
+      }
+
+      const membership = await prisma.organizationMember.findUnique({
+        where: {
+          organizationId_clerkUserId: {
+            organizationId: org.id,
+            clerkUserId: userId!,
+          },
+        },
       });
 
       if (!membership) {
         return {
           ok: false,
           status: 403,
-          error: "no_membership",
-          message: "You are not a member of any organization",
+          error: "not_member",
+          message: "You are not a member of this organization",
         };
       }
 
@@ -95,29 +111,53 @@ export async function getOrgContext(options?: GetOrgContextOptions | string): Pr
         return { ok: false, status: 403, error: "invalid_role", message: "Invalid organization role" };
       }
 
-      return { ok: true, org: membership.organization, role: membership.role as OrgRole, userId: userId! };
+      return { ok: true, org, role: membership.role as OrgRole, userId: userId! };
     }
 
-    const org = await prisma.organization.findUnique({
-      where: { clerkOrganizationId: clerkOrgId! },
-    });
+    if (clerkOrgId) {
+      const org = await prisma.organization.findUnique({
+        where: { clerkOrganizationId: clerkOrgId },
+      });
 
-    if (!org) {
-      return {
-        ok: false,
-        status: 404,
-        error: "org_not_found",
-        message: "Organization not found or not linked to Clerk organization",
-      };
-    }
+      if (!org) {
+        return {
+          ok: false,
+          status: 404,
+          error: "org_not_found",
+          message: "Organization not found or not linked to Clerk organization",
+        };
+      }
 
-    const membership = await prisma.organizationMember.findUnique({
-      where: {
-        organizationId_clerkUserId: {
-          organizationId: org.id,
-          clerkUserId: userId!,
+      const membership = await prisma.organizationMember.findUnique({
+        where: {
+          organizationId_clerkUserId: {
+            organizationId: org.id,
+            clerkUserId: userId!,
+          },
         },
-      },
+      });
+
+      if (!membership) {
+        return {
+          ok: false,
+          status: 403,
+          error: "no_membership",
+          message: "You are not a member of this organization",
+        };
+      }
+
+      const validRoles: OrgRole[] = ["AGENCY_OWNER", "AGENCY_ADMIN", "CLIENT"];
+      if (!validRoles.includes(membership.role as OrgRole)) {
+        return { ok: false, status: 403, error: "invalid_role", message: "Invalid organization role" };
+      }
+
+      return { ok: true, org, role: membership.role as OrgRole, userId: userId! };
+    }
+
+    const membership = await prisma.organizationMember.findFirst({
+      where: { clerkUserId: userId! },
+      include: { organization: true },
+      orderBy: { createdAt: "asc" },
     });
 
     if (!membership) {
@@ -125,21 +165,16 @@ export async function getOrgContext(options?: GetOrgContextOptions | string): Pr
         ok: false,
         status: 403,
         error: "no_membership",
-        message: "You are not a member of this organization",
+        message: "You are not a member of any organization",
       };
     }
 
     const validRoles: OrgRole[] = ["AGENCY_OWNER", "AGENCY_ADMIN", "CLIENT"];
     if (!validRoles.includes(membership.role as OrgRole)) {
-      return {
-        ok: false,
-        status: 403,
-        error: "invalid_role",
-        message: "Invalid organization role",
-      };
+      return { ok: false, status: 403, error: "invalid_role", message: "Invalid organization role" };
     }
 
-    return { ok: true, org, role: membership.role as OrgRole, userId: userId! };
+    return { ok: true, org: membership.organization, role: membership.role as OrgRole, userId: userId! };
   } catch (error) {
     console.error("[getOrgContext] Error:", error);
     return { ok: false, status: 500, error: "internal_error", message: "Failed to resolve organization context" };
@@ -174,6 +209,25 @@ export function isAdmin(role: OrgRole): boolean {
 
 export function isOwner(role: OrgRole): boolean {
   return role === "AGENCY_OWNER";
+}
+
+export async function listUserOrgs(userId: string): Promise<Array<{ publicId: string; id: number; name: string; role: OrgRole }>> {
+  const memberships = await prisma.organizationMember.findMany({
+    where: { clerkUserId: userId },
+    include: {
+      organization: {
+        select: { id: true, publicId: true, name: true },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return memberships.map((m) => ({
+    publicId: m.organization.publicId,
+    id: m.organization.id,
+    name: m.organization.name,
+    role: m.role as OrgRole,
+  }));
 }
 
 const VALID_TEST_USER_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
