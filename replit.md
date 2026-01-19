@@ -108,6 +108,21 @@ Preferred communication style: Simple, everyday language.
 - **Demo Key Resolver**: `src/lib/public/demoKey.ts` with `resolveDemoBotKey()` async function
 - **DemoRequest Model**: Stores name, email, businessName, phone from demo request form
 
+### Notifications Architecture (Step 36)
+- **Location**: `src/lib/notifications/webhooks.ts`
+- **Demo Request Logging**: `[DEMO_REQUEST] name=... email=... business=... phone=... id=...`
+- **Lead Logging**: `[NEW_LEAD] orgId=... botId=... leadId=... name=... phone=... source=...`
+- **Webhook Support**: Optional webhooks via `DEMO_REQUEST_WEBHOOK_URL` and `LEAD_WEBHOOK_URL`
+- **Fail-Open**: Webhook failures never block API responses
+- **Admin Settings**: `/app/admin/settings` shows auth mode, Clerk keys status, production readiness checklist
+
+### Production Hardening (Step 36)
+- **Auth Mode Protection**: DEV_BYPASS_AUTH is ignored in production (NODE_ENV=production)
+- **Secure Auth Status API**: `/api/admin/auth-status` returns auth configuration securely
+- **Deployment Docs**: `docs/PRODUCTION_CHECKLIST.md` with required env vars, smoke tests, rollback instructions
+- **Host Policy**: Public endpoints validate origin/host against bot allowlists
+- **Tenant Binding**: `enforceTenantBinding()` prevents cross-tenant access via custom domains
+
 ### Environment Variables Required
 | Variable | Purpose |
 |----------|---------|
@@ -117,6 +132,8 @@ Preferred communication style: Simple, everyday language.
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk public key for client-side auth |
 | `CLERK_SECRET_KEY` | Clerk secret key for server-side auth |
 | `NEXT_PUBLIC_DEMO_BOT_KEY` | (Optional) UUID of demo bot for /demo page |
+| `DEMO_REQUEST_WEBHOOK_URL` | (Optional) Webhook URL for demo request notifications |
+| `LEAD_WEBHOOK_URL` | (Optional) Webhook URL for new lead notifications |
 
 ### Package Manager
 - **pnpm**: Version 9.15.0 specified in `packageManager` field

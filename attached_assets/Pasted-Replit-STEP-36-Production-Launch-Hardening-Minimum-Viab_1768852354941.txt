@@ -1,0 +1,78 @@
+Replit — STEP 36: Production Launch Hardening (Minimum Viable Ops)
+
+GOAL
+Make the platform safe + reliable for first real paying clients (agency-run).
+No self-serve signup. No custom domains required.
+This step is “production readiness”: auth, notifications, abuse protection, and deployment checklist.
+
+NON-NEGOTIABLES
+- DEV_BYPASS_AUTH must be impossible in production (already enforced; do not weaken).
+- Public endpoints must stay tenant-bound (hostPolicy/enforceTenantBinding) and rate-limited.
+- Don’t add new product scope. Keep it minimal and shippable.
+- All quality gates must remain green.
+
+DELIVERABLES
+
+A) PRODUCTION AUTH CONFIG “DONE”
+1) Add an /app/admin/settings page visible only to admin/agency role that shows:
+   - Current auth mode (dev_bypass / normal / production)
+   - Whether Clerk keys are present (publishable + secret)
+   - Whether DEV_BYPASS_AUTH is set (warn if set)
+   - A “Production Readiness Checklist” card (static text)
+2) Add a new unit test suite verifying:
+   - In production, DEV_BYPASS_AUTH is ignored
+   - /app routes require Clerk when keys are present
+   - /auth-error messaging correct by mode
+
+B) DEMO REQUEST NOTIFICATIONS (NO EMAIL PROVIDER REQUIRED YET)
+When someone submits /request-demo:
+1) Continue storing DemoRequest in DB.
+2) ALSO log a single structured line to server logs:
+   [DEMO_REQUEST] name=... email=... business=... phone=... id=...
+3) Add optional webhook support:
+   - If env DEMO_REQUEST_WEBHOOK_URL is set, POST JSON payload to it.
+   - Fail open: webhook failure must not break request-demo response.
+4) Add unit tests for webhook behavior (env set/unset, failure does not 500).
+
+C) LEAD NOTIFICATIONS (MINIMUM)
+When a public lead is created via /api/public/leads:
+1) Log a structured line:
+   [NEW_LEAD] orgId=... botId=... leadId=... name=... phone=... source=...
+2) Optional webhook:
+   - If env LEAD_WEBHOOK_URL is set, POST JSON payload to it.
+   - Fail open; never block lead creation.
+3) Add unit tests for lead webhook behavior.
+
+D) RATE LIMIT + HOST BINDING “PROVE IT”
+1) Add/extend unit tests to prove:
+   - Public endpoints reject disallowed origin/host
+   - enforceTenantBinding blocks cross-tenant botPublicKey usage
+   - Rate limit returns 429 after threshold (use deterministic test clocks/mocks)
+2) Add 1 E2E test that:
+   - Loads /demo
+   - Sends a message
+   - Confirms a lead can be created and appears in /app/leads for the client role (or agency role if client view not implemented)
+
+E) DEPLOYMENT CHECKLIST DOC
+Add docs/PRODUCTION_CHECKLIST.md with:
+- Required env vars (Clerk, DB, webhook URLs optional, demo bot key)
+- “Before you deploy” steps
+- Smoke test URLs (/, /pricing, /request-demo, /demo, /app)
+- Rollback instructions (revert last commit, redeploy)
+Keep it short and practical.
+
+QUALITY GATES (paste verbatim)
+- pnpm prisma validate
+- pnpm prisma migrate status (only if schema changed)
+- pnpm lint
+- pnpm typecheck
+- pnpm vitest run
+- pnpm test:e2e
+- pnpm build
+
+REPORT FORMAT (required)
+1) What changed + why (short)
+2) File manifest (new/modified)
+3) Verbatim gate outputs
+4) Manual smoke checklist (exact URLs + what to click)
+STOP after Step 36.

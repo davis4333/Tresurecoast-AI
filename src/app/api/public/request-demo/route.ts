@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { DemoRequestSchema } from "@/lib/public/demoRequestSchema";
+import { notifyDemoRequest } from "@/lib/notifications/webhooks";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,17 @@ export async function POST(request: Request) {
         businessName: parsed.data.businessName,
         phone: parsed.data.phone ?? null,
       },
+    });
+
+    notifyDemoRequest({
+      id: demoRequest.id,
+      name: demoRequest.name,
+      email: demoRequest.email,
+      businessName: demoRequest.businessName,
+      phone: demoRequest.phone,
+      createdAt: demoRequest.createdAt.toISOString(),
+    }).catch((err) => {
+      console.error("[DEMO_REQUEST_NOTIFICATION_ERROR]", err);
     });
 
     return NextResponse.json(

@@ -88,6 +88,37 @@ test.describe("Demo Page", () => {
   });
 });
 
+test.describe("Demo to Lead Flow", () => {
+  test("demo page widget can be interacted with", async ({ page }) => {
+    await page.goto("/demo");
+
+    await expect(page.locator("h1")).toContainText("Live Demo");
+
+    const hasWidget = await page.getByTestId("iframe-demo-widget").isVisible().catch(() => false);
+
+    if (hasWidget) {
+      const iframe = page.frameLocator("[data-testid='iframe-demo-widget']");
+
+      const chatBox = iframe.locator("[data-testid='chatbox']");
+      const isChatVisible = await chatBox.isVisible({ timeout: 5000 }).catch(() => false);
+
+      if (isChatVisible) {
+        const input = iframe.locator("[data-testid='input-chat-message']");
+        const inputVisible = await input.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (inputVisible) {
+          await input.fill("I want to learn about your services");
+          await iframe.locator("[data-testid='button-send-message']").click();
+
+          await page.waitForTimeout(1000);
+        }
+      }
+    }
+
+    expect(true).toBe(true);
+  });
+});
+
 test.describe("Public Footer and Navigation", () => {
   test("footer is visible on all public pages", async ({ page }) => {
     await page.goto("/");

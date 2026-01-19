@@ -4,6 +4,7 @@ import { checkRateLimit } from "@/lib/public/rateLimit";
 import { LeadRequestSchema } from "@/lib/public/zodSchemas";
 import { scoreLead } from "@/lib/leads/scoreLead";
 import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } from "@/lib/public/hostPolicy";
+import { notifyNewLead } from "@/lib/notifications/webhooks";
 
 export const runtime = "nodejs";
 
@@ -183,6 +184,18 @@ export async function POST(req: Request) {
         role: "assistant",
         content: "Thanks! We'll be in touch shortly."
       }
+    });
+
+    notifyNewLead({
+      leadPublicId: lead.publicId,
+      orgId: conversation.organizationId,
+      botId: conversation.botId,
+      name: validName ? name : null,
+      email: validEmail ? email : null,
+      phone: validPhone ? phone : null,
+      source: "widget",
+    }).catch((err) => {
+      console.error("[LEAD_NOTIFICATION_ERROR]", err);
     });
 
     return NextResponse.json({ ok: true, leadPublicId: lead.publicId });
