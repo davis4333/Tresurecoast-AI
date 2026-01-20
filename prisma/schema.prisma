@@ -234,6 +234,7 @@ model Lead {
   serviceId      Int?
 
   status LeadStatus @default(NEW)
+  notes  String?
 
   name    String?
   email   String?
@@ -260,6 +261,9 @@ model Lead {
   @@index([conversationId])
   @@index([status])
   @@index([createdAt])
+  @@index([organizationId, createdAt])
+  @@index([serviceId, createdAt])
+  @@index([temperature])
 }
 
 model AuditLog {
