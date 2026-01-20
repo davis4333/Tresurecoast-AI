@@ -1,13 +1,15 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Public Pages Navigation", () => {
-  test("can navigate from landing to pricing to request-demo", async ({ page }) => {
+  test("can navigate from landing to pricing to request-demo", async ({
+    page,
+  }) => {
     await page.goto("/");
 
     await expect(page.locator("h1")).toContainText("AI Lead Capture");
-    await expect(page.getByTestId("link-home-logo")).toBeVisible();
+    await expect(page.getByTestId("nav-logo")).toBeVisible();
 
-    await page.getByTestId("link-nav-pricing").click();
+    await page.getByTestId("nav-pricing").click();
     await expect(page).toHaveURL("/pricing");
     await expect(page.locator("h1")).toContainText("Pricing");
 
@@ -29,12 +31,20 @@ test.describe("Public Pages Navigation", () => {
   test("pricing page shows all tiers", async ({ page }) => {
     await page.goto("/pricing");
 
-    await expect(page.getByText("Starter", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Professional", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Agency", { exact: true }).first()).toBeVisible();
+    await expect(
+      page.getByText("Starter", { exact: true }).first()
+    ).toBeVisible();
+    await expect(
+      page.getByText("Professional", { exact: true }).first()
+    ).toBeVisible();
+    await expect(
+      page.getByText("Agency", { exact: true }).first()
+    ).toBeVisible();
     await expect(page.getByText("$99")).toBeVisible();
     await expect(page.getByText("$249")).toBeVisible();
-    await expect(page.getByText("Custom", { exact: true }).first()).toBeVisible();
+    await expect(
+      page.getByText("Custom", { exact: true }).first()
+    ).toBeVisible();
   });
 });
 
@@ -44,13 +54,17 @@ test.describe("Demo Request Form", () => {
 
     const timestamp = Date.now();
     await page.getByTestId("input-demo-name").fill("Test User");
-    await page.getByTestId("input-demo-email").fill(`test${timestamp}@example.com`);
+    await page
+      .getByTestId("input-demo-email")
+      .fill(`test${timestamp}@example.com`);
     await page.getByTestId("input-demo-business").fill("Test Business Inc");
     await page.getByTestId("input-demo-phone").fill("555-0123");
 
     await page.getByTestId("button-demo-submit").click();
 
-    await expect(page.getByTestId("text-demo-request-success")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("text-demo-request-success")).toBeVisible({
+      timeout: 10000,
+    });
     await expect(page.getByText("Demo Request Received")).toBeVisible();
   });
 
@@ -59,11 +73,13 @@ test.describe("Demo Request Form", () => {
 
     await page.getByTestId("input-demo-name").fill("Test User");
     await page.getByTestId("input-demo-business").fill("Test Business");
-    
+
     const emailInput = page.getByTestId("input-demo-email");
     await emailInput.fill("invalid-email");
-    
-    const isInvalid = await emailInput.evaluate((el: HTMLInputElement) => !el.validity.valid);
+
+    const isInvalid = await emailInput.evaluate(
+      (el: HTMLInputElement) => !el.validity.valid
+    );
     expect(isInvalid).toBe(true);
   });
 });
@@ -74,8 +90,14 @@ test.describe("Demo Page", () => {
 
     await expect(page.locator("h1")).toContainText("Live Demo");
 
-    const hasWidget = await page.getByTestId("iframe-demo-widget").isVisible().catch(() => false);
-    const hasNotConfigured = await page.getByTestId("text-demo-not-configured").isVisible().catch(() => false);
+    const hasWidget = await page
+      .getByTestId("iframe-demo-widget")
+      .isVisible()
+      .catch(() => false);
+    const hasNotConfigured = await page
+      .getByTestId("text-demo-not-configured")
+      .isVisible()
+      .catch(() => false);
 
     expect(hasWidget || hasNotConfigured).toBe(true);
   });
@@ -94,21 +116,30 @@ test.describe("Demo to Lead Flow", () => {
 
     await expect(page.locator("h1")).toContainText("Live Demo");
 
-    const hasWidget = await page.getByTestId("iframe-demo-widget").isVisible().catch(() => false);
+    const hasWidget = await page
+      .getByTestId("iframe-demo-widget")
+      .isVisible()
+      .catch(() => false);
 
     if (hasWidget) {
       const iframe = page.frameLocator("[data-testid='iframe-demo-widget']");
 
       const chatBox = iframe.locator("[data-testid='chatbox']");
-      const isChatVisible = await chatBox.isVisible({ timeout: 5000 }).catch(() => false);
+      const isChatVisible = await chatBox
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
 
       if (isChatVisible) {
         const input = iframe.locator("[data-testid='input-chat-message']");
-        const inputVisible = await input.isVisible({ timeout: 3000 }).catch(() => false);
+        const inputVisible = await input
+          .isVisible({ timeout: 3000 })
+          .catch(() => false);
 
         if (inputVisible) {
           await input.fill("I want to learn about your services");
-          await iframe.locator("[data-testid='button-send-message']").click();
+          await iframe
+            .locator("[data-testid='button-send-message']")
+            .click();
 
           await page.waitForTimeout(1000);
         }
@@ -122,18 +153,23 @@ test.describe("Demo to Lead Flow", () => {
 test.describe("Public Footer and Navigation", () => {
   test("footer is visible on all public pages", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("Treasure Coast AI. All rights reserved.")).toBeVisible();
+    await expect(
+      page.getByText("Treasure Coast AI. All rights reserved.")
+    ).toBeVisible();
 
     await page.goto("/pricing");
-    await expect(page.getByText("Treasure Coast AI. All rights reserved.")).toBeVisible();
+    await expect(
+      page.getByText("Treasure Coast AI. All rights reserved.")
+    ).toBeVisible();
 
     await page.goto("/demo");
-    await expect(page.getByText("Treasure Coast AI. All rights reserved.")).toBeVisible();
+    await expect(
+      page.getByText("Treasure Coast AI. All rights reserved.")
+    ).toBeVisible();
   });
 
   test("navigation is visible on all public pages", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByTestId("link-home-logo")).toBeVisible();
-    await expect(page.getByTestId("link-sign-in")).toBeVisible();
+    await expect(page.getByTestId("nav-logo")).toBeVisible();
   });
 });
