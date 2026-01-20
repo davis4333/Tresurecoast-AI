@@ -319,16 +319,11 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
 
   return (
     <div className="flex flex-col space-y-4">
-      {/* Header - apply theme tokens and branding */}
+      {/* Header - premium branding section with animation */}
       <div
+        className="tca-chat-header text-white"
         style={{
-          padding: "var(--space-md)",
-          borderBottom: "1px solid var(--color-border)",
           backgroundColor: headerBg,
-          color: "var(--color-text-inverse)",
-          borderTopLeftRadius: "var(--radius-lg)",
-          borderTopRightRadius: "var(--radius-lg)",
-          boxShadow: "var(--shadow-md)",
         }}
       >
         <div className="flex items-center gap-3">
@@ -337,23 +332,16 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
             <img
               src={branding.brandLogoUrl!}
               alt="Logo"
-              className="h-8 w-8 rounded object-contain"
+              className="h-8 w-8 rounded-md object-contain"
             />
           )}
-          <div>
-            <h2 style={{ fontSize: "1.125rem", fontWeight: "600", margin: 0 }}>
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold leading-tight">
               {showCompanyName ? branding.brandCompanyName : (config?.botName || "Chat Support")}
             </h2>
 
             {config?.greeting && (
-              <p
-                style={{
-                  fontSize: "0.875rem",
-                  marginTop: "var(--space-xs)",
-                  opacity: 0.9,
-                  margin: "var(--space-xs) 0 0 0",
-                }}
-              >
+              <p className="mt-1 text-sm opacity-90">
                 {config.greeting}
               </p>
             )}
@@ -362,24 +350,24 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
       </div>
 
       {isLoadingHistory && (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-center">
-          <p className="text-sm text-white/60">Loading conversation...</p>
+        <div className="tca-loading-message">
+          <p className="text-sm tca-text-secondary">Loading conversation...</p>
         </div>
       )}
 
       {!isLoadingHistory && messages.length > 0 && (
-        <div className="tca-surface tca-border tca-radius-lg max-h-96 space-y-3 overflow-y-auto p-4">
+        <div className="tca-message-container-enter tca-surface tca-border tca-radius-lg max-h-96 space-y-3 overflow-y-auto p-4">
           {messages.map((msg, idx) => (
             <div
               key={idx}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              className={`flex tca-message-enter ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-[80%] ${
+                className={`max-w-[80%] sm:max-w-[70%] lg:max-w-[60%] ${
                   msg.role === "user" ? "tca-bubble-user" : "tca-bubble-assistant"
                 }`}
               >
-                <p className="text-sm">{msg.content}</p>
+                <p className="text-sm leading-relaxed">{msg.content}</p>
               </div>
             </div>
           ))}
@@ -403,18 +391,19 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
       )}
 
       {showLeadForm && (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-          <p className="mb-3 text-sm text-white/90">
+        <div className="tca-lead-form">
+          <p className="mb-4 text-sm font-medium tca-text-primary">
             Please share your contact information:
           </p>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <input
               type="text"
               value={leadName}
               onChange={(e) => setLeadName(e.target.value)}
               placeholder="Name"
               disabled={isSubmittingLead}
-              className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
+              className="tca-input tca-focus-ring"
+              data-testid="input-lead-name"
             />
             <input
               type="email"
@@ -422,7 +411,8 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
               onChange={(e) => setLeadEmail(e.target.value)}
               placeholder="Email"
               disabled={isSubmittingLead}
-              className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
+              className="tca-input tca-focus-ring"
+              data-testid="input-lead-email"
             />
             <input
               type="tel"
@@ -430,13 +420,19 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
               onChange={(e) => setLeadPhone(e.target.value)}
               placeholder="Phone"
               disabled={isSubmittingLead}
-              className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-white/30 focus:outline-none disabled:opacity-50"
+              className="tca-input tca-focus-ring"
+              data-testid="input-lead-phone"
             />
-            {leadError && <p className="text-sm text-red-400">{leadError}</p>}
+            {leadError && (
+              <p className="text-sm font-medium text-red-500" data-testid="error-lead-submission">
+                {leadError}
+              </p>
+            )}
             <button
               onClick={handleLeadSubmit}
               disabled={isSubmittingLead || !leadHasAny}
-              className="w-full rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
+              className="tca-btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="button-lead-submit"
             >
               {isSubmittingLead ? "Submitting..." : "Submit"}
             </button>
@@ -445,12 +441,14 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
-          <p className="text-sm text-red-400">{error}</p>
+        <div className="tca-error-message">
+          <p className="text-sm font-medium text-red-600 dark:text-red-400" data-testid="error-message">
+            {error}
+          </p>
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex gap-3">
         <input
           type="text"
           value={message}
@@ -459,7 +457,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
           placeholder="Type a message..."
           disabled={isSending || isLoadingHistory || showLeadForm || isSubmittingLead}
           data-testid="chat-input"
-          className="tca-input flex-1 text-sm"
+          className="tca-input tca-focus-ring flex-1"
         />
         <button
           onClick={handleSend}
@@ -474,7 +472,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
           style={{
             backgroundColor: headerBg,
           }}
-          className="tca-btn-primary w-auto px-4 py-2 text-sm disabled:opacity-50"
+          className="tca-btn-primary px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
         >
           {isSending ? "..." : "Send"}
         </button>

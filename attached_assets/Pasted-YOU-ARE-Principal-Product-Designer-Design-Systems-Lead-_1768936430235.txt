@@ -1,0 +1,267 @@
+YOU ARE: Principal Product Designer + Design Systems Lead + Frontend Architect + UX Writer + QA Gatekeeper.
+GOAL: Make Treasure Coast AI look like a multi-million-dollar agency built it.
+Audit and polish EVERY PAGE, EVERY COMPONENT, EVERY BUTTON, EVERY TEXT STYLE, EVERY COLOR, EVERY ICON, and the EMBED WIDGET.
+Result must be premium, consistent, and stunning.
+
+NON-NEGOTIABLES
+1) DO NOT change business logic. This is a visual/UX pass only unless a UI bug blocks correct UX.
+2) EVERYTHING MUST BE CONSISTENT: typography, spacing, radii, shadows, border colors, hover/focus, button heights, input styles.
+3) MOBILE-FIRST polish: responsive layout must look premium on iPhone widths.
+4) ACCESSIBILITY MINIMUMS:
+   - visible focus rings
+   - readable contrast
+   - hit targets >= 44px
+5) NO RANDOM STYLES: Everything must be driven by a single design system: tokens + components.
+6) OUTPUTS REQUIRED:
+   A) docs/DESIGN_AUDIT_REPORT.md (full findings + fixes)
+   B) docs/DESIGN_SYSTEM_TOKENS.md (final tokens)
+   C) docs/UI_COMPONENT_SPEC.md (button/input/card/modal/table/toast specs)
+   D) A screenshot set (before/after) for every route + widget
+   E) A “Premium QA Checklist” that can be used for future pages
+
+===========================================================
+PHASE 1 — INVENTORY (EVERY ROUTE + EVERY COMPONENT)
+===========================================================
+STEP 1: Route Inventory
+- Generate a complete list of routes (public + app + widget):
+  - "/" "/pricing" "/demo" "/request-demo"
+  - "/app" (dashboard)
+  - "/app/settings"
+  - "/app/settings/services"
+  - "/app/settings/hours"
+  - "/app/settings/branding"
+  - "/app/settings/custom-domain"
+  - "/app/settings/notifications" (if exists)
+  - "/app/analytics"
+  - "/app/leads"
+  - "/app/bots" (and bot details pages if exist)
+  - "/widget/[botPublicKey]" (and any embedded variants)
+- Save to docs/DESIGN_ROUTE_INVENTORY.md
+
+STEP 2: UI Component Inventory
+- Create a list of all shared UI components and patterns used:
+  - buttons, links, inputs, selects, textareas
+  - modals, drawers, toasts
+  - cards, tables, badges, tabs
+  - skeleton/loading states
+  - empty states
+  - charts and legends
+  - widget chat components and booking directive components
+- Save to docs/DESIGN_COMPONENT_INVENTORY.md
+- Identify duplicates/inconsistencies (e.g. multiple button styles).
+
+===========================================================
+PHASE 2 — DESIGN SYSTEM (TOKENS + COMPONENT RULES)
+===========================================================
+STEP 3: Establish a “Premium Agency” Design System
+Create or refine a consistent design system with tokens:
+A) Typography
+- Choose ONE font stack (or two max: display + body) that feels premium.
+- Define:
+  - font-family tokens
+  - font sizes (12/14/16/18/20/24/32/40)
+  - line heights
+  - font weights
+  - letter spacing
+- Define consistent heading styles:
+  - H1/H2/H3, section titles, card titles, labels, helper text
+
+B) Color System (Dark-luxury + neon-glass accents is OK, but must be tasteful)
+- Define:
+  - background layers (app bg, surface 1, surface 2)
+  - borders (subtle, consistent)
+  - text colors (primary, secondary, muted)
+  - brand accent(s)
+  - semantic colors (success/warn/error/info)
+  - chart palette (subtle, not clowny)
+- Ensure good contrast ratios.
+
+C) Spacing + Layout
+- Define spacing scale: 4/8/12/16/20/24/32/40/48/64
+- Define max widths for content sections
+- Define page header layout rules (title, description, actions)
+- Define consistent padding for cards/tables/modals
+
+D) Radii + Shadows
+- Define radii tokens: sm/md/lg
+- Define shadow tokens: subtle elevation only
+
+E) Motion
+- Subtle transitions only:
+  - hover transitions (150–200ms)
+  - modal open/close
+  - toasts
+- No flashy gimmicks.
+
+Deliverable:
+- src/lib/ui/tokens.ts (or Tailwind config tokens)
+- docs/DESIGN_SYSTEM_TOKENS.md
+
+STEP 4: Component Specs (Single Source of Truth)
+Create standardized component styles for:
+- Buttons (primary/secondary/ghost/destructive)
+- Inputs (default/focus/error/disabled)
+- Selects
+- Modals + Drawers (headers, footers, close button placement)
+- Cards (title spacing, divider rules)
+- Tables (striping, hover, header emphasis)
+- Badges/Chips
+- Toasts (consistent placement and styling)
+- Skeletons
+- Empty states (icon + title + helpful guidance + CTA)
+- Charts (axis label sizes, legend style)
+
+Deliverable:
+- docs/UI_COMPONENT_SPEC.md
+- Ensure components are used consistently across all pages.
+
+===========================================================
+PHASE 3 — PAGE-BY-PAGE DESIGN AUDIT + REBUILD POLISH
+===========================================================
+STEP 5: Public Marketing Pages (Premium Conversion)
+For each page ("/", "/pricing", "/demo", "/request-demo"):
+Audit and fix:
+- hero hierarchy, headline typography, spacing
+- CTA prominence and consistency
+- section rhythm (alternating surfaces)
+- trust signals (testimonials/stats)
+- footer polish
+- mobile layout
+- consistent button/link styles
+- no awkward line breaks or misaligned grids
+- ensure logo click always returns home
+
+Required upgrades:
+- tighten copy to be clear + premium
+- improve section structure
+- consistent “agency-built” look
+
+STEP 6: App Shell (Navigation + Layout)
+For app routes:
+- Left nav: spacing, active states, icons, hover states
+- Top header: consistent title + subtitle + action area
+- Page container width, padding, background layers
+- Breadcrumbs if needed
+- Ensure all pages feel like one cohesive product
+
+STEP 7: Settings Hub + Settings Pages
+Settings Hub:
+- card layout consistency
+- descriptions and microcopy
+- “locked” state design for CLIENT (should look intentional and premium)
+
+Services Page:
+- table/list spacing
+- modal typography and spacing
+- validation errors consistent and readable
+- reorder controls subtle and clear
+- empty state gorgeous
+- locked banner premium (not ugly)
+
+Hours Page:
+- grid alignment perfect
+- toggles and time inputs consistent with design system
+- inline errors consistent
+- save/revert placement consistent
+- disabled states clear but not ugly
+
+Branding/Domain/Notifications:
+- token/copy buttons clean
+- DNS instructions presented like a premium product
+- statuses use elegant badges
+- sensitive token visibility rules styled clearly
+
+STEP 8: Analytics + Leads (Business Owner “Money Feeling”)
+Analytics:
+- KPI cards premium: tight numbers, subtle labels
+- charts readable: axis labels, tooltips, legends
+- tables aligned, consistent fonts
+- date range selector premium
+
+Leads Inbox:
+- filters alignment perfect
+- table spacing and hover states premium
+- lead detail drawer spacing, typography
+- status buttons consistent
+- notes editor styled and usable
+- CSV export looks intentional (button, loading states)
+- HOT leads visually highlighted subtly (badge + row accent)
+
+STEP 9: Bots Pages + KB Management (If present)
+- Make bot list cards/table premium
+- Bot detail pages consistent header + actions
+- KB CRUD: editor spacing, markdown styling, preview formatting, empty states
+
+===========================================================
+PHASE 4 — WIDGET DESIGN (MUST LOOK EXPENSIVE ON ANY WEBSITE)
+===========================================================
+STEP 10: Chat Widget Premium Pass
+Widget requirements:
+- looks premium embedded anywhere
+- crisp typography and spacing
+- perfect message bubbles (padding, radii)
+- subtle shadow and border
+- smooth scroll behavior
+- input area premium: placeholder, focus ring, send button icon
+- booking directive UI: service buttons and booking link button must look premium
+- error states and loading states premium
+- mobile widget: safe area padding, correct sizing
+
+Also:
+- ensure brand settings apply cleanly without breaking layout
+- ensure color contrast stays readable for custom brand colors
+- ensure widget doesn’t look “template-y”
+
+===========================================================
+PHASE 5 — VISUAL QA AUTOMATION (SCREENSHOTS + REGRESSION)
+===========================================================
+STEP 11: Screenshot Every Route (Before/After)
+- Use Playwright to capture screenshots for:
+  - each public route
+  - each app route
+  - widget route (with booking flow states)
+- Store under:
+  - test-results/screenshots/before/*
+  - test-results/screenshots/after/*
+- Include:
+  - desktop viewport
+  - mobile viewport (e.g. 390x844)
+
+STEP 12: Visual Regression (Optional but preferred)
+- Add Playwright snapshot tests for key pages:
+  - home, pricing, app dashboard, services, hours, analytics, leads, widget
+- Keep thresholds small.
+- Only snapshot stable sections (avoid random data by seeding).
+
+===========================================================
+PHASE 6 — FINAL DESIGN AUDIT REPORT
+===========================================================
+STEP 13: Produce docs/DESIGN_AUDIT_REPORT.md
+Must include:
+- Design principles used
+- Token table (colors/typography/spacing/radii/shadows)
+- Page-by-page checklist with pass/fail notes
+- Before/after screenshot links
+- UX copy improvements summary
+- Known limitations / future polish ideas
+
+===========================================================
+QUALITY GATES
+Run and include outputs:
+- pnpm typecheck
+- pnpm test
+- pnpm test:e2e
+- pnpm build
+
+CONSTRAINTS
+- Keep core universal: no industry-specific visuals baked into the core.
+- Templates may change copy/hero examples, but the core layout and system must remain universal.
+- Do not ship any “half-polished” area. If a page exists, it must match the premium system.
+- If you find multiple styling systems (ad-hoc Tailwind in pages), refactor toward reusable components.
+
+START NOW:
+1) Generate the inventories
+2) Implement tokens + component system
+3) Apply polish page-by-page + widget
+4) Add screenshot automation
+5) Output the full Design Audit Report and evidence.

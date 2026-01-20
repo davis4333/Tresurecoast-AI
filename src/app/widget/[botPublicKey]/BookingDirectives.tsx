@@ -58,10 +58,10 @@ export function BookingDirectives({
   if (directiveType === "SHOW_SERVICE_PICKER" && services && services.length > 0) {
     return (
       <div
-        className="rounded-lg border border-white/10 bg-white/5 p-4"
+        className="tca-booking-container"
         data-testid="booking-service-picker"
       >
-        <p className="mb-3 text-sm text-white/90">Select a service:</p>
+        <p className="mb-4 text-sm font-medium tca-text-primary">Select a service:</p>
         <div className="flex flex-wrap gap-2">
           {services.map((service) => (
             <button
@@ -71,11 +71,11 @@ export function BookingDirectives({
               style={{
                 backgroundColor: headerBg,
               }}
-              className="rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+              className="tca-service-btn"
             >
               {service.name}
               {service.price !== null && service.price !== undefined && (
-                <span className="ml-2 opacity-75">
+                <span className="ml-1 opacity-90">
                   ${service.price}
                 </span>
               )}
@@ -89,7 +89,7 @@ export function BookingDirectives({
   if (directiveType === "SHOW_BOOKING_LINK" && bookingUrl) {
     return (
       <div
-        className="rounded-lg border border-white/10 bg-white/5 p-4"
+        className="tca-booking-container flex justify-center"
         data-testid="booking-link-container"
       >
         <a
@@ -101,7 +101,7 @@ export function BookingDirectives({
           style={{
             backgroundColor: headerBg,
           }}
-          className="inline-flex items-center gap-2 rounded-md px-6 py-3 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+          className="tca-booking-link"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -113,13 +113,14 @@ export function BookingDirectives({
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="flex-shrink-0"
           >
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
             <line x1="8" y1="2" x2="8" y2="6" />
             <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
-          Book Now
+          <span>Book Now</span>
         </a>
       </div>
     );
