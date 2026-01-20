@@ -30,6 +30,21 @@ export default function SettingsPage() {
           </TcaCard>
         </Link>
 
+        <Link href="/app/settings/hours" data-testid="link-settings-hours">
+          <TcaCard className="h-full hover:border-[var(--color-brand-primary)] transition-colors cursor-pointer">
+            <TcaCardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Business Hours</h3>
+              </div>
+            </TcaCardHeader>
+            <TcaCardBody>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                Set your weekly schedule so customers know when you&apos;re open.
+              </p>
+            </TcaCardBody>
+          </TcaCard>
+        </Link>
+
         <Link href="/app/settings/branding" data-testid="link-settings-branding">
           <TcaCard className="h-full hover:border-[var(--color-brand-primary)] transition-colors cursor-pointer">
             <TcaCardHeader>
