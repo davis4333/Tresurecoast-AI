@@ -1,0 +1,543 @@
+/**
+
+- Step 43: Booking Flow Runtime Orchestrator
+- Integrates Step 42 FSM into live chat runtime
+- 
+- This file bridges the pure FSM (Step 42) with the live chat system.
+- It handles state persistence, service loading, and directive generation.
+  */
+
+import type {
+BookingFlowState,
+LeadDraft,
+SelectedService,
+} from “./types”; // From Step 42
+import {
+validateName,
+validatePhone,
+validateEmail,
+} from “./validators”; // From Step 42
+import { prisma } from “@/lib/prisma”;
+
+/**
+
+- Persisted booking state (stored in Conversation.bookingState)
+  */
+  export interface BookingState {
+  fsmState: BookingFlowState;
+  selectedServiceId: string | null;
+  leadDraft: LeadDraft;
+  flowStartedAt: string | null; // ISO timestamp
+  lastUserMessageAt: string | null; // ISO timestamp
+  }
+
+/**
+
+- UI Directives for widget rendering
+  */
+  export interface BookingDirectives {
+  /** Service selection buttons */
+  service_buttons?: Array<{
+  serviceId: string;
+  label: string;
+  priceDisplay?: string;
+  }>;
+  /** What the bot says */
+  prompt: string;
+  /** Input mode hint for widget */
+  input_mode: “text” | “phone” | “email”;
+  /** Error message if validation failed */
+  error?: string;
+  }
+
+/**
+
+- Result of booking flow processing
+  */
+  export interface BookingFlowResult {
+  /** Updated booking state to persist */
+  updatedState: BookingState;
+  /** UI directives for widget */
+  directives: BookingDirectives;
+  /** Assistant message text (for backward compatibility) */
+  assistantText: string;
+  /** Whether state should be persisted to DB */
+  shouldPersist: boolean;
+  }
+
+/**
+
+- Booking intent keywords (from Step 42)
+  */
+  const BOOKING_INTENT_KEYWORDS = [
+  “book”,
+  “appointment”,
+  “schedule”,
+  “reserve”,
+  “how much”,
+  “price”,
+  “cost”,
+  “services”,
+  “service”,
+  “availability”,
+  “available”,
+  ] as const;
+
+/**
+
+- Check if message contains booking intent
+  */
+  function hasBookingIntent(text: string): boolean {
+  const normalized = text.toLowerCase().trim();
+  return BOOKING_INTENT_KEYWORDS.some((keyword) =>
+  normalized.includes(keyword)
+  );
+  }
+
+/**
+
+- Create initial booking state
+  */
+  export function createInitialBookingState(): BookingState {
+  return {
+  fsmState: “IDLE”,
+  selectedServiceId: null,
+  leadDraft: {},
+  flowStartedAt: null,
+  lastUserMessageAt: null,
+  };
+  }
+
+/**
+
+- Load active services for an organization
+  */
+  async function loadOrgServices(
+  organizationId: string
+  ): Promise<SelectedService[]> {
+  const services = await prisma.organizationService.findMany({
+  where: {
+  organizationId,
+  isActive: true,
+  },
+  select: {
+  id: true,
+  name: true,
+  price: true,
+  bookingUrl: true,
+  paymentUrl: true,
+  },
+  orderBy: {
+  displayOrder: “asc”,
+  },
+  });
+
+return services.map((s) => ({
+id: s.id,
+name: s.name,
+price: s.price,
+bookingUrl: s.bookingUrl,
+paymentUrl: s.paymentUrl,
+}));
+}
+
+/**
+
+- Main entry point: Maybe start booking flow
+- Called when IDLE and user message received
+  */
+  export async function maybeStartBookingFlow(params: {
+  messageText: string;
+  currentState: BookingState;
+  organizationId: string;
+  }): Promise<BookingFlowResult | null> {
+  const { messageText, currentState, organizationId } = params;
+
+// Only start if IDLE and booking intent detected
+if (currentState.fsmState !== “IDLE” || !hasBookingIntent(messageText)) {
+return null;
+}
+
+// Load services
+const services = await loadOrgServices(organizationId);
+
+if (services.length === 0) {
+return {
+updatedState: currentState, // Stay IDLE
+directives: {
+prompt:
+“I’d love to help you book, but no services are currently configured. Please contact the business directly.”,
+input_mode: “text”,
+error: “No services configured”,
+},
+assistantText:
+“I’d love to help you book, but no services are currently configured. Please contact the business directly.”,
+shouldPersist: false,
+};
+}
+
+// Transition to SERVICE_SELECTION
+const updatedState: BookingState = {
+fsmState: “SERVICE_SELECTION”,
+selectedServiceId: null,
+leadDraft: {},
+flowStartedAt: new Date().toISOString(),
+lastUserMessageAt: new Date().toISOString(),
+};
+
+return {
+updatedState,
+directives: {
+prompt: “Great! What service are you interested in?”,
+input_mode: “text”,
+service_buttons: services.map((s) => ({
+serviceId: s.id,
+label: s.name,
+priceDisplay: s.price ? `$${s.price}` : undefined,
+})),
+},
+assistantText: “Great! What service are you interested in?”,
+shouldPersist: true,
+};
+}
+
+/**
+
+- Handle booking flow input when flow is active (not IDLE)
+  */
+  export async function handleBookingInput(params: {
+  payload: {
+  text?: string;
+  kind?: “service_select” | “text”;
+  serviceId?: string;
+  };
+  currentState: BookingState;
+  organizationId: string;
+  }): Promise<BookingFlowResult> {
+  const { payload, currentState, organizationId } = params;
+  const { fsmState } = currentState;
+
+// Update last message time
+const lastUserMessageAt = new Date().toISOString();
+
+// Handle each state
+switch (fsmState) {
+case “SERVICE_SELECTION”:
+return handleServiceSelection({
+payload,
+currentState: { …currentState, lastUserMessageAt },
+organizationId,
+});
+
+```
+case "LEAD_NAME":
+  return handleLeadName({
+    payload,
+    currentState: { ...currentState, lastUserMessageAt },
+  });
+
+case "LEAD_PHONE":
+  return handleLeadPhone({
+    payload,
+    currentState: { ...currentState, lastUserMessageAt },
+  });
+
+case "LEAD_EMAIL":
+  return handleLeadEmail({
+    payload,
+    currentState: { ...currentState, lastUserMessageAt },
+    organizationId,
+  });
+
+case "COMPLETE":
+  // Reset to IDLE for next booking
+  return {
+    updatedState: createInitialBookingState(),
+    directives: {
+      prompt: "Is there anything else I can help you with?",
+      input_mode: "text",
+    },
+    assistantText: "Is there anything else I can help you with?",
+    shouldPersist: true,
+  };
+
+default:
+  // Should never happen, but safety fallback
+  return {
+    updatedState: createInitialBookingState(),
+    directives: {
+      prompt: "Something went wrong. Let's start over.",
+      input_mode: "text",
+      error: `Unknown state: ${fsmState}`,
+    },
+    assistantText: "Something went wrong. Let's start over.",
+    shouldPersist: true,
+  };
+```
+
+}
+}
+
+/**
+
+- Handle SERVICE_SELECTION state
+  */
+  async function handleServiceSelection(params: {
+  payload: { text?: string; kind?: string; serviceId?: string };
+  currentState: BookingState;
+  organizationId: string;
+  }): Promise<BookingFlowResult> {
+  const { payload, currentState, organizationId } = params;
+
+// Load services to validate selection
+const services = await loadOrgServices(organizationId);
+
+// Try to find selected service
+let selectedService: SelectedService | undefined;
+
+// Priority 1: Explicit serviceId from button click
+if (payload.kind === “service_select” && payload.serviceId) {
+selectedService = services.find((s) => s.id === payload.serviceId);
+}
+
+// Priority 2: Text matching service name or ID
+if (!selectedService && payload.text) {
+const normalized = payload.text.toLowerCase().trim();
+selectedService = services.find(
+(s) =>
+s.id === normalized ||
+s.name.toLowerCase().includes(normalized) ||
+normalized.includes(s.name.toLowerCase())
+);
+}
+
+if (!selectedService) {
+return {
+updatedState: currentState,
+directives: {
+prompt: “I didn’t catch that. Please choose one of these services:”,
+input_mode: “text”,
+error: “Invalid service selection”,
+service_buttons: services.map((s) => ({
+serviceId: s.id,
+label: s.name,
+priceDisplay: s.price ? `$${s.price}` : undefined,
+})),
+},
+assistantText:
+“I didn’t catch that. Please choose one of these services.”,
+shouldPersist: false,
+};
+}
+
+// Valid selection! Move to LEAD_NAME
+const updatedState: BookingState = {
+…currentState,
+fsmState: “LEAD_NAME”,
+selectedServiceId: selectedService.id,
+};
+
+return {
+updatedState,
+directives: {
+prompt: `Perfect! I've got you down for ${selectedService.name}. What's your name?`,
+input_mode: “text”,
+},
+assistantText: `Perfect! I've got you down for ${selectedService.name}. What's your name?`,
+shouldPersist: true,
+};
+}
+
+/**
+
+- Handle LEAD_NAME state
+  */
+  function handleLeadName(params: {
+  payload: { text?: string };
+  currentState: BookingState;
+  }): BookingFlowResult {
+  const { payload, currentState } = params;
+
+if (!payload.text) {
+return {
+updatedState: currentState,
+directives: {
+prompt: “What’s your name?”,
+input_mode: “text”,
+error: “Please enter your name”,
+},
+assistantText: “What’s your name?”,
+shouldPersist: false,
+};
+}
+
+const validation = validateName(payload.text);
+
+if (!validation.isValid) {
+return {
+updatedState: currentState,
+directives: {
+prompt: validation.error || “Please enter a valid name.”,
+input_mode: “text”,
+error: validation.error,
+},
+assistantText: validation.error || “Please enter a valid name.”,
+shouldPersist: false,
+};
+}
+
+// Valid name! Move to LEAD_PHONE
+const updatedState: BookingState = {
+…currentState,
+fsmState: “LEAD_PHONE”,
+leadDraft: {
+…currentState.leadDraft,
+name: validation.value,
+},
+};
+
+return {
+updatedState,
+directives: {
+prompt: `Thanks, ${validation.value}! What's the best phone number to reach you?`,
+input_mode: “phone”,
+},
+assistantText: `Thanks, ${validation.value}! What's the best phone number to reach you?`,
+shouldPersist: true,
+};
+}
+
+/**
+
+- Handle LEAD_PHONE state
+  */
+  function handleLeadPhone(params: {
+  payload: { text?: string };
+  currentState: BookingState;
+  }): BookingFlowResult {
+  const { payload, currentState } = params;
+
+if (!payload.text) {
+return {
+updatedState: currentState,
+directives: {
+prompt: “What’s your phone number?”,
+input_mode: “phone”,
+error: “Please enter your phone number”,
+},
+assistantText: “What’s your phone number?”,
+shouldPersist: false,
+};
+}
+
+const validation = validatePhone(payload.text);
+
+if (!validation.isValid) {
+return {
+updatedState: currentState,
+directives: {
+prompt: validation.error || “Please enter a valid phone number.”,
+input_mode: “phone”,
+error: validation.error,
+},
+assistantText: validation.error || “Please enter a valid phone number.”,
+shouldPersist: false,
+};
+}
+
+// Valid phone! Move to LEAD_EMAIL
+const updatedState: BookingState = {
+…currentState,
+fsmState: “LEAD_EMAIL”,
+leadDraft: {
+…currentState.leadDraft,
+phone: validation.value,
+},
+};
+
+return {
+updatedState,
+directives: {
+prompt: “Great! And what’s your email address?”,
+input_mode: “email”,
+},
+assistantText: “Great! And what’s your email address?”,
+shouldPersist: true,
+};
+}
+
+/**
+
+- Handle LEAD_EMAIL state (final step before COMPLETE)
+  */
+  async function handleLeadEmail(params: {
+  payload: { text?: string };
+  currentState: BookingState;
+  organizationId: string;
+  }): Promise<BookingFlowResult> {
+  const { payload, currentState, organizationId } = params;
+
+if (!payload.text) {
+return {
+updatedState: currentState,
+directives: {
+prompt: “What’s your email address?”,
+input_mode: “email”,
+error: “Please enter your email address”,
+},
+assistantText: “What’s your email address?”,
+shouldPersist: false,
+};
+}
+
+const validation = validateEmail(payload.text);
+
+if (!validation.isValid) {
+return {
+updatedState: currentState,
+directives: {
+prompt: validation.error || “Please enter a valid email address.”,
+input_mode: “email”,
+error: validation.error,
+},
+assistantText:
+validation.error || “Please enter a valid email address.”,
+shouldPersist: false,
+};
+}
+
+// Valid email! Get service info for final message
+const service = await prisma.organizationService.findUnique({
+where: { id: currentState.selectedServiceId! },
+select: { name: true, bookingUrl: true, paymentUrl: true },
+});
+
+const bookingUrl = service?.bookingUrl || service?.paymentUrl;
+
+// Move to COMPLETE
+const updatedState: BookingState = {
+…currentState,
+fsmState: “COMPLETE”,
+leadDraft: {
+…currentState.leadDraft,
+email: validation.value,
+},
+};
+
+// Step 43: Just reach COMPLETE state
+// Step 44 will handle actual lead creation + booking link click tracking
+const prompt = bookingUrl
+? `Perfect! Here's your booking link for ${service?.name}:`
+: `Thanks, ${currentState.leadDraft.name}! I've saved your information. Someone will contact you soon at ${validation.value} to complete your ${service?.name} booking.`;
+
+return {
+updatedState,
+directives: {
+prompt,
+input_mode: “text”,
+// Step 44 will add: booking_link directive with URL + click tracking
+},
+assistantText: prompt,
+shouldPersist: true,
+};
+}
