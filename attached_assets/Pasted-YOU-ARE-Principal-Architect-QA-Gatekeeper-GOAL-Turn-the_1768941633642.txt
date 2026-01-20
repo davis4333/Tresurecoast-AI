@@ -1,0 +1,86 @@
+YOU ARE: Principal Architect + QA Gatekeeper.
+
+GOAL
+Turn the current test suite into a true “ship gate” with a single command we can run before demos/launch that proves:
+- schema + migrations OK
+- types OK
+- unit tests OK
+- E2E smoke/security OK
+- visual regression OK
+- full E2E OK
+- production build OK
+
+CONSTRAINTS
+- Do NOT refactor unrelated code.
+- Keep changes minimal and consistent with existing patterns.
+- If any script already exists, do not duplicate; update in-place.
+- Use pnpm (not npm) unless a script already uses npm.
+- After changes, run commands in the exact order below and paste outputs into a QA Evidence Report.
+
+STEP A — UPDATE package.json (REQUIRED)
+1) Open package.json and add/merge these scripts EXACTLY:
+
+"test": "vitest run",
+"test:e2e:smoke": "playwright test --project=smoke",
+"test:e2e:security": "playwright test --project=security",
+"test:e2e:visual": "playwright test --project=visual",
+"test:e2e:full": "playwright test --project=chromium",
+"qa:gates": "pnpm prisma generate && pnpm prisma migrate status && pnpm typecheck && pnpm test && pnpm test:e2e:smoke && pnpm test:e2e:security",
+"qa:ship": "pnpm qa:gates && pnpm test:e2e:visual && pnpm test:e2e:full && pnpm build"
+
+2) If there are existing scripts with the same names, update them to match the above.
+3) Save package.json.
+
+STEP B — ADD SHIP CHECKLIST DOC (1 FILE)
+Create SHIP_CHECKLIST.md with a short, strict checklist:
+- Ship only if `pnpm qa:ship` passes with 0 failures.
+- Visual suite must have no unexpected diffs.
+- Security suite must pass.
+- Confirm DEV_BYPASS_AUTH is disabled in production.
+- Env validation runs at boot (no missing vars).
+
+Keep it concise and binary.
+
+STEP C — RUN THE SHIP GATES (COMMANDS)
+Run these commands in this EXACT order and capture the outputs:
+
+1) pnpm -v
+2) pnpm prisma generate
+3) pnpm prisma migrate status
+4) pnpm typecheck
+5) pnpm test
+6) pnpm test:e2e:smoke
+7) pnpm test:e2e:security
+8) pnpm test:e2e:visual
+9) pnpm test:e2e:full
+10) pnpm build
+11) pnpm qa:gates
+12) pnpm qa:ship
+
+If any step fails:
+- STOP
+- Fix only what is necessary
+- Re-run from the failed step onward
+- Then re-run `pnpm qa:ship` at the end
+
+STEP D — OUTPUT: QA EVIDENCE REPORT (MANDATORY)
+Return a single “QA Evidence Report” that includes:
+
+1) Files Changed (list them)
+2) package.json scripts block (paste the final scripts section)
+3) Command outputs (paste outputs for each command 1–12 above)
+4) Summary table:
+   - Typecheck: PASS/FAIL
+   - Unit tests: PASS/FAIL (count)
+   - E2E smoke: PASS/FAIL
+   - E2E security: PASS/FAIL
+   - E2E visual: PASS/FAIL (diffs? yes/no)
+   - E2E full: PASS/FAIL
+   - Build: PASS/FAIL
+5) If visual diffs exist:
+   - Attach which pages/components changed
+   - Confirm if changes are expected or regressions
+   - If regression, fix and re-run visual + qa:ship
+
+DO NOT add extra “nice-to-have” work. Only do what’s needed for the ship gate and evidence.
+START NOW.

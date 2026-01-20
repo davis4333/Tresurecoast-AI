@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { TcaCard, TcaCardBody, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaBadge } from "@/components/tca/TcaBadge";
-import { Briefcase, Clock, Palette, Bell, User, Plug, CreditCard, Key, Wrench } from "lucide-react";
+import { Briefcase, Clock, Palette, Bell, User, Plug, CreditCard, Key, Wrench, RotateCcw } from "lucide-react";
 
 export default function SettingsPage() {
   return (
@@ -101,6 +101,24 @@ export default function SettingsPage() {
             <TcaCardBody>
               <p className="text-sm text-[var(--color-text-secondary)]">
                 Configure email alerts for hot leads and booking clicks.
+              </p>
+            </TcaCardBody>
+          </TcaCard>
+        </Link>
+
+        <Link href="/app/settings/demo" data-testid="settings-demo-link" className="group">
+          <TcaCard className="h-full transition-all duration-200 hover:border-red-500/50 hover:shadow-md cursor-pointer border-red-500/20">
+            <TcaCardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10 transition-transform duration-200 group-hover:scale-105">
+                  <RotateCcw className="h-5 w-5 text-red-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Demo Reset</h3>
+              </div>
+            </TcaCardHeader>
+            <TcaCardBody>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                Reset demo data before prospect demonstrations (Owner only).
               </p>
             </TcaCardBody>
           </TcaCard>

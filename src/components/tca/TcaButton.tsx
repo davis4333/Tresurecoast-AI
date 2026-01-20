@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cx } from "./tca";
 
-type Variant = "primary" | "secondary" | "ghost" | "outline";
+type Variant = "primary" | "secondary" | "ghost" | "outline" | "destructive";
 type Size = "sm" | "md" | "lg";
 
 export type TcaButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -36,6 +36,8 @@ export function TcaButton({
       "bg-transparent text-[var(--color-text-primary)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]",
     ghost:
       "bg-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]",
+    destructive:
+      "bg-red-600 text-white shadow-sm hover:bg-red-700 hover:shadow-lg hover:shadow-red-600/25 hover:-translate-y-0.5 active:translate-y-0",
   };
 
   return (

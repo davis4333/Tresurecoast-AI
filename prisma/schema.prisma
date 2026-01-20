@@ -16,6 +16,7 @@ enum AuditAction {
   LEAD_CREATED
   ROUTE_LINK_UPDATED
   DOMAIN_ALLOWLIST_UPDATED
+  DEMO_RESET
 }
 
 enum BotStatus {
