@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "DataEventType" ADD VALUE 'BOOKING_FLOW_EVENT';

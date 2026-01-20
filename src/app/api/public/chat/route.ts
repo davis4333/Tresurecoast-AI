@@ -6,6 +6,8 @@ import { runTruthEngine, type BotLinkData } from "@/lib/truth/truthEngine";
 import { detectTopic } from "@/lib/public/topicDetect";
 import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } from "@/lib/public/hostPolicy";
 import { retrieve, formatCitedAnswer } from "@/lib/truthMode/retrieve";
+import { processBookingFlow } from "@/lib/booking/runtime";
+import { BookingFlowState, ResponseDirectiveType } from "@/lib/booking/types";
 
 export const runtime = "nodejs";
 
@@ -146,6 +148,50 @@ export async function POST(req: Request) {
         content: message,
       },
     });
+
+    const bookingResult = await processBookingFlow({
+      organizationId: bot.organizationId,
+      conversationId: conversation.id,
+      conversationPublicId: conversation.publicId,
+      botId: bot.id,
+      workspaceId: bot.workspaceId,
+      userMessage: message,
+    });
+
+    if (bookingResult.handled) {
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          role: "assistant",
+          content: bookingResult.reply,
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        conversationPublicId: conversation.publicId,
+        reply: bookingResult.reply,
+        intent: "BOOKING_FLOW",
+        confidence: 1.0,
+        sourcedFrom: ["booking_flow"],
+        requiresLeadCapture: false,
+        missingFields: [],
+        topic: "BOOKING",
+        suggestedActions: bookingResult.bookingUrl
+          ? [{ type: "book", label: "Book Now", url: bookingResult.bookingUrl }]
+          : [],
+        externalRedirectUrl: bookingResult.bookingUrl ?? null,
+        usedKnowledgeBase: false,
+        knowledgeSources: [],
+        bookingFlow: {
+          state: bookingResult.state,
+          directiveType: bookingResult.directiveType,
+          services: bookingResult.services,
+          leadCreated: bookingResult.leadCreated,
+          leadId: bookingResult.leadId,
+        },
+      });
+    }
 
     const topicResult = detectTopic(message);
 

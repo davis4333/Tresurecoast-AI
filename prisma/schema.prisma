@@ -45,6 +45,7 @@ enum DataEventType {
   LEAD_CAPTURE_TRIGGERED
   REDIRECT_CLICK
   LEAD_SCORED
+  BOOKING_FLOW_EVENT
 }
 
 enum LeadTemperature {
