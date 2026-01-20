@@ -1,0 +1,192 @@
+Good. Step 38 is the right foundation and the QA proof you pasted hits the important stuff (RBAC, isolation, duplicates, gates). Now the best next move isn’t hours yet.
+
+Best next move: Step 39 = Client Settings UI for Services (must-have)
+
+If businesses don’t have a dead-simple way to manage their service menu + booking/payment links, the “must have” feeling dies. The booking flow and analytics depend on services being real and maintained.
+
+Hours can follow right after, but Services UI unlocks revenue (booking links + lead capture routing).
+
+Below is the exact prompt to send Replit for Step 39.
+
+⸻
+
+REPLIT PROMPT — STEP 39 (CLIENT SETTINGS UI: SERVICES)
+
+TITLE: Step 39 — Services Editor UI (Org-Level) + AllowClientEdits Gate + UX Polish + QA Evidence
+
+ROLE
+
+You are the Senior Frontend Engineer + QA Gatekeeper. Build a premium, business-owner-friendly UI for managing organization services. Follow existing UI patterns (shadcn/ui + Tailwind + app routing conventions). No new design system.
+
+⸻
+
+OBJECTIVE
+
+Create a Services Editor inside the client-facing settings area so owners/admins (and clients only if allowed) can manage:
+	•	service name
+	•	price (optional)
+	•	booking URL (optional)
+	•	payment URL (optional)
+	•	active toggle
+	•	display order (reorder)
+
+This UI must call the Step 38 API:
+/api/org/settings/services (GET/POST/PUT/DELETE)
+
+⸻
+
+NON-NEGOTIABLE RULES
+	1.	Respect RBAC in UI
+	•	If user cannot edit (CLIENT and allowClientEdits=false), show read-only mode with a locked banner.
+	•	Never show destructive actions (add/edit/delete/reorder) when read-only.
+	2.	No trust-the-client
+	•	UI gating is for UX; API still enforces RBAC. Handle 403 gracefully.
+	3.	Premium UX
+	•	Clean layout, crisp spacing, empty states, inline validation, “saved” feedback, skeleton loading, toasts.
+	4.	Small and testable
+	•	Add unit tests for validation helpers.
+	•	Add at least one E2E test proving create/edit/delete works for OWNER and is blocked for CLIENT when allowClientEdits=false.
+
+⸻
+
+SCOPE
+
+A) UI LOCATION
+
+Add a new section/page consistent with existing app structure.
+Preferred:
+	•	src/app/app/settings/services/page.tsx
+OR
+	•	integrate into existing settings area if there is already a “Branding” settings page pattern (copy layout style).
+
+Include navigation entry if settings nav exists.
+
+⸻
+
+B) UI BEHAVIOR (REQUIRED)
+
+1) Load
+
+On page load:
+	•	GET /api/org/settings/services
+	•	Render list ordered by displayOrder asc, id asc
+
+2) Empty State
+
+If no services:
+	•	Show friendly empty state:
+	•	title: “Add your first service”
+	•	short explanation: services power booking links and lead capture
+	•	CTA button (if editable): “Add service”
+
+3) Service Row (Card or Table)
+
+Each service shows:
+	•	Name
+	•	Price (formatted dollars if priceCents)
+	•	Booking URL + Payment URL (truncate + copy button)
+	•	Active badge (Active / Hidden)
+	•	Actions:
+	•	Edit
+	•	Delete (confirm modal)
+	•	Reorder (drag handle OR up/down buttons)
+
+4) Add/Edit Modal (or side panel)
+
+Form fields:
+	•	Name (required)
+	•	Price (optional, dollars input -> convert to priceCents int)
+	•	Booking URL (optional)
+	•	Payment URL (optional)
+	•	Active toggle
+	•	Display order (hidden if you implement reorder UI)
+
+Validation:
+	•	Match server constraints (name length, url validation)
+	•	Show inline errors
+	•	Disable submit while saving
+	•	Success toast: “Service saved”
+	•	Error toast:
+	•	409 => “That service name already exists”
+	•	403 => “Edits are locked by the agency”
+	•	default => “Something went wrong”
+
+5) Reorder
+
+Implement reorder via:
+	•	Up/down buttons per row (simplest and reliable)
+	•	When moved, update displayOrder via PUT for affected rows.
+	•	Make it robust: keep displayOrder compact (0..n-1) after reorder.
+
+⸻
+
+C) RBAC GATING (REQUIRED)
+
+We need to know whether editing is allowed.
+
+Implement a lightweight way to get allowClientEdits:
+Option 1 (preferred): update GET /api/org/settings/services response to include:
+
+{ "ok": true, "services": [...], "permissions": { "canEdit": boolean, "allowClientEdits": boolean, "role": "..." } }
+
+If you do this, add unit tests to ensure CLIENT sees canEdit=false when allowClientEdits=false.
+
+Option 2: if you don’t want to change Step 38 API shape, create a small endpoint:
+	•	GET /api/org/settings/permissions returning { allowClientEdits, role, canEditServices }
+
+Choose the least invasive approach consistent with existing codebase.
+
+⸻
+
+D) TESTING REQUIREMENTS
+
+Unit tests
+	•	validation helpers: dollars -> cents conversion, url normalization/trimming
+	•	reorder function produces correct displayOrder sequence
+
+E2E tests (Playwright)
+	1.	OWNER:
+
+	•	visits services settings
+	•	creates service
+	•	edits service name
+	•	deletes service
+Expected: success toasts + list updates
+
+	2.	CLIENT with allowClientEdits=false:
+
+	•	visits services settings
+Expected: “locked” banner + no add/edit/delete controls
+Optional: attempt direct action returns toast from 403
+
+⸻
+
+E) QUALITY GATES + QA EVIDENCE REPORT
+
+Run and paste outputs:
+	1.	pnpm typecheck
+	2.	pnpm vitest run
+	3.	pnpm test:e2e
+	4.	pnpm build
+
+QA Evidence Report must include:
+	•	page path + components created
+	•	screenshot-like textual description of UI states (loading/empty/filled/locked)
+	•	proof of RBAC gating (client locked)
+	•	proof reorder updates displayOrder
+	•	failing cases handled (409/403)
+
+Commit message:
+Step 39: services settings UI with RBAC gating and reorder
+
+STOP after Step 39. Do not start Hours until this is merged and green.
+
+⸻
+
+What comes right after Step 39 (so you know the plan)
+
+Step 40 = Org Hours model + API (same RBAC)
+Step 41 = Hours UI
+Then Booking Flow state machine (service selection → lead capture → correct booking link).
+
+If you want the “multi-million dollar” feel fastest, Step 39 is the move.

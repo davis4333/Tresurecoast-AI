@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { TcaCard, TcaCardBody, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaBadge } from "@/components/tca/TcaBadge";
 
@@ -14,9 +15,39 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <Link href="/app/settings/services" data-testid="link-settings-services">
+          <TcaCard className="h-full hover:border-[var(--color-brand-primary)] transition-colors cursor-pointer">
+            <TcaCardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Services</h3>
+              </div>
+            </TcaCardHeader>
+            <TcaCardBody>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                Manage your service menu with prices, booking links, and payment URLs.
+              </p>
+            </TcaCardBody>
+          </TcaCard>
+        </Link>
+
+        <Link href="/app/settings/branding" data-testid="link-settings-branding">
+          <TcaCard className="h-full hover:border-[var(--color-brand-primary)] transition-colors cursor-pointer">
+            <TcaCardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Branding</h3>
+              </div>
+            </TcaCardHeader>
+            <TcaCardBody>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                Customize your white-label branding, colors, and custom domain.
+              </p>
+            </TcaCardBody>
+          </TcaCard>
+        </Link>
+
         <TcaCard>
           <TcaCardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Account</h3>
               <TcaBadge>Coming Soon</TcaBadge>
             </div>

@@ -31,6 +31,14 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const org = await prisma.organization.findUnique({
+      where: { id: ctx.org.id },
+      select: { allowClientEdits: true },
+    });
+
+    const allowClientEdits = org?.allowClientEdits ?? false;
+    const canEdit = canEditServices(ctx.role, allowClientEdits);
+
     const services = await prisma.organizationService.findMany({
       where: { organizationId: ctx.org.id },
       orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
@@ -47,7 +55,15 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ ok: true, services });
+    return NextResponse.json({
+      ok: true,
+      services,
+      permissions: {
+        canEdit,
+        allowClientEdits,
+        role: ctx.role,
+      },
+    });
   } catch (error) {
     console.error("[API] GET /api/org/settings/services error:", error);
     return NextResponse.json(
