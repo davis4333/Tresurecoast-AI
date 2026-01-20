@@ -62,6 +62,27 @@ Preferred communication style: Simple, everyday language.
 - **Functionality**: Placeholder replacement, generation of starter knowledge, and default settings.
 - **Integration**: Used in onboarding and client creation for quick setup.
 
+### Knowledge Base Management
+- **Location**: `/app/kb` - Full CRUD interface for managing bot knowledge sources
+- **API**: `/api/org/bots/[botPublicKey]/knowledge` with GET/POST and [sourceId] GET/PUT/DELETE
+- **Features**: Title/content editing, content hash deduplication, template source prefixing
+
+### Revenue Attribution & Analytics
+- **averageOrderValue**: Optional field on Organization for revenue calculations
+- **Analytics API**: Enhanced with revenueInfluencedCents, hotLeadsCount, conversionRate
+- **Dashboard**: RevenueMetricsCard displays revenue influenced, hot leads, conversion rate
+- **Topic Analytics**: Top topics breakdown already shown in analytics page
+
+### Lead Export
+- **Endpoint**: `/api/org/leads/export` - CSV export with all filters
+- **Features**: Max 5000 rows, proper CSV escaping, same filters as leads list
+- **UI**: Export button on leads page with current filter state
+
+### Setup Progress Tracking
+- **Evaluator**: 12 checkpoints across 4 categories (basics/content/engagement/advanced)
+- **API**: `/api/org/setup-status` returns progress and next action
+- **UI**: SetupStatusCard with visual progress ring on dashboard
+
 ### Key Design Decisions
 - Clear separation between public and internal APIs.
 - Consistent UUID validation.
