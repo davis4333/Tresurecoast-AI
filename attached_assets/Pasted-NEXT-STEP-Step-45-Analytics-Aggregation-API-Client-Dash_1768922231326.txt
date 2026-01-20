@@ -1,0 +1,54 @@
+NEXT STEP: Step 45 — Analytics Aggregation API + Client Dashboard v1 (must be client-friendly, fast, and tenant-safe)
+
+GOAL
+Expose clean, org-scoped analytics that prove ROI:
+- Leads over time
+- Booking link clicks over time
+- Clicks by service
+- Funnel counts: service_selected → lead_created → link_shown → link_clicked
+- Top topics/questions (if DataEvents already capture topics)
+
+NON-NEGOTIABLES
+1) Tenant isolation: all queries must be scoped to ctx.org.id from getOrgContext()
+2) RBAC:
+   - OWNER/ADMIN always
+   - CLIENT only if allowClientEdits=true OR (better) separate allowClientAnalytics=true flag (your call; choose safest)
+3) Performance:
+   - Add DB indexes needed for aggregation
+   - Use date bucketing (daily) and limit ranges (default 30 days; max 365)
+4) Correctness:
+   - Funnel counts must be unique per conversation where appropriate (avoid double-counting)
+   - Service breakdown must join to OrganizationService safely
+5) Security:
+   - Validate query params (date range, timezone optional)
+   - No leaking service tokens/verification tokens/etc.
+
+DELIVERABLES
+A) API: /api/org/analytics/overview (GET)
+Return JSON:
+{
+  ok: true,
+  range: { start, end },
+  funnel: { serviceSelected, leadCreated, linkShown, linkClicked },
+  leadsByDay: [{ date, count }],
+  clicksByDay: [{ date, count }],
+  clicksByService: [{ serviceId, serviceName, clicks }],
+  topTopics: [{ topic, count }] // if available
+}
+
+B) API: /api/org/analytics/leads (GET) optional (if you want modular)
+C) UI: /app/analytics (Dashboard v1)
+- KPIs at top (last 30 days): leads, clicks, conversion %
+- Simple charts (no overdesign, but clean)
+- Table for clicks by service
+- Date range selector (7/30/90) minimal
+
+QUALITY GATES / QA EVIDENCE REQUIRED
+- Unit tests for aggregation correctness + tenant isolation + RBAC
+- E2E test: dashboard loads and shows non-empty KPIs for seeded data
+- pnpm typecheck, pnpm build, pnpm test, pnpm test:e2e all pass
+- Provide sample JSON response + screenshot of dashboard
+- Provide proof indexes exist (Prisma schema/migration snippet)
+
+DO NOT TOUCH
+Booking flow runtime logic unless a test proves a bug. Keep Step 44 stable.
