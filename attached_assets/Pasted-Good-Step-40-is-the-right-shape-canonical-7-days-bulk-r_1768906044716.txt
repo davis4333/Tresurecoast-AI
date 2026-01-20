@@ -1,0 +1,172 @@
+Good. Step 40 is the right shape (canonical 7 days + bulk replace + RBAC). If those gates are genuinely green, you’re in the “real product” zone.
+
+Next best move: Step 41 — Hours Editor UI (client-facing, RBAC-aware, premium UX)
+
+Why this is the next domino:
+	•	You now have the backend + validation. Without UI, clients can’t self-serve, and you can’t sell “set it and forget it.”
+	•	This is also the foundation for the booking/lead flow to answer “Are you open?” and “When can I come in?” cleanly.
+
+Below is the exact prompt to paste into Replit to build Step 41 to the same standard as Step 39.
+
+⸻
+
+REPLIT PROMPT — STEP 41 (HOURS EDITOR UI)
+
+TITLE: Step 41 — Organization Hours Editor UI (Premium UX + RBAC gating + E2E + Unit tests)
+
+ROLE
+
+Act as Senior Frontend Engineer + QA Gatekeeper. Implement a polished Hours Editor UI at /app/settings/hours that uses the Step 40 API and matches the Services UI quality (Step 39): skeletons, empty/loading handling, toasts, locked state, and thorough tests.
+
+⸻
+
+GOALS
+	1.	Add a new settings page: /app/settings/hours
+	2.	Render a weekly grid for all 7 days (0–6, Sunday–Saturday)
+	3.	Allow editing:
+	•	Toggle Open/Closed per day
+	•	Edit open/close times (24h HH:MM)
+	4.	Enforce RBAC visually and functionally:
+	•	If API says permissions.canEdit=false → UI is read-only + locked banner
+	•	If editable → Save works (PUT bulk replace)
+	5.	Strong UX:
+	•	Client-friendly
+	•	No janky time parsing bugs
+	•	Prevent invalid saves (open >= close, missing times, bad format)
+	6.	Add new tests:
+	•	Unit tests for helpers
+	•	E2E tests for the full UI flow
+
+⸻
+
+NON-NEGOTIABLE UX REQUIREMENTS
+	•	Always show all 7 days in the same order (Sunday → Saturday).
+	•	If locked:
+	•	Show a clear banner: “Editing is disabled by your agency.”
+	•	Disable inputs + Save button.
+	•	If editable:
+	•	Inline validation messages under the row (per day).
+	•	Save button disabled until changes exist and form is valid.
+	•	Must have:
+	•	Loading skeleton (like Step 39)
+	•	Success + error toasts
+	•	“Revert changes” button (or “Reset”) once dirty (optional but preferred)
+
+⸻
+
+API CONTRACT (Use Step 40 exactly)
+	•	GET /api/org/settings/hours returns:
+
+{
+  "ok": true,
+  "hours": [{ "dayOfWeek": 0, "isClosed": false, "openTime": "09:00", "closeTime": "17:00" }, ...],
+  "permissions": { "canEdit": true/false, "role": "...", "allowClientEdits": true/false }
+}
+
+	•	PUT /api/org/settings/hours accepts:
+
+{ "hours": [7 items...] }
+
+
+⸻
+
+FILES / IMPLEMENTATION
+
+A) Page + Component
+
+Create:
+	•	src/app/app/settings/hours/page.tsx (or consistent route structure with your app)
+	•	src/app/app/settings/hours/HoursEditor.tsx (client component)
+
+Use same UI primitives as Step 39 (shadcn/ui etc), same toast system, same page shell.
+
+B) Shared helpers
+
+Create:
+	•	src/lib/settings/hoursHelpers.ts
+Functions:
+	•	dayLabel(dayOfWeek): string → Sunday…Saturday
+	•	isValidTime("HH:MM")
+	•	compareTimes(a,b) and validateDayRow(day) returning error strings
+	•	normalizeHours(hoursFromApi) → ensures exactly 7 days in correct order
+
+C) Behavior rules
+	•	Row editing:
+	•	When “Closed” toggled ON → clear times and disable time inputs
+	•	When “Closed” toggled OFF → default times to 09:00–17:00 if empty
+	•	Save:
+	•	PUT the full 7-day payload
+	•	On success: update local baseline, clear dirty state, toast success
+	•	On fail: toast with API error message
+
+D) Settings hub link
+
+Add a link card to Hours in your Settings hub (where Services is linked now).
+
+⸻
+
+TESTING REQUIREMENTS
+
+Unit tests
+
+Create:
+	•	tests/unit/hoursHelpers.test.ts
+Cover:
+	•	dayLabel mapping
+	•	time validation
+	•	open < close validation
+	•	closed-day validation rules
+	•	normalizeHours returns 7 ordered days
+
+E2E tests (Playwright)
+
+Create:
+	•	tests/e2e/hours-settings.spec.ts
+Cover:
+
+	1.	OWNER can load hours page and see 7 rows
+	2.	OWNER can toggle a day closed, save, reload, persists
+	3.	OWNER invalid time (close < open) blocks save + shows error
+	4.	CLIENT locked state shows banner + inputs disabled when allowClientEdits=false
+	5.	CLIENT editable state works when allowClientEdits=true (if you have existing RBAC test utilities)
+
+All tests must pass.
+
+⸻
+
+QUALITY GATES + QA EVIDENCE REPORT
+
+Run and paste results:
+	•	pnpm typecheck
+	•	pnpm vitest run
+	•	pnpm test:e2e
+	•	pnpm build
+
+Evidence report must include:
+	•	Screenshot/DOM proof: 7-day grid renders
+	•	Locked banner proof for CLIENT
+	•	Save + persistence proof for OWNER
+	•	Failing validation proof (open >= close) blocks save
+	•	Final test counts + build success
+
+Commit:
+Step 41: hours settings UI with RBAC gating and tests
+
+STOP after Step 41.
+
+⸻
+
+What comes immediately after Step 41 (so you’re not guessing)
+
+Step 41.5 — Contact Info Editor (org-level)
+Then we go straight into the “must-have” money flow:
+
+Step 42–44: Booking State Machine
+	•	deterministic service selection buttons
+	•	lead capture
+	•	correct booking/payment URL output
+	•	click tracking
+
+That’s where the platform starts feeling like “clients log in and it just works.”
+
+If you want, paste the Step 41 QA report when Replit finishes and I’ll audit it like a release gatekeeper (edge cases + UX polish + test gaps).
