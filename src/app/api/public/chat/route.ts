@@ -181,10 +181,12 @@ export async function POST(req: Request) {
         ok: true,
         conversationPublicId: conversation.publicId,
         reply: bookingResult.reply,
+        assistant: { content: bookingResult.reply },
         intent: "BOOKING_FLOW",
         confidence: 1.0,
         sourcedFrom: ["booking_flow"],
         requiresLeadCapture: false,
+        leadCaptureRequested: false,
         missingFields: [],
         topic: "BOOKING",
         suggestedActions: bookingResult.bookingUrl
@@ -199,6 +201,7 @@ export async function POST(req: Request) {
           services: bookingResult.services,
           leadCreated: bookingResult.leadCreated,
           leadId: bookingResult.leadId,
+          bookingUrl: bookingResult.bookingUrl,
         },
       });
     }
@@ -353,10 +356,12 @@ export async function POST(req: Request) {
       ok: true,
       conversationPublicId: conversation.publicId,
       reply: finalReply,
+      assistant: { content: finalReply },
       intent: truthResult.intent,
       confidence: truthResult.confidence,
       sourcedFrom: usedKnowledgeBase ? knowledgeSources : truthResult.sourcedFrom,
       requiresLeadCapture,
+      leadCaptureRequested: requiresLeadCapture,
       missingFields: truthResult.missingFields,
       topic: truthResult.topic,
       suggestedActions: truthResult.suggestedActions,

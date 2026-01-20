@@ -1,0 +1,218 @@
+Good. That summary sounds like a launch-ready product — but summaries lie. Here’s the straight truth:
+
+If you haven’t personally verified the “money loop” end-to-end in production-like conditions, you’re not done. You’re “done on paper.”
+
+Below is the final launch gate. If you can pass all of this clean, you’re legitimately ready to advertise and onboard local businesses.
+
+⸻
+
+The Real Definition of “Finished”
+
+You’re finished when a stranger can:
+	1.	land on your site and instantly understand the value,
+	2.	try a demo widget,
+	3.	request a demo or sign up through you,
+	4.	you can onboard them in under 30 minutes,
+	5.	they embed the widget,
+	6.	it captures leads + booking clicks,
+	7.	their dashboard proves ROI,
+	8.	you get notified of hot leads,
+	9.	nothing breaks under spam/traffic,
+	10.	no tenant leakage ever.
+
+Everything else is noise.
+
+⸻
+
+LAUNCH GATE: 7 Non-Negotiable Proofs
+
+1) Production Safety Proof (no dev bypass, no leaks)
+
+Must be true in production environment:
+	•	DEV_BYPASS_AUTH cannot work
+	•	any org-scoped API route must enforce getOrgContext
+	•	any query without organizationId filtering is a bug
+
+Hard test:
+	•	attempt cross-org fetch via API and confirm 403/404 every time
+	•	attempt to access domain verification token as CLIENT → must return null
+
+✅ Pass = you can’t accidentally “leak a client” (this is the fastest way to die in SaaS).
+
+⸻
+
+2) Money Loop Proof (widget → lead → booking click → dashboard)
+
+This is the heart.
+
+Do this exact test:
+	1.	Clear data (new bot/org)
+	2.	Add services (3) + hours
+	3.	Open the widget on an allowed domain
+	4.	Type: “I want to book”
+	5.	Pick service button
+	6.	Enter name/phone/email
+	7.	Click booking link
+	8.	Open /app/leads
+	•	lead exists
+	•	serviceId attached
+	•	scoreReasons exist
+	9.	Open /app/analytics
+	•	funnel shows: selected → lead created → link shown → link clicked
+	•	unique conversation counting isn’t inflated
+
+✅ Pass = you can confidently tell businesses: “This makes you money.”
+
+⸻
+
+3) Client Owner Experience Proof (what they can do vs what they can’t)
+
+You promised: they log in and see everything they need; editing is minimal and controlled.
+
+Required:
+	•	CLIENT role can view everything that matters
+	•	CLIENT edits are gated by allowClientEdits
+	•	locked banners are clear and premium
+	•	editing can’t silently fail (must clearly block)
+
+✅ Pass = business owners don’t feel helpless OR dangerous.
+
+⸻
+
+4) Truth Mode Proof (no hallucinations, safe unknown handling)
+
+This is your brand promise.
+
+Required behavior:
+	•	if answer isn’t in KB/services/hours/contact/settings → it must say it doesn’t know
+	•	it offers next best action: booking flow or lead capture
+	•	it never invents prices, hours, locations, policies
+
+✅ Pass = you avoid “AI embarrassment” that kills trust.
+
+⸻
+
+5) Notification Proof (hot lead email + logging)
+
+If this doesn’t work, you lose clients.
+
+Required:
+	•	hot lead triggers email via Resend
+	•	NotificationLog stores:
+	•	what means “hot”
+	•	recipient(s)
+	•	payload + leadPublicId
+	•	success/fail + retry info
+	•	safe rate limiting (no spam loops)
+
+✅ Pass = you and the client don’t miss money.
+
+⸻
+
+6) Performance + Embedding Proof
+
+Local businesses won’t tolerate a slow widget.
+
+Required:
+	•	widget loads fast (< ~1s perceived load on decent connection)
+	•	no giant JS bundle blocking page
+	•	domain allowlist blocks unauthorized embedding
+	•	chat endpoint rate-limited, spam-protected
+
+✅ Pass = you don’t get abused or slow down client sites.
+
+⸻
+
+7) Sales Readiness Proof (you can actually sell it)
+
+This is what separates a “cool app” from “money machine.”
+
+Required assets:
+	•	landing page that screams:
+	•	what it does
+	•	who it’s for
+	•	proof (testimonials, stats, demo)
+	•	CTA (request demo)
+	•	demo script (5 minutes)
+	•	pricing model
+	•	onboarding checklist you can run fast
+
+✅ Pass = you can start outreach tomorrow.
+
+⸻
+
+What’s “Realistic” vs “No” from your original vision
+
+Realistic (and you’re basically there)
+	•	Multi-tenant SaaS with strict isolation
+	•	Embeddable widget + domain allowlist
+	•	Deterministic booking flow
+	•	Truth-mode grounded answers
+	•	Leads inbox + analytics funnel
+	•	Optional AI that generates drafts with review
+	•	Notifications
+
+“No” (or “not yet”) if you want stability
+	•	“AI scrapes everything automatically and perfectly” with no review
+→ you can do import + draft generation, but always require approval or you’ll publish garbage.
+	•	“Smartest AI in the world” without cost control
+→ you can make it feel elite through UX + guardrails + good KB, not raw model spend.
+	•	Fully hands-off onboarding with zero human work
+→ not if you want quality. The winning formula is: you enter business facts, AI drafts structure, you approve.
+
+⸻
+
+What you should build NEXT (if the summary is accurate)
+
+If everything you listed is truly implemented and verified, the next highest ROI is:
+
+A) “Agency Onboarding Wizard” that makes setup stupid fast
+
+Not “AI does everything,” but:
+	•	you fill business facts once
+	•	AI drafts KB/FAQs/voice
+	•	review + publish
+	•	widget ready
+
+This is what turns your platform into a repeatable sales machine.
+
+Wizard must output:
+	•	services/hours/contact complete
+	•	top 30 FAQ KB entries drafted (template-driven, industry-aware)
+	•	disclaimers/policies drafted (with approval)
+	•	“voice/personality” for the assistant
+
+B) “Template Flywheel” (the compounding advantage)
+
+Every new client should improve future setups:
+	•	templates versioned
+	•	captured winning FAQs by industry
+	•	reusable service bundles
+	•	reusable lead qualification questions
+
+This is how you get the “better and better and better” effect without hallucinations.
+
+⸻
+
+Your next message to me (so I can QA like a killer)
+
+Send me one of these (no fluff):
+	1.	The production URL + test creds for OWNER and CLIENT
+or
+	2.	Paste your latest QA Evidence Report output + 10 screenshots:
+
+	•	landing page hero + CTA
+	•	demo widget page
+	•	services settings
+	•	hours settings
+	•	analytics dashboard (7/30/90)
+	•	lead inbox list
+	•	lead detail drawer
+	•	KB manager
+	•	setup progress tracker
+	•	notifications settings + a NotificationLog entry
+
+Then I’ll tell you exactly:
+	•	what’s genuinely launch-ready,
+	•	what still smells like a dev project,
+	•	the 3 fixes that will make people throw money at you instead of “this is cool.”
