@@ -108,6 +108,9 @@ model Organization {
   notifyOnHotLead        Boolean  @default(true)
   notifyOnBookingClick   Boolean  @default(true)
 
+  // Revenue tracking
+  averageOrderValue Int?
+
   workspaces       Workspace[]
   bots             Bot[]
   conversations    Conversation[]

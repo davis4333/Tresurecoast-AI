@@ -2,6 +2,7 @@ import { TcaCard, TcaCardBody, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaButton } from "@/components/tca/TcaButton";
 import { TcaBadge } from "@/components/tca/TcaBadge";
 import { SetupStatusCard } from "@/components/tca/SetupStatusCard";
+import { RevenueMetricsCard } from "@/components/tca/RevenueMetricsCard";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -84,6 +85,8 @@ export default function DashboardPage() {
           </TcaCardBody>
         </TcaCard>
       </div>
+
+      <RevenueMetricsCard />
 
       <TcaCard>
         <TcaCardHeader>

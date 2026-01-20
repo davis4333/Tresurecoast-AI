@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
   const org = await prisma.organization.findUnique({
     where: { id: ctx.org.id },
-    select: { allowClientEdits: true },
+    select: { allowClientEdits: true, averageOrderValue: true },
   });
 
   if (ctx.role === "CLIENT" && !org?.allowClientEdits) {
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     "BOOKING_LINK_CLICKED",
   ] as const;
 
-  const [funnelCounts, leadsByDayRaw, clicksByDayRaw, topTopics, clicksByServiceRaw] = await Promise.all([
+  const [funnelCounts, leadsByDayRaw, clicksByDayRaw, topTopics, clicksByServiceRaw, hotLeadsCount] = await Promise.all([
     prisma.$queryRaw<Array<{ type: string; unique_conversations: bigint }>>`
       SELECT type, COUNT(DISTINCT "conversationId") as unique_conversations
       FROM "DataEvent"
@@ -120,6 +120,14 @@ export async function GET(request: NextRequest) {
       GROUP BY os.id, os.name
       ORDER BY "clicks" DESC
     `,
+
+    prisma.lead.count({
+      where: {
+        organizationId: ctx.org.id,
+        temperature: "HOT",
+        createdAt: { gte: range.start, lte: range.end },
+      },
+    }),
   ]);
 
   const funnel = {
@@ -152,6 +160,25 @@ export async function GET(request: NextRequest) {
       count: t._count.id,
     }));
 
+  // Calculate revenue influenced from booking clicks × service prices
+  let revenueInfluencedCents = 0;
+  for (const service of clicksByServiceRaw) {
+    const servicePrice = await prisma.organizationService.findUnique({
+      where: { id: service.serviceId },
+      select: { priceCents: true }
+    });
+    if (servicePrice?.priceCents) {
+      revenueInfluencedCents += Number(service.clicks) * servicePrice.priceCents;
+    } else if (org?.averageOrderValue) {
+      revenueInfluencedCents += Number(service.clicks) * org.averageOrderValue;
+    }
+  }
+
+  // Calculate conversion rate: (linkClicked / serviceSelected) × 100
+  const conversionRate = funnel.serviceSelected > 0 
+    ? Math.round((funnel.linkClicked / funnel.serviceSelected) * 10000) / 100 
+    : 0;
+
   return NextResponse.json({
     ok: true,
     range: {
@@ -163,5 +190,8 @@ export async function GET(request: NextRequest) {
     clicksByDay: clicksByDayArray,
     clicksByService,
     topTopics: topTopicsArray,
+    revenueInfluencedCents,
+    hotLeadsCount,
+    conversionRate,
   });
 }
