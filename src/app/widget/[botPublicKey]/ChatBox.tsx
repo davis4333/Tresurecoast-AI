@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { isValidUUID } from "@/lib/public/uuid";
+import { BookingDirectives, type BookingService, type BookingDirectiveType } from "./BookingDirectives";
 
 type ChatBoxProps = {
   botPublicKey: string;
@@ -11,6 +12,13 @@ type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+};
+
+type BookingFlowData = {
+  directiveType?: BookingDirectiveType;
+  services?: BookingService[];
+  bookingUrl?: string;
+  leadCreated?: boolean;
 };
 
 type WidgetBranding = {
@@ -41,6 +49,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
   const [leadPhone, setLeadPhone] = useState("");
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
   const [leadError, setLeadError] = useState<string | null>(null);
+  const [bookingFlow, setBookingFlow] = useState<BookingFlowData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const storageKey = `tca_conversation_${botPublicKey}`;
 
@@ -157,6 +166,17 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
             setShowLeadForm(true);
           }
 
+          if (data.bookingFlow) {
+            setBookingFlow({
+              directiveType: data.bookingFlow.directiveType,
+              services: data.bookingFlow.services,
+              bookingUrl: data.externalRedirectUrl || data.bookingFlow.bookingUrl,
+              leadCreated: data.bookingFlow.leadCreated,
+            });
+          } else {
+            setBookingFlow(null);
+          }
+
           if (wasNewConversation) {
             fetchHistory(data.conversationPublicId);
           }
@@ -229,6 +249,62 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
   };
 
   const leadHasAny = !!leadName.trim() || !!leadEmail.trim() || !!leadPhone.trim();
+
+  const handleServiceSelect = useCallback(async (service: BookingService) => {
+    setIsSending(true);
+    setError(null);
+
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: service.name,
+      timestamp: new Date().toISOString()
+    };
+    setMessages((prev) => [...prev, userMessage]);
+
+    try {
+      const storedConvId = localStorage.getItem(storageKey);
+
+      const res = await fetch("/api/public/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          botPublicKey,
+          conversationPublicId: storedConvId,
+          message: service.name
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.ok && data.assistant?.content) {
+        localStorage.setItem(storageKey, data.conversationPublicId);
+
+        const assistantMessage: ChatMessage = {
+          role: "assistant",
+          content: data.assistant.content,
+          timestamp: new Date().toISOString()
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+
+        if (data.bookingFlow) {
+          setBookingFlow({
+            directiveType: data.bookingFlow.directiveType,
+            services: data.bookingFlow.services,
+            bookingUrl: data.externalRedirectUrl || data.bookingFlow.bookingUrl,
+            leadCreated: data.bookingFlow.leadCreated,
+          });
+        } else {
+          setBookingFlow(null);
+        }
+      } else {
+        setError(data.error || "Failed to send message");
+      }
+    } catch {
+      setError("Failed to send message");
+    } finally {
+      setIsSending(false);
+    }
+  }, [botPublicKey, storageKey]);
 
   const branding = config?.branding;
   const headerBg = branding?.whiteLabelEnabled && branding?.brandPrimaryColor
@@ -309,6 +385,21 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
           ))}
           <div ref={messagesEndRef} />
         </div>
+      )}
+
+      {bookingFlow && (
+        bookingFlow.directiveType === "SHOW_SERVICE_PICKER" ||
+        bookingFlow.directiveType === "SHOW_BOOKING_LINK"
+      ) && (
+        <BookingDirectives
+          directiveType={bookingFlow.directiveType}
+          services={bookingFlow.services}
+          bookingUrl={bookingFlow.bookingUrl}
+          conversationPublicId={localStorage.getItem(storageKey) || undefined}
+          botPublicKey={botPublicKey}
+          headerBg={headerBg}
+          onServiceSelect={handleServiceSelect}
+        />
       )}
 
       {showLeadForm && (
