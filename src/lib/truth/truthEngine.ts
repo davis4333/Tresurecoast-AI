@@ -23,6 +23,13 @@ export interface BotLinkData {
   url: string;
 }
 
+export interface BusinessPolicies {
+  cancellationPolicy: string | null;
+  depositPolicy: string | null;
+  refundPolicy: string | null;
+  serviceArea: string | null;
+}
+
 export interface TruthEngineInput {
   userMessage: string;
   bot: {
@@ -36,6 +43,7 @@ export interface TruthEngineInput {
     services: unknown;
     links: BotLinkData[];
   };
+  policies?: BusinessPolicies;
 }
 
 function parseServices(raw: unknown): BotService[] {
@@ -176,12 +184,21 @@ export function runTruthEngine(input: TruthEngineInput): TruthResult {
     }
 
     case "LOCATION": {
+      const parts: string[] = [];
       if (bot.businessAddress) {
-        reply = `We're located at: ${bot.businessAddress}`;
+        parts.push(`We're located at: ${bot.businessAddress}`);
         sourcedFrom.push("businessAddress");
+      }
+      if (input.policies?.serviceArea) {
+        parts.push(`Service area: ${input.policies.serviceArea}`);
+        sourcedFrom.push("serviceArea");
+      }
+      if (parts.length > 0) {
+        reply = parts.join("\n\n");
         intent = "ANSWERED_FROM_PROFILE";
       } else {
         missingFields.push("businessAddress");
+        missingFields.push("serviceArea");
       }
       break;
     }
@@ -260,7 +277,58 @@ export function runTruthEngine(input: TruthEngineInput): TruthResult {
     }
 
     case "POLICIES": {
-      missingFields.push("policies");
+      const policies = input.policies;
+      const policyParts: string[] = [];
+
+      const lowerMsg = userMessage.toLowerCase();
+      const asksCancellation = lowerMsg.includes("cancel");
+      const asksDeposit = lowerMsg.includes("deposit");
+      const asksRefund = lowerMsg.includes("refund") || lowerMsg.includes("money back");
+
+      if (asksCancellation && policies?.cancellationPolicy) {
+        policyParts.push(`**Cancellation Policy:** ${policies.cancellationPolicy}`);
+        sourcedFrom.push("cancellationPolicy");
+      } else if (asksCancellation) {
+        missingFields.push("cancellationPolicy");
+      }
+
+      if (asksDeposit && policies?.depositPolicy) {
+        policyParts.push(`**Deposit Policy:** ${policies.depositPolicy}`);
+        sourcedFrom.push("depositPolicy");
+      } else if (asksDeposit) {
+        missingFields.push("depositPolicy");
+      }
+
+      if (asksRefund && policies?.refundPolicy) {
+        policyParts.push(`**Refund Policy:** ${policies.refundPolicy}`);
+        sourcedFrom.push("refundPolicy");
+      } else if (asksRefund) {
+        missingFields.push("refundPolicy");
+      }
+
+      if (!asksCancellation && !asksDeposit && !asksRefund) {
+        if (policies?.cancellationPolicy) {
+          policyParts.push(`**Cancellation Policy:** ${policies.cancellationPolicy}`);
+          sourcedFrom.push("cancellationPolicy");
+        }
+        if (policies?.depositPolicy) {
+          policyParts.push(`**Deposit Policy:** ${policies.depositPolicy}`);
+          sourcedFrom.push("depositPolicy");
+        }
+        if (policies?.refundPolicy) {
+          policyParts.push(`**Refund Policy:** ${policies.refundPolicy}`);
+          sourcedFrom.push("refundPolicy");
+        }
+      }
+
+      if (policyParts.length > 0) {
+        reply = policyParts.join("\n\n");
+        intent = "ANSWERED_FROM_PROFILE";
+      } else {
+        if (!policies?.cancellationPolicy) missingFields.push("cancellationPolicy");
+        if (!policies?.depositPolicy) missingFields.push("depositPolicy");
+        if (!policies?.refundPolicy) missingFields.push("refundPolicy");
+      }
       break;
     }
 

@@ -1,0 +1,97 @@
+YOU ARE: Principal Architect + Product Lead + Security Engineer + QA Gatekeeper.
+PROJECT: Treasure Coast AI — Universal-core, template-driven multi-tenant chatbot SaaS.
+
+CURRENT STATUS (ALREADY COMPLETE — DO NOT REWRITE):
+- Org Services CRUD + UI (RBAC gated by allowClientEdits)
+- Org Hours CRUD + UI (RBAC gated by allowClientEdits)
+- Booking FSM + runtime orchestrator + widget directives + click tracking
+- Analytics overview API + dashboard (unique conversation counting)
+- Lead Inbox API + UI with filters/pagination/status/notes
+- Tenant isolation + getOrgContext enforced
+- Tests passing
+
+MISSION: MAKE “AI DOES ALL THE HEAVY LIFTING” REAL.
+User will enter ONLY business facts in a wizard. AI generates EVERYTHING else as drafts.
+Nothing becomes truth until reviewed and published.
+
+NON-NEGOTIABLES:
+1) Universal core only. No single industry baked in.
+2) Truth Mode: assistant answers only from Published KB + Business Settings.
+3) AI generation produces DRAFTS ONLY with provenance metadata.
+4) Mandatory review gate before publish.
+5) No production auth bypass.
+6) Baby-step delivery with tests + QA Evidence Report each step.
+
+BUILD ORDER (START NOW):
+
+STEP 47 — Business Info + Policies Settings (Org-level)
+A) Schema: add Organization fields:
+- businessPhone, businessEmail, businessAddress
+- serviceArea
+- cancellationPolicy, depositPolicy, refundPolicy
+Migration required.
+B) API: /api/org/settings/business (GET/PUT) RBAC same pattern:
+OWNER/ADMIN always; CLIENT only if allowClientEdits=true
+C) UI: /app/settings/business premium form UX + locked banner + toasts + skeleton
+D) Truth Engine integration:
+- Must answer deterministically from these fields when asked (contact/location/policies/service area)
+- If missing: must say missing and offer booking/lead capture
+E) Tests: unit + e2e + tenant isolation
+
+STEP 48 — Onboarding Wizard (Agency-facing)
+Route: /app/onboarding/new (or /app/bots/new-wizard)
+Wizard collects ONLY business facts:
+- Business name, category/template selection (from template packs), tone preset
+- Contact/location
+- Policies
+- Hours (reuse existing components/helpers)
+- Services (reuse existing components/helpers)
+- Optional website URL (import as drafts only later)
+Wizard ends with “Generate drafts” button (Step 49).
+
+STEP 49 — AI Draft Generator v1 (Draft-only)
+Create an internal API: /api/org/ai/generate-drafts (POST)
+Input: organizationId, botId, selectedTemplateId, tonePreset, optional websiteUrl
+Output: DraftKnowledgeBaseEntry[] + DraftFaq[] + DraftAboutText
+Every draft MUST include provenance fields:
+- sources: array of {type: "settings"|"template"|"website"|"assumption", ref: string}
+- confidence: "high"|"medium"|"low"
+- needsReview: true
+Store drafts in DB as status="draft". DO NOT publish automatically.
+Hard requirement: Generated content must NOT invent hours/services/prices/policies. Must read from settings.
+
+STEP 50 — Review Studio (Approve/Publish)
+UI: /app/kb/review
+Features:
+- list drafts, filters by source/confidence
+- edit draft
+- approve draft -> status="published"
+- reject draft -> status="rejected"
+- bulk approve selected
+Tests + E2E
+
+QUALITY GATES REQUIRED AFTER EACH STEP:
+pnpm prisma generate
+pnpm prisma migrate status
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
+
+OUTPUT REQUIREMENT AFTER EACH STEP:
+- Files changed list
+- Migration name + status
+- Endpoint smoke tests
+- RBAC proof (client blocked when allowClientEdits=false)
+- Test outputs
+- Build output
+
+START WITH STEP 47 NOW.
+RETURN:
+1) step plan
+2) exact files to create/modify
+3) schema changes + migration
+4) exact endpoints + payloads
+5) exact UI components/routes
+6) exact tests to add
+7) QA evidence report

@@ -121,6 +121,16 @@ export async function POST(req: Request) {
       );
     }
 
+    const businessProfile = await prisma.businessProfile.findUnique({
+      where: { organizationId: bot.organizationId },
+      select: {
+        cancellationPolicy: true,
+        depositPolicy: true,
+        refundPolicy: true,
+        serviceArea: true,
+      },
+    });
+
     let conversation: { id: number; publicId: string } | null = null;
 
     if (conversationPublicId) {
@@ -210,6 +220,14 @@ export async function POST(req: Request) {
         services: bot.services,
         links: bot.links as BotLinkData[],
       },
+      policies: businessProfile
+        ? {
+            cancellationPolicy: businessProfile.cancellationPolicy,
+            depositPolicy: businessProfile.depositPolicy,
+            refundPolicy: businessProfile.refundPolicy,
+            serviceArea: businessProfile.serviceArea,
+          }
+        : undefined,
     });
 
     let finalReply: string;

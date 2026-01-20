@@ -15,6 +15,21 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <Link href="/app/settings/business" data-testid="link-settings-business">
+          <TcaCard className="h-full hover:border-[var(--color-brand-primary)] transition-colors cursor-pointer">
+            <TcaCardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Business Info</h3>
+              </div>
+            </TcaCardHeader>
+            <TcaCardBody>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                Update your contact information, location, and business policies.
+              </p>
+            </TcaCardBody>
+          </TcaCard>
+        </Link>
+
         <Link href="/app/settings/services" data-testid="link-settings-services">
           <TcaCard className="h-full hover:border-[var(--color-brand-primary)] transition-colors cursor-pointer">
             <TcaCardHeader>
@@ -55,6 +70,21 @@ export default function SettingsPage() {
             <TcaCardBody>
               <p className="text-sm text-[var(--color-text-secondary)]">
                 Customize your white-label branding, colors, and custom domain.
+              </p>
+            </TcaCardBody>
+          </TcaCard>
+        </Link>
+
+        <Link href="/app/settings/notifications" data-testid="link-settings-notifications">
+          <TcaCard className="h-full hover:border-[var(--color-brand-primary)] transition-colors cursor-pointer">
+            <TcaCardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Notifications</h3>
+              </div>
+            </TcaCardHeader>
+            <TcaCardBody>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                Configure email alerts for hot leads and booking clicks.
               </p>
             </TcaCardBody>
           </TcaCard>

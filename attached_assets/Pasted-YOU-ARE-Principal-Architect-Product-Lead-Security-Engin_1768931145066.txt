@@ -1,0 +1,152 @@
+YOU ARE: Principal Architect + Product Lead + Security Engineer + QA Gatekeeper.
+PROJECT: Treasure Coast AI (Universal-core, template-driven multi-tenant chatbot SaaS)
+
+CURRENT STATUS (ALREADY BUILT — DO NOT REWRITE)
+- Tenant isolation + RBAC with OrganizationMember + getOrgContext enforced
+- Org-level Services CRUD + Services Editor UI (RBAC gated by allowClientEdits)
+- Org-level Hours CRUD + Hours Editor UI (RBAC gated by allowClientEdits)
+- Deterministic Booking FSM (IDLE → SERVICE_SELECTION → LEAD_NAME → LEAD_PHONE → LEAD_EMAIL → COMPLETE)
+- Booking runtime orchestrator integrated into public chat API BEFORE truth engine
+- Widget booking directives UI + booking click tracking endpoint
+- Analytics aggregation API + dashboard (unique conversation counting via COUNT(DISTINCT conversationId))
+- Lead Inbox API + UI with filtering, pagination, status/notes updates (RBAC enforced)
+- All quality gates passing (unit/e2e/typecheck/build)
+
+NON-NEGOTIABLES
+1) Universal core only: No industry baked into core logic, models, or UI copy.
+2) Industry “magic” comes from Templates (packs) that seed DRAFTS only.
+3) Truth Mode: assistant answers ONLY from:
+   - Published KB entries
+   - Organization settings (services/hours/contact/policies)
+   If unknown: it must say so and offer booking/lead capture.
+4) Deterministic booking flow only (no AI choosing booking URLs).
+5) Security: tenant isolation + least privilege RBAC; no production auth bypass.
+6) Every step is small, shippable, testable.
+7) Every step ends with a QA Evidence Report (commands + outputs).
+
+NEXT MISSION: MAKE THIS A MUST-HAVE PRODUCT
+We are building the “Launchable Beast” features that make business owners throw money:
+- Contact + Policies settings (truth-grounded)
+- “Missing setup info” detection + checklist
+- Template Packs v1 + template version upgrades
+- KB Review Studio (approve drafts → publish)
+- Notifications (Email first) + NotificationLog proof
+- Agency Onboarding Wizard (10-minute setup)
+- Embed Wizard + Copy Kit
+- ROI layer (“estimated revenue influenced”)
+- Marketing demo mode polish
+- Stripe billing + plan gating
+
+BUILD ORDER (DO NOT SKIP)
+STEP 47 — Organization Contact Info + Policies (Org-level) + Truth Engine integration
+A) Schema
+- Add Organization fields:
+  businessPhone, businessEmail, businessAddress
+  serviceArea (text)
+  cancellationPolicy (text)
+  depositPolicy (text)
+  refundPolicy (text)
+- Migration required.
+B) API
+- /api/org/settings/business (GET/PUT)
+- RBAC: OWNER/ADMIN always; CLIENT only if allowClientEdits=true
+- Zod validation; sanitize; max lengths; trim; allow empty fields
+C) UI
+- /app/settings/business
+- Premium form UX: sections, helper text, “locked” banner for blocked clients, skeleton, toasts
+- Settings hub links to Business Info & Policies
+D) Truth Engine
+- When user asks about refunds/cancellation/deposit/location/contact/service area:
+  respond deterministically from these settings (no hallucinations)
+- If missing: say missing and offer lead capture/booking
+E) Tests
+- Unit tests: validators + RBAC + tenant isolation
+- E2E: owner can update, client locked, persisted after reload
+F) QA Evidence Report
+- Files changed
+- Migration name
+- Command outputs:
+  pnpm prisma generate
+  pnpm prisma migrate status
+  pnpm typecheck
+  pnpm test
+  pnpm test:e2e
+  pnpm build
+
+STEP 48 — Setup Checklist + “Missing Info” Detection
+- Create an org/bot “setup completeness” evaluator:
+  - missing services
+  - missing hours
+  - missing contact
+  - missing policies (optional thresholds)
+  - missing published KB for top topics
+- UI:
+  - a “Setup Status” card in dashboard + settings hub
+  - actionable links to fix
+- Tests: logic + UI rendering
+
+STEP 49 — Template Packs v1 (Repo-based)
+- Implement Template definition files in repo:
+  templateId, name, version, tags
+  draftKbEntries, suggestedServices, keywordSets
+- Template selection on bot creation
+- Seeding adds DRAFT KB entries only; idempotent; bot-scoped
+- Switching template adds new drafts only; never overwrites published
+- Tests: idempotency, no overwrite, no cross-bot leaks
+
+STEP 50 — KB Review Studio
+- UI to review drafts, approve/publish, reject, edit
+- Diff view for revisions
+- “Unanswered questions” queue can generate draft suggestions (tenant-private)
+- Tests + E2E
+
+STEP 51 — Notifications v1 (Email)
+- Notification settings: enabled, recipients, triggers
+- NotificationLog: event type, payload hash, status, attempts
+- Send mocked in tests
+- Triggers: HOT lead created, booking link clicked, daily digest
+- UI: /app/settings/notifications
+
+STEP 52 — Agency Onboarding Wizard (10-minute setup)
+- A guided flow that ends in:
+  - services/hours/contact/policies filled
+  - template selected
+  - KB drafts generated (optional)
+  - review screen
+  - publish bot + show embed instructions
+- Must not auto-publish KB drafts.
+
+STEP 53 — Embed Wizard + Copy Kit
+- Show script tag snippet
+- Domain allowlist instructions
+- “Test install” step (loads widget in sandbox preview)
+- Copy kit: short website section + FAQ snippet business can paste
+
+STEP 54 — ROI Layer
+- Add org setting: averageOrderValue (optional)
+- Compute estimated value influenced:
+  - use service price when available else AOV
+  - clearly label as estimate
+- Add KPIs and weekly summary
+
+STEP 55 — Marketing Demo Mode Polish
+- Demo org seed data
+- Live widget on marketing pages
+- Screenshots/case study layout
+
+STEP 56 — Stripe Billing + Plan Gating
+- Plans + checkout + portal
+- Feature gating by plan
+- Tests for gating correctness
+
+IMPORTANT: START WITH STEP 47 NOW.
+DO NOT JUMP AHEAD.
+DO NOT REWRITE ALREADY BUILT FEATURES.
+KEEP CHANGES MINIMAL AND CONSISTENT WITH EXISTING PATTERNS.
+RETURN ONLY:
+1) Implementation plan for Step 47
+2) Exact files to create/modify
+3) Exact endpoints + payloads
+4) Exact validation rules
+5) Exact test list (unit + e2e)
+6) QA Evidence Report template (ready to paste)

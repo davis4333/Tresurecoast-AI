@@ -399,12 +399,18 @@ model BusinessProfile {
   businessName String
   category     String
   phone        String?
+  email        String?
   address      String?
+  serviceArea  String?
   hours        Json?
   websiteUrl   String?
   bookingUrl   String?
   tone         String   // "professional" | "friendly" | "luxury" | "bold" | "chill"
   primaryGoal  String   // "bookings" | "leads" | "faqs" | "support"
+
+  cancellationPolicy String?
+  depositPolicy      String?
+  refundPolicy       String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
