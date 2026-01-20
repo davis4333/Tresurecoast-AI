@@ -66,6 +66,18 @@ export async function GET(
           publicId: true,
         },
       },
+      notificationLogs: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: {
+          publicId: true,
+          type: true,
+          channel: true,
+          recipientEmail: true,
+          status: true,
+          createdAt: true,
+        },
+      },
     },
   });
 
@@ -96,6 +108,14 @@ export async function GET(
       conversationPublicId: lead.conversation?.publicId ?? null,
       createdAt: lead.createdAt.toISOString(),
       updatedAt: lead.updatedAt.toISOString(),
+      notificationLogs: lead.notificationLogs.map((log) => ({
+        publicId: log.publicId,
+        type: log.type,
+        channel: log.channel,
+        recipientEmail: log.recipientEmail,
+        status: log.status,
+        createdAt: log.createdAt.toISOString(),
+      })),
     },
   });
 }

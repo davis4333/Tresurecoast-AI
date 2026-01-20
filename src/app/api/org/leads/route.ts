@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
   const [leads, total] = await Promise.all([
     prisma.lead.findMany({
       where: whereClause,
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,
       ...(cursorLead && { cursor: { id: cursorLead.id }, skip: 1 }),
       select: {

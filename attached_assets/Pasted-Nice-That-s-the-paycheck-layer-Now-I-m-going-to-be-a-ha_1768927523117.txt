@@ -1,0 +1,139 @@
+Nice. That’s the “paycheck layer.” Now I’m going to be a hard QA gatekeeper: it’s not “done” until the edge cases that break trust are locked down. Here’s what I’d verify, what I’d tighten, and the best next move.
+
+⸻
+
+Step 46 quick verdict
+
+Product-wise: this is exactly the right feature set (filters, drawer, status/notes, click-to-call/email).
+Engineering-wise: if cursor pagination + tenant isolation + RBAC + full lead detail are truly in place, this is solid.
+
+But there are a few classic traps that can quietly ruin a lead inbox.
+
+⸻
+
+8 “don’t ship without checking” items
+
+1) Public ID tenant enforcement (critical)
+
+For /api/org/leads/[leadPublicId] and PATCH: confirm the query is:
+	•	where: { leadPublicId, organizationId: ctx.org.id }
+Not: findUnique({ where: { leadPublicId } }) then check org after.
+
+2) Cursor pagination correctness
+
+Make sure you’re using stable sort + cursor:
+	•	sort by createdAt desc, id desc (or id desc alone if monotonic)
+	•	cursor uses the same fields
+	•	next page doesn’t duplicate/skip records when new leads arrive
+
+3) Search behavior isn’t leaking data
+
+Search must be org-scoped first, then OR conditions inside that scope. Example of safe pattern:
+	•	where: { organizationId, AND: [ search ORs… ] }
+Unsafe pattern:
+	•	OR: [{ organizationId }, { name contains…}] (this leaks)
+
+4) Stats cards match filters (or clearly don’t)
+
+If stats cards show “total/hot/new/booked” but ignore current filters, users get confused and think it’s wrong.
+Pick one:
+	•	Option A: stats reflect current filters
+	•	Option B: stats are global and you label them “All time / last 30 days”
+
+5) Status transitions policy
+
+Do you allow any transition (NEW → CLOSED) or enforce a workflow?
+I’d keep it freeform for now but add:
+	•	updatedAt tracking
+	•	“lastActivityAt” (optional)
+
+6) Notes sanitization
+
+If notes render in HTML anywhere, sanitize. If plain text only, enforce plain text and escape output.
+
+7) PII exposure for CLIENT role
+
+Right now CLIENT can view leads (good), but confirm you’re not exposing internal-only fields like:
+	•	scoreReasons internals (fine if you want transparency, but be intentional)
+	•	raw event logs if you add them later
+	•	anything that reveals other tenants or admin metadata
+
+8) “Answers” field integrity
+
+If answers come from the chat, ensure they’re not storing arbitrary HTML/JS (XSS risk). Output escaped.
+
+⸻
+
+Best next move: Step 47 Hot Lead Notifications (email first)
+
+Your platform becomes “must have” when the business gets pinged immediately when money happens.
+
+Step 47 — Lead Notifications + Delivery Log
+
+Triggers (simple + high ROI)
+	•	HOT lead created (temperature = HOT)
+	•	Booking link clicked (strong intent)
+	•	Optional: lead status changed to BOOKED (for tracking)
+
+What to build
+
+A) DB
+	•	NotificationLog table:
+	•	id, organizationId, leadId, type, channel(email), to, status(sent/failed), providerMessageId, error, createdAt
+This is crucial for trust: “did it send?”
+
+B) API / Worker
+	•	On lead creation + on booking link click, enqueue a notification job
+	•	Send via your email provider (Resend/Postmark/etc.)
+	•	Retry on transient failures
+
+C) UI
+	•	/app/settings/notifications
+	•	toggle on/off
+	•	destination email(s)
+	•	choose triggers (HOT, booking click)
+	•	Lead drawer shows “Notification sent at …” (optional)
+
+D) QA gates
+	•	Unit tests for trigger conditions + tenant isolation
+	•	Integration test that a HOT lead inserts NotificationLog and calls sender
+	•	E2E: enable notifications → create hot lead → verify log exists (mock provider)
+
+⸻
+
+Copy/paste prompt for Replit: Step 47
+
+STEP 47 — HOT LEAD NOTIFICATIONS (EMAIL) + DELIVERY LOG
+
+GOAL
+Make the platform feel “alive”: when a high-intent lead happens, notify the business instantly and record proof.
+
+SCOPE
+1) Add NotificationLog model (org-scoped) storing: leadId, type, channel, recipient, status, providerMessageId, error, createdAt.
+2) Add Organization notification settings: notificationEnabled, notificationEmails (comma-separated or array), notifyOnHotLead, notifyOnBookingClick.
+3) Implement sending email on:
+   - HOT lead created
+   - BOOKING_LINK_CLICK event
+4) Add /app/settings/notifications UI to manage settings (RBAC: OWNER/ADMIN always; CLIENT only if allowClientEdits=true OR create separate allowClientNotifications).
+5) Add admin-safe email template (clean, premium): lead name/contact, service, score, quick CTA link back to /app/leads?lead=...
+6) Include delivery log visibility in Lead drawer (read-only).
+
+NON-NEGOTIABLES
+- Tenant isolation on all queries and logs
+- Never send emails if notificationEnabled=false
+- Validate email list; reject invalid emails
+- Add retries for transient failures
+- Tests must pass: unit + e2e + typecheck + build
+
+QA EVIDENCE REQUIRED
+- Unit tests for triggers + email validation + log creation
+- Proof: create HOT lead -> NotificationLog inserted -> mocked send called
+- Proof: booking link click -> NotificationLog inserted
+- pnpm test, pnpm test:e2e, pnpm typecheck, pnpm build all PASS
+
+
+⸻
+
+If you want the fastest “wow” after Step 47: add one-click call/text buttons in the lead drawer (still within app), then later SMS automation.
+
+If you paste the actual Prisma schema snippets for Lead + NotificationLog + current Organization settings, I’ll tell you exactly where you’ll hit migration/typing pain before it happens.

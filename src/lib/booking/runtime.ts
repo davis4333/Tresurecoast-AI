@@ -21,6 +21,7 @@ import {
   isRestart,
   isCancel,
 } from "./stateMachine";
+import { triggerHotLeadNotification, triggerBookingClickNotification } from "@/lib/notifications/triggers";
 import {
   BookingFlowState,
   ResponseDirectiveType,
@@ -182,6 +183,22 @@ async function createLeadFromBooking(
       serviceName: context.selectedService?.name ?? null,
     });
 
+    triggerHotLeadNotification({
+      organizationId: input.organizationId,
+      leadId: lead.id,
+      leadPublicId: lead.publicId,
+      lead: {
+        name: context.leadDraft.name,
+        email: context.leadDraft.email,
+        phone: context.leadDraft.phone ?? null,
+        score: 70,
+        temperature: "HOT",
+        serviceName: context.selectedService?.name ?? null,
+      },
+    }).catch((err) => {
+      console.error("[NOTIFICATION] Hot lead notification failed:", err);
+    });
+
     return lead.id;
   } catch (error: unknown) {
     if (
@@ -243,6 +260,7 @@ async function logGranularBookingEvent(
 
 /**
  * Log BOOKING_LINK_CLICKED event (exported for click tracking API)
+ * Also triggers booking click notification if configured
  */
 export async function logBookingLinkClicked(
   organizationId: number,
@@ -260,6 +278,35 @@ export async function logBookingLinkClicked(
     userMessage: "",
   };
   await logGranularBookingEvent(input, "BOOKING_LINK_CLICKED", metadata);
+
+  if (metadata.leadId) {
+    const lead = await prisma.lead.findUnique({
+      where: { id: metadata.leadId },
+      select: {
+        publicId: true,
+        name: true,
+        email: true,
+        phone: true,
+        service: { select: { name: true } },
+      },
+    });
+
+    if (lead) {
+      triggerBookingClickNotification({
+        organizationId,
+        leadId: metadata.leadId,
+        leadPublicId: lead.publicId,
+        lead: {
+          name: lead.name,
+          email: lead.email,
+          phone: lead.phone,
+          serviceName: lead.service?.name ?? null,
+        },
+      }).catch((err) => {
+        console.error("[NOTIFICATION] Booking click notification failed:", err);
+      });
+    }
+  }
 }
 
 /**

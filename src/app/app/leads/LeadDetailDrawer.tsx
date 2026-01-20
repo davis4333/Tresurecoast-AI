@@ -21,9 +21,19 @@ interface LeadSummary {
   updatedAt: string;
 }
 
+interface NotificationLog {
+  publicId: string;
+  type: string;
+  channel: string;
+  recipientEmail: string;
+  status: string;
+  createdAt: string;
+}
+
 interface LeadFull extends LeadSummary {
   scoreReasons: string[] | null;
   answers: Record<string, unknown> | null;
+  notificationLogs?: NotificationLog[];
 }
 
 interface LeadDetailDrawerProps {
@@ -410,6 +420,47 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                   )}
                 </div>
               </div>
+
+              {fullLead.notificationLogs && fullLead.notificationLogs.length > 0 && (
+                <div className="border-t border-[var(--color-border)] pt-6">
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                    Notification History
+                  </h3>
+                  <ul className="space-y-2" data-testid="notification-logs">
+                    {fullLead.notificationLogs.map((log) => (
+                      <li
+                        key={log.publicId}
+                        className="flex items-center justify-between rounded-lg bg-[var(--color-surface-hover)] px-3 py-2 text-sm"
+                      >
+                        <div>
+                          <span className="font-medium text-[var(--color-text-primary)]">
+                            {log.type.replace(/_/g, " ")}
+                          </span>
+                          <span className="ml-2 text-[var(--color-text-muted)]">
+                            to {log.recipientEmail}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                              log.status === "SENT"
+                                ? "bg-green-500/20 text-green-400"
+                                : log.status === "FAILED"
+                                ? "bg-red-500/20 text-red-400"
+                                : "bg-yellow-500/20 text-yellow-400"
+                            }`}
+                          >
+                            {log.status}
+                          </span>
+                          <span className="text-xs text-[var(--color-text-muted)]">
+                            {new Date(log.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="border-t border-[var(--color-border)] pt-6">
                 <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
