@@ -18,6 +18,8 @@ import {
   transition,
   initBookingContext,
   isBookingIntent,
+  isRestart,
+  isCancel,
 } from "./stateMachine";
 import {
   BookingFlowState,
@@ -137,7 +139,7 @@ async function persistBookingState(
 }
 
 /**
- * Create lead from booking flow context
+ * Create lead from booking flow context (idempotent - skips if lead already exists)
  */
 async function createLeadFromBooking(
   input: BookingFlowInput,
@@ -145,6 +147,15 @@ async function createLeadFromBooking(
 ): Promise<number | null> {
   if (!context.leadDraft.name || !context.leadDraft.email) {
     return null;
+  }
+
+  const existingLead = await prisma.lead.findFirst({
+    where: { conversationId: input.conversationId },
+    select: { id: true },
+  });
+
+  if (existingLead) {
+    return existingLead.id;
   }
 
   const lead = await prisma.lead.create({
@@ -232,6 +243,19 @@ export async function processBookingFlow(
       reply: "",
       directiveType: ResponseDirectiveType.CONTINUE_CHAT,
       state: BookingFlowState.IDLE,
+    };
+  }
+
+  if (
+    currentContext.state === BookingFlowState.COMPLETE &&
+    !isRestart(input.userMessage) &&
+    !isCancel(input.userMessage)
+  ) {
+    return {
+      handled: false,
+      reply: "",
+      directiveType: ResponseDirectiveType.CONTINUE_CHAT,
+      state: BookingFlowState.COMPLETE,
     };
   }
 
