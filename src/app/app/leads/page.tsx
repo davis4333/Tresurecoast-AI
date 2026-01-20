@@ -5,6 +5,7 @@ import { TcaCard, TcaCardBody, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaButton } from "@/components/tca/TcaButton";
 import { TcaBadge } from "@/components/tca/TcaBadge";
 import { LeadDetailDrawer } from "./LeadDetailDrawer";
+import { Download } from "lucide-react";
 
 interface Lead {
   leadPublicId: string;
@@ -139,15 +140,34 @@ export default function LeadsPage() {
     }
   };
 
+  const handleExportCsv = () => {
+    const params = new URLSearchParams();
+    if (dateRange && dateRange !== "all") params.set("days", dateRange);
+    if (statusFilter) params.set("status", statusFilter);
+    if (tempFilter) params.set("temperature", tempFilter);
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    window.open(`/api/org/leads/export?${params.toString()}`, "_blank");
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="tca-gradient-text text-3xl font-extrabold tracking-tight">
-          Leads Inbox
-        </h2>
-        <p className="mt-2 text-[var(--color-text-secondary)]">
-          View and manage leads captured by your chatbots.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="tca-gradient-text text-3xl font-extrabold tracking-tight">
+            Leads Inbox
+          </h2>
+          <p className="mt-2 text-[var(--color-text-secondary)]">
+            View and manage leads captured by your chatbots.
+          </p>
+        </div>
+        <TcaButton
+          variant="secondary"
+          onClick={handleExportCsv}
+          data-testid="button-export-leads"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </TcaButton>
       </div>
 
       {summary && (
