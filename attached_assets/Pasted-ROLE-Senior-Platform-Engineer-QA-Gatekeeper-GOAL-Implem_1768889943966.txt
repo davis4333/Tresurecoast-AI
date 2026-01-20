@@ -1,0 +1,71 @@
+ROLE: Senior Platform Engineer + QA Gatekeeper.
+
+GOAL: Implement STEP 27 — Real multi-tenant membership + org context, replacing the current single-tenant “first org” placeholder logic.
+
+NON-NEGOTIABLES:
+- Do NOT change Organization.id type (must remain Int @id @default(autoincrement())).
+- All Prisma imports must use "@/lib/prisma" (no "@/lib/db").
+- Production MUST NOT allow DEV bypass. Dev bypass may exist only when DEV_BYPASS_AUTH="true" AND NODE_ENV!=="production".
+- All /api/org/* routes must use ONE shared helper: src/lib/auth/getOrgContext.ts
+- Enforce roles:
+  - AGENCY_OWNER / AGENCY_ADMIN can write branding + custom domain settings
+  - CLIENT is read-only (no token visibility, no edits)
+
+IMPLEMENTATION REQUIREMENTS:
+1) Prisma
+- Add OrganizationMember model:
+  - id Int @id @default(autoincrement())
+  - organizationId Int (FK → Organization.id, onDelete Cascade)
+  - clerkUserId String
+  - role String (AGENCY_OWNER|AGENCY_ADMIN|CLIENT)
+  - @@unique([organizationId, clerkUserId])
+  - @@index([clerkUserId]), @@index([organizationId])
+
+2) Migrations
+- Use Prisma migrate dev to generate the migration.
+- Do NOT hand-write table names unless required; prefer Prisma-generated migration.
+
+3) Auth Context
+Create: src/lib/auth/getOrgContext.ts
+- In production: requires Clerk auth userId; must find OrganizationMember by clerkUserId.
+- If no membership: return 403 no_membership.
+- Return: { ok:true, org:{id,...}, role, userId }
+- Provide helpers: isAdmin(role), isOwner(role)
+
+4) Route Refactors
+Modify these routes to use getOrgContext:
+- src/app/api/org/branding/route.ts
+- src/app/api/org/custom-domain/route.ts
+- src/app/api/org/custom-domain/verify/route.ts
+- src/app/api/org/custom-domain/rotate-token/route.ts
+
+Security changes:
+- Only admins can see domainVerificationToken in GET custom-domain.
+- Only admins can PUT/verify/rotate-token.
+
+5) Tests
+Add unit tests for getOrgContext:
+- 401 when unauthenticated in production
+- 403 when membership missing
+- ok when membership exists
+- invalid role rejected
+Add route tests verifying:
+- CLIENT cannot update branding or custom domain
+- token hidden for CLIENT on GET /custom-domain
+
+QUALITY GATES (must all pass):
+pnpm prisma generate
+pnpm prisma migrate dev --name step27_org_membership
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
+
+DELIVERABLE:
+- Commit with message: "Step 27: real org membership + org context"
+- Provide a concise QA evidence report including:
+  - schema diff summary
+  - migration name
+  - commands output summary
+  - 3 manual API curls showing 401/403/200 behavior
