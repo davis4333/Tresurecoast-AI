@@ -1,0 +1,52 @@
+ROLE: You are the senior engineer + QA gatekeeper. Implement a surgical fix, then prove it with tests + greps + gates.
+
+CONTEXT
+We added Industry Templates. The seeding dedup logic currently does:
+findFirst({ where: { OR: [{ contentHash }, { title: source.title }] } })
+This is NOT bot-scoped and can incorrectly skip seeding for other bots/orgs.
+
+GOAL
+Make knowledge seeding dedup SAFE and CORRECT:
+- Dedup must be scoped to (botId, contentHash) primarily.
+- Title-based dedup, if kept, must also be scoped to botId (and ideally to template-tagged entries only).
+- Do NOT introduce schema changes unless absolutely necessary.
+
+REQUIREMENTS
+1) Update src/lib/templates/seedKnowledge.ts so dedup check includes botId:
+   - For contentHash: require { botId, contentHash }.
+   - If title dedup is used, require { botId, title } (not global).
+   - Prefer only contentHash dedup since the DB already enforces @@unique([botId, contentHash]).
+   - If title dedup is retained, restrict it to template-seeded sources only (ex: title startsWith "Template:" or metadata/tag if exists). Do NOT block user-added KB with same title.
+
+2) Add unit tests:
+   - A test that seeds the same template KB into TWO different bots and asserts both bots get the KB.
+   - A test that title collisions across bots do not prevent seeding.
+   - A test that running seeding twice on the same bot remains idempotent (no duplicates).
+
+3) Add/Update E2E (only if quick):
+   - OPTIONAL: Add an E2E assertion that creating 2 clients with same template results in both bots having "Template:" KB items.
+
+4) Quality gates MUST be green:
+   pnpm lint
+   pnpm typecheck
+   pnpm vitest run
+   pnpm test:e2e
+   pnpm build
+
+5) VERBATIM OUTPUTS REQUIRED (paste back):
+A) rg -n "seedTemplateKnowledge|seedKnowledge|findFirst" src/lib/templates/seedKnowledge.ts -n
+B) Show the updated dedup query code block
+C) vitest output for the new tests
+D) E2E output (if changed)
+E) All quality gate outputs
+
+DO NOT:
+- Do not change unrelated files.
+- Do not weaken tenant isolation.
+- Do not add global dedup behavior.
+
+DELIVERABLE
+Reply with:
+1) What changed (files + short diff summary)
+2) Raw outputs for A–E
+3) Confirm: dedup is bot-scoped and idempotent

@@ -14,6 +14,14 @@ export interface SeedKnowledgeResult {
   titles: string[];
 }
 
+/**
+ * Seeds template-generated knowledge sources for a bot.
+ *
+ * Dedup logic (bot-scoped, safe for multi-tenant):
+ * 1. Primary: Skip if (botId, contentHash) already exists (DB-enforced unique).
+ * 2. Secondary: Skip if (botId, title) already exists AND title starts with "Template:".
+ *    This prevents duplicate template entries but allows user-added KB with same title.
+ */
 export async function seedTemplateKnowledge(
   botId: number,
   organizationId: number,
@@ -32,20 +40,35 @@ export async function seedTemplateKnowledge(
 
   for (const source of sources) {
     const contentHash = computeContentHash(source.content);
+    const isTemplateTitle = source.title.startsWith(TEMPLATE_TITLE_PREFIX);
 
-    const existing = await prisma.botKnowledgeSource.findFirst({
+    // Primary dedup: Check if exact content already exists for THIS bot
+    const existingByHash = await prisma.botKnowledgeSource.findFirst({
       where: {
         botId,
-        OR: [
-          { contentHash },
-          { title: source.title },
-        ],
+        contentHash,
       },
     });
 
-    if (existing) {
+    if (existingByHash) {
       skipped++;
       continue;
+    }
+
+    // Secondary dedup: Only check title collision for template-prefixed entries
+    // This prevents duplicate template KB but allows user KB with same title
+    if (isTemplateTitle) {
+      const existingByTitle = await prisma.botKnowledgeSource.findFirst({
+        where: {
+          botId,
+          title: source.title,
+        },
+      });
+
+      if (existingByTitle) {
+        skipped++;
+        continue;
+      }
     }
 
     await prisma.botKnowledgeSource.create({
