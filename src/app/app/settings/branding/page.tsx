@@ -186,7 +186,7 @@ export default function BrandingSettingsPage() {
                 value={brandPrimaryColor}
                 onChange={(e) => setBrandPrimaryColor(e.target.value)}
                 disabled={!whiteLabelEnabled}
-                data-testid="input-primary-color-picker"
+                data-testid="branding-color-input"
                 className="h-10 w-14 cursor-pointer rounded-md border border-[var(--color-border)] bg-transparent p-1 disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <input
@@ -214,7 +214,7 @@ export default function BrandingSettingsPage() {
               type="button"
               role="switch"
               aria-checked={showPoweredBy}
-              data-testid="toggle-powered-by"
+              data-testid="branding-powered-toggle"
               onClick={() => setShowPoweredBy(!showPoweredBy)}
               disabled={!whiteLabelEnabled}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${
@@ -237,7 +237,7 @@ export default function BrandingSettingsPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            data-testid="button-save-branding"
+            data-testid="branding-save-button"
             className="tca-btn-primary"
           >
             {saving ? "Saving..." : "Save Changes"}

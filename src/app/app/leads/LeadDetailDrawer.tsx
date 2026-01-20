@@ -185,12 +185,12 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
       <div
         className="fixed inset-0 z-40 bg-black/50"
         onClick={() => onOpenChange(false)}
-        data-testid="drawer-backdrop"
+        data-testid="leads-drawer-backdrop"
       />
 
       <div
         className="fixed right-0 top-0 z-50 flex h-full w-full max-w-lg flex-col border-l border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl"
-        data-testid="lead-drawer"
+        data-testid="leads-drawer"
       >
         {toast && (
           <div className="absolute left-4 right-4 top-4 z-50 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-hover)] px-4 py-3">
@@ -203,7 +203,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
           <button
             onClick={() => onOpenChange(false)}
             className="tca-focus-ring rounded-lg p-2 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
-            data-testid="button-close-drawer"
+            data-testid="leads-drawer-close"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -223,7 +223,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
             </div>
           ) : error ? (
             <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4">
-              <p className="text-sm text-red-400" data-testid="drawer-error">{error}</p>
+              <p className="text-sm text-red-400" data-testid="leads-drawer-error">{error}</p>
               <TcaButton
                 variant="secondary"
                 onClick={() => lead && fetchLeadDetails(lead.leadPublicId)}
@@ -241,7 +241,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                 <div className="space-y-3">
                   <div>
                     <span className="text-sm text-[var(--color-text-muted)]">Name</span>
-                    <p className="text-[var(--color-text-primary)]" data-testid="lead-name">
+                    <p className="text-[var(--color-text-primary)]" data-testid="leads-drawer-name">
                       {fullLead.name || "Not provided"}
                     </p>
                   </div>
@@ -252,7 +252,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                         <a
                           href={`mailto:${fullLead.email}`}
                           className="text-[var(--color-brand-primary)] hover:underline"
-                          data-testid="link-email"
+                          data-testid="leads-drawer-email"
                         >
                           {fullLead.email}
                         </a>
@@ -268,7 +268,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                         <a
                           href={`tel:${fullLead.phone}`}
                           className="text-[var(--color-brand-primary)] hover:underline"
-                          data-testid="link-phone"
+                          data-testid="leads-drawer-phone"
                         >
                           {fullLead.phone}
                         </a>
@@ -287,18 +287,18 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                 <div className="flex items-center gap-4">
                   <span
                     className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${TEMPERATURE_BADGE_CLASSES[fullLead.temperature]}`}
-                    data-testid="lead-temperature"
+                    data-testid="leads-drawer-temperature"
                   >
                     {fullLead.temperature}
                   </span>
-                  <span className="text-3xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="lead-score">
+                  <span className="text-3xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="leads-drawer-score">
                     {fullLead.score}
                   </span>
                 </div>
                 {fullLead.scoreReasons && fullLead.scoreReasons.length > 0 && (
                   <div className="mt-4">
                     <span className="text-sm text-[var(--color-text-muted)]">Score Breakdown</span>
-                    <ul className="mt-2 space-y-1 text-sm text-[var(--color-text-secondary)]" data-testid="score-reasons">
+                    <ul className="mt-2 space-y-1 text-sm text-[var(--color-text-secondary)]" data-testid="leads-drawer-score-reasons">
                       {fullLead.scoreReasons.map((reason, idx) => (
                         <li key={idx} className="flex items-start gap-2">
                           <span className="text-[var(--color-text-muted)]">-</span>
@@ -321,7 +321,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                       variant={fullLead.status === status ? "primary" : "secondary"}
                       onClick={() => handleStatusChange(status)}
                       disabled={isUpdating || fullLead.status === status}
-                      data-testid={`status-btn-${status.toLowerCase()}`}
+                      data-testid={`leads-drawer-status-${status.toLowerCase()}`}
                       className="text-xs"
                     >
                       {status}
@@ -339,13 +339,13 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add notes about this lead..."
                   className="tca-input tca-focus-ring min-h-[120px] w-full resize-none"
-                  data-testid="textarea-notes"
+                  data-testid="leads-drawer-notes"
                 />
                 <TcaButton
                   onClick={handleNotesSave}
                   disabled={isUpdating || notes === (fullLead.notes || "")}
                   className="mt-3"
-                  data-testid="button-save-notes"
+                  data-testid="leads-drawer-save-notes"
                 >
                   {isUpdating ? "Saving..." : "Save Notes"}
                 </TcaButton>
@@ -356,7 +356,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                   <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
                     Additional Information
                   </h3>
-                  <div className="space-y-2 text-sm" data-testid="lead-answers">
+                  <div className="space-y-2 text-sm" data-testid="leads-drawer-answers">
                     {Object.entries(fullLead.answers).map(([key, value]) => (
                       <div key={key} className="flex justify-between">
                         <span className="text-[var(--color-text-muted)]">{key}</span>
@@ -400,7 +400,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                 <div className="flex flex-wrap gap-2">
                   {fullLead.email && (
                     <a href={`mailto:${fullLead.email}`}>
-                      <TcaButton variant="secondary" data-testid="action-email">
+                      <TcaButton variant="secondary" data-testid="leads-drawer-action-email">
                         <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
@@ -410,7 +410,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                   )}
                   {fullLead.phone && (
                     <a href={`tel:${fullLead.phone}`}>
-                      <TcaButton variant="secondary" data-testid="action-call">
+                      <TcaButton variant="secondary" data-testid="leads-drawer-action-call">
                         <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                         </svg>
@@ -426,7 +426,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                   <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
                     Notification History
                   </h3>
-                  <ul className="space-y-2" data-testid="notification-logs">
+                  <ul className="space-y-2" data-testid="leads-drawer-notification-logs">
                     {fullLead.notificationLogs.map((log) => (
                       <li
                         key={log.publicId}

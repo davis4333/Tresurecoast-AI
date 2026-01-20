@@ -8,14 +8,14 @@ import { BrandingCssVars } from "@/components/branding/BrandingCssVars";
 import dynamic from "next/dynamic";
 
 const NAV_ITEMS = [
-  { href: "/app", label: "Dashboard", icon: "grid" },
-  { href: "/app/leads", label: "Leads", icon: "users" },
-  { href: "/app/bots", label: "Bots", icon: "bot" },
-  { href: "/app/kb", label: "Knowledge Base", icon: "bookOpen" },
-  { href: "/app/conversations", label: "Conversations", icon: "chat" },
-  { href: "/app/insights", label: "Insights", icon: "chart" },
-  { href: "/app/settings", label: "Settings", icon: "settings" },
-  { href: "/app/settings/branding", label: "Branding", icon: "palette" },
+  { href: "/app", label: "Dashboard", icon: "grid", testId: "nav-dashboard" },
+  { href: "/app/leads", label: "Leads", icon: "users", testId: "nav-leads" },
+  { href: "/app/bots", label: "Bots", icon: "bot", testId: "nav-bots" },
+  { href: "/app/kb", label: "Knowledge Base", icon: "bookOpen", testId: "nav-knowledge-base" },
+  { href: "/app/conversations", label: "Conversations", icon: "chat", testId: "nav-conversations" },
+  { href: "/app/analytics", label: "Analytics", icon: "chart", testId: "nav-analytics" },
+  { href: "/app/settings", label: "Settings", icon: "settings", testId: "nav-settings" },
+  { href: "/app/settings/branding", label: "Branding", icon: "palette", testId: "nav-branding" },
 ];
 
 function NavIcon({ icon }: { icon: string }) {
@@ -134,7 +134,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Link
               key={item.href}
               href={item.href}
-              data-testid={`nav-${item.label.toLowerCase()}`}
+              data-testid={item.testId}
               className={cx(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive(item.href)

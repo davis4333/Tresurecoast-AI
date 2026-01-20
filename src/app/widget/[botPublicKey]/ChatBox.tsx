@@ -318,10 +318,11 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
     : "Powered by Treasure Coast AI";
 
   return (
-    <div className="flex flex-col space-y-4">
+    <div className="flex flex-col space-y-4" data-testid="chatbox">
       {/* Header - premium branding section with animation */}
       <div
         className="tca-chat-header text-white"
+        data-testid="widget-header"
         style={{
           backgroundColor: headerBg,
         }}
@@ -366,6 +367,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
                 className={`max-w-[80%] sm:max-w-[70%] lg:max-w-[60%] ${
                   msg.role === "user" ? "tca-bubble-user" : "tca-bubble-assistant"
                 }`}
+                data-testid={msg.role === "user" ? `widget-message-user-${idx}` : `widget-message-assistant-${idx}`}
               >
                 <p className="text-sm leading-relaxed">{msg.content}</p>
               </div>
@@ -403,7 +405,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
               placeholder="Name"
               disabled={isSubmittingLead}
               className="tca-input tca-focus-ring"
-              data-testid="input-lead-name"
+              data-testid="widget-lead-name-input"
             />
             <input
               type="email"
@@ -412,7 +414,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
               placeholder="Email"
               disabled={isSubmittingLead}
               className="tca-input tca-focus-ring"
-              data-testid="input-lead-email"
+              data-testid="widget-lead-email-input"
             />
             <input
               type="tel"
@@ -421,7 +423,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
               placeholder="Phone"
               disabled={isSubmittingLead}
               className="tca-input tca-focus-ring"
-              data-testid="input-lead-phone"
+              data-testid="widget-lead-phone-input"
             />
             {leadError && (
               <p className="text-sm font-medium text-red-500" data-testid="error-lead-submission">
@@ -432,7 +434,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
               onClick={handleLeadSubmit}
               disabled={isSubmittingLead || !leadHasAny}
               className="tca-btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="button-lead-submit"
+              data-testid="widget-lead-submit"
             >
               {isSubmittingLead ? "Submitting..." : "Submit"}
             </button>
@@ -456,7 +458,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           placeholder="Type a message..."
           disabled={isSending || isLoadingHistory || showLeadForm || isSubmittingLead}
-          data-testid="chat-input"
+          data-testid="input-chat-message"
           className="tca-input tca-focus-ring flex-1"
         />
         <button
@@ -468,7 +470,7 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
             isSubmittingLead ||
             !message.trim()
           }
-          data-testid="chat-send"
+          data-testid="button-send-message"
           style={{
             backgroundColor: headerBg,
           }}

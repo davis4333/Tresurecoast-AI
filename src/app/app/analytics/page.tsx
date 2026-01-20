@@ -126,7 +126,7 @@ export default function AnalyticsPage() {
                 variant={days === d ? "primary" : "secondary"}
                 size="sm"
                 onClick={() => setDays(d)}
-                data-testid={`button-range-${d}`}
+                data-testid={`analytics-filter-range-${d}`}
               >
                 {d}d
               </TcaButton>
@@ -151,7 +151,7 @@ export default function AnalyticsPage() {
         {!loading && data && (
           <>
             {activityData && activityData.hotLeadCount > 0 && (
-              <TcaCard className="border-orange-500/30 bg-gradient-to-r from-orange-500/10 to-red-500/10" data-testid="card-hot-leads-alert">
+              <TcaCard className="border-orange-500/30 bg-gradient-to-r from-orange-500/10 to-red-500/10" data-testid="analytics-kpi-hot-leads-alert">
                 <TcaCardBody>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -171,7 +171,7 @@ export default function AnalyticsPage() {
                       variant="primary"
                       size="sm"
                       onClick={() => router.push("/app/leads?temperature=HOT")}
-                      data-testid="button-view-hot-leads"
+                      data-testid="analytics-kpi-view-hot-leads"
                     >
                       View Hot Leads
                     </TcaButton>
@@ -185,10 +185,10 @@ export default function AnalyticsPage() {
                           className="flex items-center justify-between rounded-lg bg-[var(--color-surface)] p-3"
                         >
                           <div>
-                            <div className="font-medium text-[var(--color-text-primary)]" data-testid={`text-lead-name-${lead.publicId}`}>
+                            <div className="font-medium text-[var(--color-text-primary)]" data-testid={`analytics-kpi-lead-name-${lead.publicId}`}>
                               {lead.name || lead.email || "Anonymous"}
                             </div>
-                            <div className="text-xs text-[var(--color-text-secondary)]" data-testid={`text-lead-service-${lead.publicId}`}>
+                            <div className="text-xs text-[var(--color-text-secondary)]" data-testid={`analytics-kpi-lead-service-${lead.publicId}`}>
                               {lead.serviceName && <span>{lead.serviceName} - </span>}
                               {formatTimeAgo(lead.createdAt)}
                             </div>
@@ -199,7 +199,7 @@ export default function AnalyticsPage() {
                                 variant="secondary"
                                 size="sm"
                                 onClick={() => window.open(`tel:${lead.phone}`, "_self")}
-                                data-testid={`button-call-${lead.publicId}`}
+                                data-testid={`analytics-kpi-call-${lead.publicId}`}
                               >
                                 <Phone className="mr-1 h-3 w-3" />
                                 Call
@@ -210,7 +210,7 @@ export default function AnalyticsPage() {
                                 variant="secondary"
                                 size="sm"
                                 onClick={() => window.open(`mailto:${lead.email}`, "_self")}
-                                data-testid={`button-email-${lead.publicId}`}
+                                data-testid={`analytics-kpi-email-${lead.publicId}`}
                               >
                                 <Mail className="mr-1 h-3 w-3" />
                                 Email
@@ -226,9 +226,9 @@ export default function AnalyticsPage() {
             )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <TcaCard data-testid="card-leads">
+              <TcaCard data-testid="analytics-kpi-leads">
                 <TcaCardBody className="text-center">
-                  <div className="text-3xl font-bold text-[var(--color-brand-primary)]" data-testid="text-total-leads">
+                  <div className="text-3xl font-bold text-[var(--color-brand-primary)]" data-testid="analytics-kpi-total-leads">
                     {totalLeads}
                   </div>
                   <div className="text-sm text-[var(--color-text-secondary)]">Total Leads</div>
@@ -240,9 +240,9 @@ export default function AnalyticsPage() {
                 </TcaCardBody>
               </TcaCard>
 
-              <TcaCard data-testid="card-clicks">
+              <TcaCard data-testid="analytics-kpi-clicks">
                 <TcaCardBody className="text-center">
-                  <div className="text-3xl font-bold text-[var(--color-brand-primary)]" data-testid="text-total-clicks">
+                  <div className="text-3xl font-bold text-[var(--color-brand-primary)]" data-testid="analytics-kpi-total-clicks">
                     {totalClicks}
                   </div>
                   <div className="text-sm text-[var(--color-text-secondary)]">Booking Clicks</div>
@@ -254,9 +254,9 @@ export default function AnalyticsPage() {
                 </TcaCardBody>
               </TcaCard>
 
-              <TcaCard data-testid="card-conversion">
+              <TcaCard data-testid="analytics-kpi-conversion">
                 <TcaCardBody className="text-center">
-                  <div className="text-3xl font-bold text-[var(--color-brand-primary)]" data-testid="text-conversion-rate">
+                  <div className="text-3xl font-bold text-[var(--color-brand-primary)]" data-testid="analytics-kpi-conversion-rate">
                     {calculateConversion(data.funnel.serviceSelected, data.funnel.linkClicked)}
                   </div>
                   <div className="text-sm text-[var(--color-text-secondary)]">Funnel Conversion</div>
@@ -266,7 +266,7 @@ export default function AnalyticsPage() {
                 </TcaCardBody>
               </TcaCard>
 
-              <TcaCard data-testid="card-lead-conversion">
+              <TcaCard data-testid="analytics-kpi-lead-conversion">
                 <TcaCardBody className="text-center">
                   <div className="text-3xl font-bold text-[var(--color-brand-primary)]">
                     {calculateConversion(data.funnel.leadCreated, data.funnel.linkClicked)}
@@ -279,7 +279,7 @@ export default function AnalyticsPage() {
               </TcaCard>
             </div>
 
-            <TcaCard data-testid="card-funnel">
+            <TcaCard data-testid="analytics-kpi-funnel">
               <TcaCardHeader>Booking Funnel with Conversion Rates</TcaCardHeader>
               <TcaCardBody>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -344,7 +344,7 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2 space-y-6">
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                  <TcaCard data-testid="card-leads-chart">
+                  <TcaCard data-testid="analytics-kpi-leads-chart">
                     <TcaCardHeader>Leads Over Time</TcaCardHeader>
                     <TcaCardBody>
                       {data.leadsByDay.length === 0 ? (
@@ -370,7 +370,7 @@ export default function AnalyticsPage() {
                     </TcaCardBody>
                   </TcaCard>
 
-                  <TcaCard data-testid="card-clicks-chart">
+                  <TcaCard data-testid="analytics-kpi-clicks-chart">
                     <TcaCardHeader>Clicks Over Time</TcaCardHeader>
                     <TcaCardBody>
                       {data.clicksByDay.length === 0 ? (
@@ -397,7 +397,7 @@ export default function AnalyticsPage() {
                   </TcaCard>
                 </div>
 
-                <TcaCard data-testid="card-clicks-by-service">
+                <TcaCard data-testid="analytics-kpi-clicks-by-service">
                   <TcaCardHeader>Clicks by Service</TcaCardHeader>
                   <TcaCardBody>
                     {data.clicksByService.length === 0 ? (
@@ -430,7 +430,7 @@ export default function AnalyticsPage() {
                 </TcaCard>
 
                 {data.topTopics.length > 0 && (
-                  <TcaCard data-testid="card-top-topics">
+                  <TcaCard data-testid="analytics-kpi-top-topics">
                     <TcaCardHeader>Top Topics Customers Ask About</TcaCardHeader>
                     <TcaCardBody>
                       <div className="flex flex-wrap gap-2">
@@ -449,7 +449,7 @@ export default function AnalyticsPage() {
               </div>
 
               <div className="space-y-6">
-                <TcaCard data-testid="card-activity">
+                <TcaCard data-testid="analytics-kpi-activity">
                   <TcaCardHeader>Recent Activity (24h)</TcaCardHeader>
                   <TcaCardBody>
                     {!activityData || activityData.activities.length === 0 ? (

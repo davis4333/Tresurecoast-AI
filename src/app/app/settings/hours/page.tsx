@@ -185,7 +185,7 @@ export default function HoursSettingsPage() {
               <div
                 key={day.dayOfWeek}
                 className="p-4 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)]"
-                data-testid={`day-row-${day.dayOfWeek}`}
+                data-testid={`hours-day-${day.dayOfWeek}`}
               >
                 <div className="flex items-center gap-4">
                   <div className="w-28 flex-shrink-0">
@@ -210,7 +210,7 @@ export default function HoursSettingsPage() {
                           ? "bg-[var(--color-brand-primary)]"
                           : "bg-[var(--color-surface-hover)]"
                       } ${!canEdit ? "opacity-50 cursor-not-allowed" : ""}`}
-                      data-testid={`toggle-open-${day.dayOfWeek}`}
+                      data-testid={`hours-closed-toggle-${day.dayOfWeek}`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -242,7 +242,7 @@ export default function HoursSettingsPage() {
                           className={`tca-input w-28 text-sm ${
                             dayError?.openTime ? "border-red-500" : ""
                           } ${!canEdit ? "opacity-50 cursor-not-allowed" : ""}`}
-                          data-testid={`input-open-${day.dayOfWeek}`}
+                          data-testid={`hours-open-input-${day.dayOfWeek}`}
                         />
                       </div>
                       <span className="text-[var(--color-text-muted)]">to</span>
@@ -254,7 +254,7 @@ export default function HoursSettingsPage() {
                         className={`tca-input w-28 text-sm ${
                           dayError?.closeTime ? "border-red-500" : ""
                         } ${!canEdit ? "opacity-50 cursor-not-allowed" : ""}`}
-                        data-testid={`input-close-${day.dayOfWeek}`}
+                        data-testid={`hours-close-input-${day.dayOfWeek}`}
                       />
                     </div>
                   )}
@@ -279,7 +279,7 @@ export default function HoursSettingsPage() {
                 onClick={handleRevert}
                 disabled={saving}
                 className="px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] flex items-center gap-2 disabled:opacity-50"
-                data-testid="button-revert"
+                data-testid="hours-revert-button"
               >
                 <RotateCcw className="w-4 h-4" />
                 Revert Changes
@@ -289,7 +289,7 @@ export default function HoursSettingsPage() {
               onClick={handleSave}
               disabled={!canSave || saving}
               className="tca-btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="button-save"
+              data-testid="hours-save-button"
             >
               <Save className="w-4 h-4" />
               {saving ? "Saving..." : "Save Hours"}

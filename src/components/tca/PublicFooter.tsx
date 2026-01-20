@@ -2,12 +2,12 @@ import Link from "next/link";
 
 const FOOTER_LINKS = {
   Product: [
-    { href: "/pricing", label: "Pricing" },
-    { href: "/demo", label: "Live Demo" },
-    { href: "/request-demo", label: "Request Demo" },
+    { href: "/pricing", label: "Pricing", testId: "footer-pricing" },
+    { href: "/demo", label: "Live Demo", testId: "footer-demo" },
+    { href: "/request-demo", label: "Request Demo", testId: "footer-request-demo" },
   ],
   Company: [
-    { href: "mailto:sales@treasurecoastai.com", label: "Contact" },
+    { href: "mailto:sales@treasurecoastai.com", label: "Contact", testId: "footer-contact" },
   ],
 };
 
@@ -17,7 +17,7 @@ export function PublicFooter() {
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="grid gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
-            <div className="mb-4 text-lg font-extrabold text-[var(--color-brand-primary)]">
+            <div className="mb-4 text-lg font-extrabold text-[var(--color-brand-primary)]" data-testid="footer-logo">
               Treasure Coast AI
             </div>
             <p className="max-w-sm text-sm text-[var(--color-text-secondary)]">
@@ -37,6 +37,7 @@ export function PublicFooter() {
                     <Link
                       href={link.href}
                       className="text-sm text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)]"
+                      data-testid={link.testId}
                     >
                       {link.label}
                     </Link>

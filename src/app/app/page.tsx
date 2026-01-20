@@ -22,7 +22,7 @@ export default function DashboardPage() {
       <SetupStatusCard />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Link href="/app/leads" className="group">
+        <Link href="/app/leads" className="group" data-testid="card-kpi-leads">
           <TcaCard className="h-full transition-all duration-200 hover:border-[var(--color-brand-primary)] hover:shadow-md">
             <TcaCardHeader>
               <div className="flex items-center gap-3">
@@ -32,18 +32,18 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="text-total-leads">—</div>
+                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="card-kpi-leads-value">—</div>
                   <div className="text-sm font-medium text-[var(--color-text-secondary)]">Total Leads</div>
                 </div>
               </div>
             </TcaCardHeader>
             <TcaCardBody>
-              <TcaButton variant="secondary" fullWidth data-testid="button-view-leads">View Leads</TcaButton>
+              <TcaButton variant="secondary" fullWidth data-testid="card-kpi-leads-action">View Leads</TcaButton>
             </TcaCardBody>
           </TcaCard>
         </Link>
 
-        <Link href="/app/bots" className="group">
+        <Link href="/app/bots" className="group" data-testid="card-kpi-bots">
           <TcaCard className="h-full transition-all duration-200 hover:border-[var(--color-brand-primary)] hover:shadow-md">
             <TcaCardHeader>
               <div className="flex items-center gap-3">
@@ -53,18 +53,18 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="text-active-bots">—</div>
+                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="card-kpi-bots-value">—</div>
                   <div className="text-sm font-medium text-[var(--color-text-secondary)]">Active Bots</div>
                 </div>
               </div>
             </TcaCardHeader>
             <TcaCardBody>
-              <TcaButton variant="secondary" fullWidth data-testid="button-manage-bots">Manage Bots</TcaButton>
+              <TcaButton variant="secondary" fullWidth data-testid="card-kpi-bots-action">Manage Bots</TcaButton>
             </TcaCardBody>
           </TcaCard>
         </Link>
 
-        <Link href="/app/conversations" className="group">
+        <Link href="/app/conversations" className="group" data-testid="card-kpi-conversations">
           <TcaCard className="h-full transition-all duration-200 hover:border-[var(--color-brand-primary)] hover:shadow-md">
             <TcaCardHeader>
               <div className="flex items-center gap-3">
@@ -74,13 +74,13 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="text-conversations">—</div>
+                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="card-kpi-conversations-value">—</div>
                   <div className="text-sm font-medium text-[var(--color-text-secondary)]">Conversations</div>
                 </div>
               </div>
             </TcaCardHeader>
             <TcaCardBody>
-              <TcaButton variant="secondary" fullWidth data-testid="button-view-conversations">View All</TcaButton>
+              <TcaButton variant="secondary" fullWidth data-testid="card-kpi-conversations-action">View All</TcaButton>
             </TcaCardBody>
           </TcaCard>
         </Link>
@@ -88,20 +88,20 @@ export default function DashboardPage() {
 
       <RevenueMetricsCard />
 
-      <TcaCard>
+      <TcaCard data-testid="card-quick-actions">
         <TcaCardHeader>
           <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Quick Actions</h3>
         </TcaCardHeader>
         <TcaCardBody>
           <div className="flex flex-wrap gap-3">
             <Link href="/app/leads">
-              <TcaButton data-testid="button-leads-inbox">View Leads Inbox</TcaButton>
+              <TcaButton data-testid="quick-action-leads">View Leads Inbox</TcaButton>
             </Link>
             <Link href="/app/bots">
-              <TcaButton variant="secondary" data-testid="button-configure-bots">Configure Bots</TcaButton>
+              <TcaButton variant="secondary" data-testid="quick-action-bots">Configure Bots</TcaButton>
             </Link>
             <Link href="/app/settings">
-              <TcaButton variant="ghost" data-testid="button-settings">Settings</TcaButton>
+              <TcaButton variant="ghost" data-testid="quick-action-settings">Settings</TcaButton>
             </Link>
           </div>
         </TcaCardBody>

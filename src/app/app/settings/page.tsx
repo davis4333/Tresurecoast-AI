@@ -16,7 +16,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Link href="/app/settings/business" data-testid="link-settings-business" className="group">
+        <Link href="/app/settings/business" data-testid="settings-business-link" className="group">
           <TcaCard className="h-full transition-all duration-200 hover:border-[var(--color-brand-primary)] hover:shadow-md cursor-pointer">
             <TcaCardHeader>
               <div className="flex items-center gap-3">
@@ -34,7 +34,7 @@ export default function SettingsPage() {
           </TcaCard>
         </Link>
 
-        <Link href="/app/settings/services" data-testid="link-settings-services" className="group">
+        <Link href="/app/settings/services" data-testid="settings-services-link" className="group">
           <TcaCard className="h-full transition-all duration-200 hover:border-[var(--color-brand-primary)] hover:shadow-md cursor-pointer">
             <TcaCardHeader>
               <div className="flex items-center gap-3">
@@ -52,7 +52,7 @@ export default function SettingsPage() {
           </TcaCard>
         </Link>
 
-        <Link href="/app/settings/hours" data-testid="link-settings-hours" className="group">
+        <Link href="/app/settings/hours" data-testid="settings-hours-link" className="group">
           <TcaCard className="h-full transition-all duration-200 hover:border-[var(--color-brand-primary)] hover:shadow-md cursor-pointer">
             <TcaCardHeader>
               <div className="flex items-center gap-3">
@@ -70,7 +70,7 @@ export default function SettingsPage() {
           </TcaCard>
         </Link>
 
-        <Link href="/app/settings/branding" data-testid="link-settings-branding" className="group">
+        <Link href="/app/settings/branding" data-testid="settings-branding-link" className="group">
           <TcaCard className="h-full transition-all duration-200 hover:border-[var(--color-brand-primary)] hover:shadow-md cursor-pointer">
             <TcaCardHeader>
               <div className="flex items-center gap-3">
@@ -88,7 +88,7 @@ export default function SettingsPage() {
           </TcaCard>
         </Link>
 
-        <Link href="/app/settings/notifications" data-testid="link-settings-notifications" className="group">
+        <Link href="/app/settings/notifications" data-testid="settings-notifications-link" className="group">
           <TcaCard className="h-full transition-all duration-200 hover:border-[var(--color-brand-primary)] hover:shadow-md cursor-pointer">
             <TcaCardHeader>
               <div className="flex items-center gap-3">

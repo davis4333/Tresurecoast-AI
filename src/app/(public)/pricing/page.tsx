@@ -79,7 +79,7 @@ export default function PricingPage() {
               </ul>
             </TcaCardBody>
             <TcaCardFooter>
-              <Link href="/request-demo" className="block">
+              <Link href="/request-demo" className="block" data-testid="link-pricing-starter-request-demo">
                 <TcaButton variant="secondary" fullWidth>Request Demo</TcaButton>
               </Link>
             </TcaCardFooter>
@@ -139,7 +139,7 @@ export default function PricingPage() {
               </ul>
             </TcaCardBody>
             <TcaCardFooter>
-              <Link href="/request-demo" className="block">
+              <Link href="/request-demo" className="block" data-testid="link-pricing-agency-contact-sales">
                 <TcaButton variant="secondary" fullWidth>Contact Sales</TcaButton>
               </Link>
             </TcaCardFooter>

@@ -221,7 +221,7 @@ export default function LeadsPage() {
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
                 className="tca-input w-full"
-                data-testid="select-date-range"
+                data-testid="leads-filter-date-range"
               >
                 <option value="7">Last 7 days</option>
                 <option value="30">Last 30 days</option>
@@ -238,7 +238,7 @@ export default function LeadsPage() {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="tca-input w-full"
-                data-testid="select-status"
+                data-testid="leads-filter-status"
               >
                 <option value="">All Statuses</option>
                 <option value="NEW">New</option>
@@ -256,7 +256,7 @@ export default function LeadsPage() {
                 value={tempFilter}
                 onChange={(e) => setTempFilter(e.target.value)}
                 className="tca-input w-full"
-                data-testid="select-temperature"
+                data-testid="leads-filter-temperature"
               >
                 <option value="">All Temperatures</option>
                 <option value="HOT">Hot</option>
@@ -275,7 +275,7 @@ export default function LeadsPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Name, email, or phone..."
                 className="tca-input w-full"
-                data-testid="input-search"
+                data-testid="leads-filter-search"
               />
             </div>
           </div>
@@ -343,7 +343,7 @@ export default function LeadsPage() {
                       key={lead.leadPublicId}
                       onClick={() => handleLeadClick(lead)}
                       className="cursor-pointer"
-                      data-testid={`lead-row-${lead.leadPublicId}`}
+                      data-testid={`leads-row-${lead.leadPublicId}`}
                     >
                       <td className="whitespace-nowrap text-[var(--color-text-secondary)]">
                         {formatDate(lead.createdAt)}
@@ -365,7 +365,7 @@ export default function LeadsPage() {
                         <div className="flex items-center gap-2">
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${TEMPERATURE_BADGE_CLASSES[lead.temperature] || ""}`}
-                            data-testid={`temp-${lead.leadPublicId}`}
+                            data-testid={`leads-row-temp-${lead.leadPublicId}`}
                           >
                             {lead.temperature}
                           </span>
@@ -377,7 +377,7 @@ export default function LeadsPage() {
                       <td>
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[lead.status] || ""}`}
-                          data-testid={`status-${lead.leadPublicId}`}
+                          data-testid={`leads-row-status-${lead.leadPublicId}`}
                         >
                           {lead.status}
                         </span>

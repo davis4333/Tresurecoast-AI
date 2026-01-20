@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 import { cx } from "./tca";
 
 const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/pricing", label: "Pricing" },
-  { href: "/demo", label: "Live Demo" },
-  { href: "/request-demo", label: "Request Demo" },
+  { href: "/", label: "Home", testId: "nav-home" },
+  { href: "/pricing", label: "Pricing", testId: "nav-pricing" },
+  { href: "/demo", label: "Live Demo", testId: "nav-demo" },
+  { href: "/request-demo", label: "Request Demo", testId: "nav-request-demo" },
 ];
 
 export function PublicNav() {
@@ -20,7 +20,7 @@ export function PublicNav() {
         <Link
           href="/"
           className="text-xl font-extrabold text-[var(--color-brand-primary)]"
-          data-testid="link-home-logo"
+          data-testid="nav-logo"
         >
           Treasure Coast AI
         </Link>
@@ -30,7 +30,7 @@ export function PublicNav() {
             <Link
               key={link.href}
               href={link.href}
-              data-testid={`link-nav-${link.label.toLowerCase().replace(/\s/g, "-")}`}
+              data-testid={link.testId}
               className={cx(
                 "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 pathname === link.href

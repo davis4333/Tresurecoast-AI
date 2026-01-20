@@ -67,7 +67,7 @@ export function BookingDirectives({
             <button
               key={service.id}
               onClick={() => onServiceSelect(service)}
-              data-testid={`button-service-${service.id}`}
+              data-testid={`widget-service-button-${service.id}`}
               style={{
                 backgroundColor: headerBg,
               }}
@@ -97,7 +97,7 @@ export function BookingDirectives({
           target="_blank"
           rel="noopener noreferrer"
           onClick={handleBookingLinkClick}
-          data-testid="link-booking"
+          data-testid="booking-link-button"
           style={{
             backgroundColor: headerBg,
           }}

@@ -327,7 +327,7 @@ export default function ServicesSettingsPage() {
             <button
               onClick={openAddModal}
               className="tca-btn-primary flex items-center gap-2"
-              data-testid="button-add-service"
+              data-testid="services-add-button"
             >
               <Plus className="w-4 h-4" />
               Add Service
@@ -350,7 +350,7 @@ export default function ServicesSettingsPage() {
               <button
                 onClick={openAddModal}
                 className="tca-btn-primary"
-                data-testid="button-add-service-empty"
+                data-testid="services-add-button-empty"
               >
                 Add Service
               </button>
@@ -362,7 +362,7 @@ export default function ServicesSettingsPage() {
               <div
                 key={service.id}
                 className="flex items-center gap-4 p-4 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)]"
-                data-testid={`service-row-${service.id}`}
+                data-testid={`services-row-${service.id}`}
               >
                 {canEdit && (
                   <div className="flex flex-col gap-1">
@@ -370,7 +370,7 @@ export default function ServicesSettingsPage() {
                       onClick={() => handleReorder(index, "up")}
                       disabled={index === 0}
                       className="p-1 rounded hover:bg-[var(--color-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed"
-                      data-testid={`button-move-up-${service.id}`}
+                      data-testid={`services-reorder-up-${service.id}`}
                       aria-label="Move up"
                     >
                       <ChevronUp className="w-4 h-4" />
@@ -379,7 +379,7 @@ export default function ServicesSettingsPage() {
                       onClick={() => handleReorder(index, "down")}
                       disabled={index === services.length - 1}
                       className="p-1 rounded hover:bg-[var(--color-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed"
-                      data-testid={`button-move-down-${service.id}`}
+                      data-testid={`services-reorder-down-${service.id}`}
                       aria-label="Move down"
                     >
                       <ChevronDown className="w-4 h-4" />
@@ -474,7 +474,7 @@ export default function ServicesSettingsPage() {
                     <button
                       onClick={() => openEditModal(service)}
                       className="p-2 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                      data-testid={`button-edit-${service.id}`}
+                      data-testid={`services-edit-button-${service.id}`}
                       aria-label="Edit service"
                     >
                       <Pencil className="w-4 h-4" />
@@ -482,7 +482,7 @@ export default function ServicesSettingsPage() {
                     <button
                       onClick={() => setDeleteConfirmId(service.id)}
                       className="p-2 rounded-lg hover:bg-red-500/10 text-[var(--color-text-secondary)] hover:text-red-400"
-                      data-testid={`button-delete-${service.id}`}
+                      data-testid={`services-delete-button-${service.id}`}
                       aria-label="Delete service"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -499,7 +499,7 @@ export default function ServicesSettingsPage() {
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
-          data-testid="modal-service"
+          data-testid="services-modal"
         >
           <div className="tca-card bg-[var(--color-surface)] p-6 w-full max-w-md mx-4 shadow-2xl">
             <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)] mb-6">
@@ -517,7 +517,7 @@ export default function ServicesSettingsPage() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., Men's Haircut"
                   className={`tca-input tca-focus-ring ${formErrors.name ? "border-red-500" : ""}`}
-                  data-testid="input-service-name"
+                  data-testid="services-name-input"
                 />
                 {formErrors.name && (
                   <p className="text-xs text-red-400 mt-1" data-testid="error-service-name">
@@ -538,7 +538,7 @@ export default function ServicesSettingsPage() {
                     onChange={(e) => setFormData({ ...formData, priceInput: e.target.value })}
                     placeholder="25.00"
                     className={`tca-input tca-focus-ring pl-7 ${formErrors.priceInput ? "border-red-500" : ""}`}
-                    data-testid="input-service-price"
+                    data-testid="services-price-input"
                   />
                 </div>
                 {formErrors.priceInput && (
@@ -558,7 +558,7 @@ export default function ServicesSettingsPage() {
                   onChange={(e) => setFormData({ ...formData, bookingUrl: e.target.value })}
                   placeholder="https://calendly.com/..."
                   className={`tca-input tca-focus-ring ${formErrors.bookingUrl ? "border-red-500" : ""}`}
-                  data-testid="input-booking-url"
+                  data-testid="services-bookingUrl-input"
                 />
                 {formErrors.bookingUrl && (
                   <p className="text-xs text-red-400 mt-1" data-testid="error-booking-url">
@@ -577,7 +577,7 @@ export default function ServicesSettingsPage() {
                   onChange={(e) => setFormData({ ...formData, paymentUrl: e.target.value })}
                   placeholder="https://pay.stripe.com/..."
                   className={`tca-input tca-focus-ring ${formErrors.paymentUrl ? "border-red-500" : ""}`}
-                  data-testid="input-payment-url"
+                  data-testid="services-paymentUrl-input"
                 />
                 {formErrors.paymentUrl && (
                   <p className="text-xs text-red-400 mt-1" data-testid="error-payment-url">
@@ -618,7 +618,7 @@ export default function ServicesSettingsPage() {
               <button
                 onClick={closeModal}
                 className="tca-btn-secondary tca-focus-ring"
-                data-testid="button-cancel"
+                data-testid="services-cancel-button"
               >
                 Cancel
               </button>
@@ -626,7 +626,7 @@ export default function ServicesSettingsPage() {
                 onClick={handleSave}
                 disabled={saving}
                 className="tca-btn-primary tca-focus-ring disabled:opacity-50"
-                data-testid="button-save-service"
+                data-testid="services-save-button"
               >
                 {saving ? "Saving..." : editingService ? "Save Changes" : "Add Service"}
               </button>
@@ -660,7 +660,7 @@ export default function ServicesSettingsPage() {
                 onClick={() => handleDelete(deleteConfirmId)}
                 disabled={deleting}
                 className="tca-focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
-                data-testid="button-confirm-delete"
+                data-testid="services-delete-button"
               >
                 {deleting ? "Deleting..." : "Delete"}
               </button>

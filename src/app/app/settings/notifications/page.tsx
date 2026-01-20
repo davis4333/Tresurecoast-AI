@@ -157,7 +157,7 @@ export default function NotificationsSettingsPage() {
                 onChange={(e) => mutation.mutate({ notificationEnabled: e.target.checked })}
                 disabled={mutation.isPending}
                 className="peer sr-only"
-                data-testid="toggle-notifications-enabled"
+                data-testid="notifications-enabled-toggle"
               />
               <div className="peer h-6 w-11 rounded-full bg-[var(--color-surface-hover)] after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-[var(--color-brand-primary)] peer-checked:after:translate-x-full peer-focus:outline-none" />
             </label>
@@ -180,7 +180,7 @@ export default function NotificationsSettingsPage() {
                   placeholder="email@example.com"
                   className="tca-input flex-1"
                   onKeyDown={(e) => e.key === "Enter" && handleAddEmail()}
-                  data-testid="input-add-email"
+                  data-testid="notifications-recipients-input"
                 />
                 <TcaButton
                   onClick={handleAddEmail}
@@ -233,7 +233,7 @@ export default function NotificationsSettingsPage() {
                       onChange={(e) => mutation.mutate({ notifyOnHotLead: e.target.checked })}
                       disabled={mutation.isPending}
                       className="peer sr-only"
-                      data-testid="toggle-hot-lead"
+                      data-testid="notifications-hot-leads-toggle"
                     />
                     <div className="peer h-6 w-11 rounded-full bg-[var(--color-surface-hover)] after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-[var(--color-brand-primary)] peer-checked:after:translate-x-full peer-focus:outline-none" />
                   </label>
@@ -253,7 +253,7 @@ export default function NotificationsSettingsPage() {
                       onChange={(e) => mutation.mutate({ notifyOnBookingClick: e.target.checked })}
                       disabled={mutation.isPending}
                       className="peer sr-only"
-                      data-testid="toggle-booking-click"
+                      data-testid="notifications-booking-toggle"
                     />
                     <div className="peer h-6 w-11 rounded-full bg-[var(--color-surface-hover)] after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-[var(--color-brand-primary)] peer-checked:after:translate-x-full peer-focus:outline-none" />
                   </label>
