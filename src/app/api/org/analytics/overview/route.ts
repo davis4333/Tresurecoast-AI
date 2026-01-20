@@ -57,33 +57,40 @@ export async function GET(request: NextRequest) {
     "BOOKING_LINK_CLICKED",
   ] as const;
 
-  const [funnelCounts, leadsByDay, clickEvents, topTopics, clicksByServiceRaw] = await Promise.all([
-    prisma.dataEvent.groupBy({
-      by: ["type"],
-      where: {
-        organizationId: ctx.org.id,
-        type: { in: [...funnelTypes] },
-        createdAt: { gte: range.start, lte: range.end },
-      },
-      _count: { conversationId: true },
-    }),
+  const [funnelCounts, leadsByDayRaw, clicksByDayRaw, topTopics, clicksByServiceRaw] = await Promise.all([
+    prisma.$queryRaw<Array<{ type: string; unique_conversations: bigint }>>`
+      SELECT type, COUNT(DISTINCT "conversationId") as unique_conversations
+      FROM "DataEvent"
+      WHERE "organizationId" = ${ctx.org.id}
+        AND type IN ('BOOKING_SERVICE_SELECTED', 'BOOKING_LEAD_CREATED', 'BOOKING_LINK_SHOWN', 'BOOKING_LINK_CLICKED')
+        AND "createdAt" >= ${range.start}
+        AND "createdAt" <= ${range.end}
+        AND "conversationId" IS NOT NULL
+      GROUP BY type
+    `,
 
-    prisma.lead.findMany({
-      where: {
-        organizationId: ctx.org.id,
-        createdAt: { gte: range.start, lte: range.end },
-      },
-      select: { createdAt: true },
-    }),
+    prisma.$queryRaw<Array<{ date: Date | string; unique_conversations: bigint }>>`
+      SELECT DATE("createdAt") as date, COUNT(DISTINCT "conversationId") as unique_conversations
+      FROM "Lead"
+      WHERE "organizationId" = ${ctx.org.id}
+        AND "createdAt" >= ${range.start}
+        AND "createdAt" <= ${range.end}
+        AND "conversationId" IS NOT NULL
+      GROUP BY DATE("createdAt")
+      ORDER BY date
+    `,
 
-    prisma.dataEvent.findMany({
-      where: {
-        organizationId: ctx.org.id,
-        type: "BOOKING_LINK_CLICKED",
-        createdAt: { gte: range.start, lte: range.end },
-      },
-      select: { createdAt: true, payload: true },
-    }),
+    prisma.$queryRaw<Array<{ date: Date | string; unique_conversations: bigint }>>`
+      SELECT DATE("createdAt") as date, COUNT(DISTINCT "conversationId") as unique_conversations
+      FROM "DataEvent"
+      WHERE "organizationId" = ${ctx.org.id}
+        AND type = 'BOOKING_LINK_CLICKED'
+        AND "createdAt" >= ${range.start}
+        AND "createdAt" <= ${range.end}
+        AND "conversationId" IS NOT NULL
+      GROUP BY DATE("createdAt")
+      ORDER BY date
+    `,
 
     prisma.dataEvent.groupBy({
       by: ["topic"],
@@ -101,7 +108,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         os.id as "serviceId",
         os.name as "serviceName",
-        COUNT(de.id) as "clicks"
+        COUNT(DISTINCT de."conversationId") as "clicks"
       FROM "DataEvent" de
       LEFT JOIN "OrganizationService" os ON (de.payload->>'serviceId')::int = os.id
       WHERE de."organizationId" = ${ctx.org.id}
@@ -109,35 +116,28 @@ export async function GET(request: NextRequest) {
         AND de."createdAt" >= ${range.start}
         AND de."createdAt" <= ${range.end}
         AND os.id IS NOT NULL
+        AND de."conversationId" IS NOT NULL
       GROUP BY os.id, os.name
       ORDER BY "clicks" DESC
     `,
   ]);
 
   const funnel = {
-    serviceSelected: funnelCounts.find((c) => c.type === "BOOKING_SERVICE_SELECTED")?._count?.conversationId || 0,
-    leadCreated: funnelCounts.find((c) => c.type === "BOOKING_LEAD_CREATED")?._count?.conversationId || 0,
-    linkShown: funnelCounts.find((c) => c.type === "BOOKING_LINK_SHOWN")?._count?.conversationId || 0,
-    linkClicked: funnelCounts.find((c) => c.type === "BOOKING_LINK_CLICKED")?._count?.conversationId || 0,
+    serviceSelected: Number(funnelCounts.find((c) => c.type === "BOOKING_SERVICE_SELECTED")?.unique_conversations || 0),
+    leadCreated: Number(funnelCounts.find((c) => c.type === "BOOKING_LEAD_CREATED")?.unique_conversations || 0),
+    linkShown: Number(funnelCounts.find((c) => c.type === "BOOKING_LINK_SHOWN")?.unique_conversations || 0),
+    linkClicked: Number(funnelCounts.find((c) => c.type === "BOOKING_LINK_CLICKED")?.unique_conversations || 0),
   };
 
-  const leadsByDayMap: Record<string, number> = {};
-  for (const lead of leadsByDay) {
-    const date = formatDateForBucket(lead.createdAt);
-    leadsByDayMap[date] = (leadsByDayMap[date] || 0) + 1;
-  }
-  const leadsByDayArray = Object.entries(leadsByDayMap)
-    .map(([date, count]) => ({ date, count }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const leadsByDayArray = leadsByDayRaw.map((row) => ({
+    date: row.date instanceof Date ? formatDateForBucket(row.date) : String(row.date).split("T")[0] ?? "",
+    count: Number(row.unique_conversations),
+  }));
 
-  const clicksByDayMap: Record<string, number> = {};
-  for (const event of clickEvents) {
-    const date = formatDateForBucket(event.createdAt);
-    clicksByDayMap[date] = (clicksByDayMap[date] || 0) + 1;
-  }
-  const clicksByDayArray = Object.entries(clicksByDayMap)
-    .map(([date, count]) => ({ date, count }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const clicksByDayArray = clicksByDayRaw.map((row) => ({
+    date: row.date instanceof Date ? formatDateForBucket(row.date) : String(row.date).split("T")[0] ?? "",
+    count: Number(row.unique_conversations),
+  }));
 
   const clicksByService = clicksByServiceRaw.map((row) => ({
     serviceId: row.serviceId,
