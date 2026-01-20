@@ -134,7 +134,10 @@ Preferred communication style: Simple, everyday language.
 - **Canonical Response**: Hours API always returns exactly 7 days (0=Sunday through 6=Saturday)
 - **Tenant Isolation**: All operations scoped to user's org via `getOrgContext()`
 - **Services UI**: `/app/settings/services` - Full CRUD editor with reorder, locked state for restricted clients
-- **Unit Tests**: `tests/unit/orgServices.route.test.ts`, `tests/unit/orgHours.*.test.ts`
+- **Hours UI**: `/app/settings/hours` - 7-day grid editor with open/close toggles, time inputs, validation, locked state
+- **Hours Helpers**: `src/lib/settings/hoursHelpers.ts` - dayLabel, isValidTime, compareTimes, validateDayRow, normalizeHours, hasChanges, preparePayload
+- **Unit Tests**: `tests/unit/orgServices.route.test.ts`, `tests/unit/orgHours.*.test.ts`, `tests/unit/hoursHelpers.test.ts`
+- **E2E Tests**: `tests/e2e/services-settings.spec.ts`, `tests/e2e/hours-settings.spec.ts`
 
 ### Industry Templates Architecture (Step 37)
 - **Location**: `src/lib/templates/*` - All template logic isolated here
