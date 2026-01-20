@@ -1,0 +1,248 @@
+Copy/paste this into Replit exactly. It’s written to force a clean Step 38 build (org-level Services + RBAC + tests + QA evidence) with zero hand-waving.
+
+⸻
+
+REPLIT PROMPT — NEXT BUILD STEP (STEP 38)
+
+TITLE: Step 38 — Organization Services (Org-Level) + RBAC + Tests + Migration + QA Evidence
+
+ROLE
+
+You are the platform’s Principal Engineer + QA Gatekeeper. Implement Step 38 end-to-end in the existing repo with strict tenant isolation and role-based access. Do not invent new architecture patterns—match what the codebase already uses (Step 27 getOrgContext, test patterns, prisma conventions).
+
+⸻
+
+OBJECTIVE (WHAT “DONE” MEANS)
+
+Add Organization-level Service Menu support so the platform can power deterministic booking flows later.
+
+When finished, the platform must have:
+	1.	A new Prisma model OrganizationService tied to organizationId (NOT botId).
+	2.	A new Organization flag allowClientEdits controlling whether CLIENT can modify business settings.
+	3.	A full CRUD API at /api/org/settings/services with strict RBAC and tenant isolation.
+	4.	Unit/integration tests proving RBAC + isolation + duplicate prevention.
+	5.	Migration applied and all quality gates pass.
+	6.	A QA Evidence Report with exact command outputs + grep proofs.
+
+⸻
+
+NON-NEGOTIABLE RULES
+	•	All org-scoped API routes must use getOrgContext({ testUserId: getTestUserId(req) }) exactly like Step 27.
+	•	Do NOT revert to any “first org” fallback. No local _helpers for auth.
+	•	Enforce RBAC:
+	•	AGENCY_OWNER / AGENCY_ADMIN: always can edit
+	•	CLIENT: can edit ONLY if Organization.allowClientEdits === true
+	•	Enforce tenant isolation on every query: organizationId = ctx.org.id
+	•	Use Next.js route flags:
+export const runtime = "nodejs"; and export const dynamic = "force-dynamic";
+	•	Validation is required (Zod). No loose any.
+	•	Tests must run in CI style and be deterministic.
+
+⸻
+
+STEP 38A — PRISMA SCHEMA CHANGES
+
+1) Modify prisma/schema.prisma
+
+Add this field to Organization model:
+	•	allowClientEdits Boolean @default(false)
+
+Add this new model:
+
+OrganizationService
+	•	id Int @id @default(autoincrement())
+	•	organizationId Int
+	•	name String
+	•	priceCents Int?
+	•	bookingUrl String?
+	•	paymentUrl String?
+	•	displayOrder Int @default(0)
+	•	isActive Boolean @default(true)
+	•	createdAt DateTime @default(now())
+	•	updatedAt DateTime @updatedAt
+	•	relation:
+	•	organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+	•	indexes/constraints:
+	•	@@index([organizationId])
+	•	@@unique([organizationId, name]) (plus implement API-level case-insensitive duplicate guard)
+
+Also add relation on Organization:
+	•	services OrganizationService[]
+
+⸻
+
+STEP 38B — API IMPLEMENTATION
+
+2) Create API route: src/app/api/org/settings/services/route.ts
+
+Implement handlers: GET, POST, PUT, DELETE.
+
+Shared requirements:
+	•	const ctx = await getOrgContext({ testUserId: getTestUserId(req) });
+	•	If !ctx.ok, return { ok:false, error, message } with ctx.status.
+	•	Load org allowClientEdits from DB (or include in ctx if ctx already selects it; do NOT trust stale values).
+	•	Define:
+	•	const canEdit = isAdmin(ctx.role) || (ctx.role === "CLIENT" && org.allowClientEdits);
+
+GET
+	•	Returns list of services for org, ordered:
+	•	displayOrder asc, id asc
+	•	Response shape:
+
+{ "ok": true, "services": [ ... ] }
+
+POST (create)
+	•	RBAC: require canEdit === true else 403
+	•	Validate body with Zod:
+	•	name: required string, trim, min 2, max 80
+	•	priceCents: optional int >= 0
+	•	bookingUrl/paymentUrl: optional valid URL
+	•	displayOrder: optional int >= 0
+	•	isActive: optional boolean
+	•	Duplicate prevention:
+	•	Must reject if another service in same org has same name ignoring case.
+	•	Return 409 { ok:false, error:"duplicate_service" }
+	•	Create in Prisma with organizationId = ctx.org.id
+
+PUT (update)
+	•	RBAC: require canEdit
+	•	Body includes id (or serviceId) + updatable fields validated with Zod.
+	•	Must confirm service belongs to org before update:
+	•	findUnique by id then verify organizationId matches ctx.org.id OR updateMany scoped by both id+organizationId.
+	•	Duplicate name rule applies if name changes (case-insensitive check).
+	•	Return updated service.
+
+DELETE
+	•	RBAC: require canEdit
+	•	Must delete only if service belongs to org:
+	•	use deleteMany({ where:{ id, organizationId: ctx.org.id }})
+	•	If nothing deleted, return 404.
+
+Status codes:
+	•	200 OK for GET/PUT/DELETE success
+	•	201 OK or 200 for POST (either ok)
+	•	400 validation errors
+	•	401/403 from ctx and RBAC
+	•	404 for missing resource
+	•	409 duplicate
+	•	500 internal errors with console.error tags like [API] ...
+
+⸻
+
+STEP 38C — VALIDATION MODULE
+
+3) Create src/lib/validators/orgServices.ts
+
+Export Zod schemas:
+	•	OrganizationServiceCreateSchema
+	•	OrganizationServiceUpdateSchema
+Include name normalization helper:
+	•	normalizeServiceName(name) => trimmed single-spaced string
+Also export serviceNameKey(name) => normalized lowercase used for duplicate checks.
+
+⸻
+
+STEP 38D — TESTS (MUST PASS)
+
+4) Create tests: tests/unit/orgServices.route.test.ts (or match repo convention)
+
+Write tests proving:
+
+Test Set 1: Tenant Isolation
+	•	Create Org A + Org B
+	•	Create service in Org A
+	•	Ensure GET as Org B does not return Org A service
+	•	Ensure Org B cannot update/delete Org A service (404)
+
+Test Set 2: RBAC
+	•	Create membership roles:
+	•	OWNER, ADMIN, CLIENT
+	•	Set allowClientEdits=false:
+	•	CLIENT POST/PUT/DELETE must return 403
+	•	Set allowClientEdits=true:
+	•	CLIENT can POST/PUT/DELETE (200/201)
+
+Test Set 3: Duplicate Prevention
+	•	In same org: create “Haircut”
+	•	attempt create “haircut” => must 409
+	•	In different org: “Haircut” allowed
+
+Test Set 4: CRUD Happy Path
+	•	POST create
+	•	GET returns it
+	•	PUT updates name/price/order
+	•	DELETE removes it
+	•	GET no longer includes it
+
+Use the repo’s existing strategy for:
+	•	seeding orgs/members
+	•	testUserId injection via getTestUserId(req) if present
+	•	Prisma test DB usage (follow patterns from earlier integration tests like seedKnowledgeIntegration)
+
+⸻
+
+STEP 38E — MIGRATION
+
+5) Run and commit migration
+
+Commands:
+	1.	pnpm prisma generate
+	2.	pnpm prisma migrate dev --name step38_org_services
+
+Ensure migration includes:
+	•	add allowClientEdits column on Organization
+	•	create OrganizationService table
+	•	FK orgId with cascade delete
+	•	unique index orgId+name
+	•	indexes
+
+⸻
+
+STEP 38F — QUALITY GATES (PASTE OUTPUTS)
+
+Run in order and paste the full outputs into a “Step 38 QA Evidence Report”:
+	1.	pnpm prisma generate
+	2.	pnpm prisma migrate status
+	3.	pnpm typecheck
+	4.	pnpm vitest run
+	5.	pnpm test:e2e
+	6.	pnpm build
+
+⸻
+
+STEP 38G — QA EVIDENCE REPORT REQUIREMENTS
+
+At the end, produce a report containing:
+	1.	File list proof
+
+	•	find src/app/api/org/settings/services -type f -maxdepth 2 -print
+	•	rg -n "OrganizationService|allowClientEdits" prisma/schema.prisma
+
+	2.	Route flags proof
+
+	•	rg -n 'export const runtime = "nodejs"|export const dynamic = "force-dynamic"' src/app/api/org/settings/services/route.ts
+
+	3.	RBAC proof
+
+	•	Show JSON outputs demonstrating:
+	•	CLIENT blocked when allowClientEdits=false (403)
+	•	CLIENT allowed when allowClientEdits=true (200)
+
+	4.	Tenant isolation proof
+
+	•	Show Org B cannot see Org A services
+
+	5.	Quality gate outputs pasted
+	6.	Commit message:
+
+	•	Step 38: org-level services settings with RBAC + tests
+
+⸻
+
+STOP CONDITION
+
+Do NOT start Step 39 UI until Step 38 is merged and all gates pass with evidence.
+
+⸻
+
+If anything conflicts with the existing repo structure, adapt file paths to match conventions—but keep the architecture rules above intact.

@@ -1,0 +1,100 @@
+Good roadmap structure (small, testable steps), but I’d change two big architectural choices right now so you don’t paint yourself into a corner:
+
+What I like
+	•	It’s broken into baby steps with clear phases.
+	•	It prioritizes the stuff that makes the product feel “real”: services + hours + booking flow + analytics.
+	•	It ends with launch QA instead of “we’ll test later.”
+
+What I’d fix (tell-it-like-it-is)
+
+1) Don’t attach Services/Hours to botId (use Organization-level, then optionally per-bot overrides)
+
+Replit’s Step 38/40 says: Service model ... botId and BusinessHours ... botId.
+
+That will hurt you later because:
+	•	Most businesses have one set of services/hours across all bots (website bot + SMS bot + FB bot, etc.)
+	•	You’ll duplicate data and create confusion if a client edits hours in one bot but not another.
+	•	Your whole product is “org-centric multi-tenant,” not “bot-centric.”
+
+Better:
+	•	Store OrganizationService + OrganizationHours at the Organization level.
+	•	If you later need bot-specific differences, add an optional override:
+	•	BotServiceOverride referencing serviceId, or
+	•	services can be org-level with botId nullable (null = org default).
+
+This keeps onboarding and UX clean.
+
+2) Don’t make CLIENT able to edit everything by default
+
+Replit proposes: “CLIENT can edit, AGENCY has full access.” That sounds good until you onboard real clients and they wreck configuration.
+
+Better permissions approach:
+	•	OWNER/ADMIN: full edit always
+	•	CLIENT: edit only if allowClientEdits=true (org setting toggle)
+	•	Or scope client edits to “safe” fields only (hours/contact) and lock monetization-critical ones (payment links) behind admin.
+
+You can still sell “self-service,” but you keep control.
+
+3) Booking flow should be a state machine, not ad-hoc intent logic
+
+Steps 42–44 are right, but the implementation needs discipline:
+	•	deterministic UI buttons
+	•	required lead fields (name/phone/email)
+	•	service context stored in conversation state
+	•	booking link displayed only after lead submit (or optional “skip”)
+
+If you do this as a state machine module, it’ll stay stable as features grow.
+
+4) The AI onboarding phase is fine — but you already said you’ll input the info
+
+So Phase 4 should be reframed:
+	•	Not “AI onboarding wizard required”
+	•	Instead: “optional AI enhancement mode” that generates:
+	•	draft FAQs
+	•	draft KB entries
+	•	draft “About” copy
+And ALWAYS requires review before publish.
+
+That’s safer + easier + more realistic.
+
+⸻
+
+My recommended version of their plan (minimal changes, big payoff)
+
+Phase 1: Business Settings (do this first)
+
+Step 38: Org-level Service model + API (not botId)
+Step 39: Service Editor UI
+Step 40: Org-level Hours model + API
+Step 41: Hours Editor UI
+(Optional Step 41.5: Contact info + policies — adds polish fast.)
+
+Phase 2: Booking Flow
+
+Step 42: Service selection buttons
+Step 43: Lead capture with service context
+Step 44: Booking link + click tracking
+
+Phase 3: Analytics
+
+Same as they wrote — but make sure events are logged at the moment they happen.
+
+Phase 4: AI Enhancement (optional)
+
+Generate drafts only, review required.
+
+⸻
+
+What I would tell Replit to start with (the best next move)
+
+Start with Step 38, but rewrite it as:
+	•	OrganizationService (orgId-scoped)
+	•	Endpoints under /api/org/settings/services (org-scoped)
+	•	Role: OWNER/ADMIN can edit; CLIENT edit only if enabled
+	•	Tests: tenant isolation + 409 duplicates + RBAC
+
+That sets you up for the rest without schema regret.
+
+⸻
+
+If you want, I’ll rewrite Replit’s Step 38 prompt in the exact style that gets you clean implementation + QA evidence (schemas, routes, tests, quality gates), and it’ll be aligned with Step 27’s getOrgContext pattern.

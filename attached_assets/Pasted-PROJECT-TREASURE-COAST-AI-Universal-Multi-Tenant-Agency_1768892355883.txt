@@ -1,0 +1,175 @@
+PROJECT: TREASURE COAST AI — Universal Multi-Tenant, Agency-Run AI Chatbot SaaS
+GOAL: Build a “must-have” platform for local service businesses where the website + product feels like a multi-million-dollar agency built it. The customer experience must scream: “We handle everything for you — you just run your business.”
+
+CORE BUSINESS MODEL (NON-NEGOTIABLE)
+1) Agency-first model:
+   - I (agency owner) create and configure client bots.
+   - Clients do NOT get full admin power. Clients mainly view performance + leads and can adjust only a limited set of business settings (like hours, booking links, service menu items).
+2) Universal multi-tenant SaaS:
+   - Many organizations (clients) exist inside one platform.
+   - Strong tenant isolation: no cross-org data leaks. Ever.
+3) AI does the heavy lifting:
+   - After I enter minimal inputs, AI should generate/assemble most of the client’s setup: profile, knowledge base, default FAQs, service routing behavior, lead capture flows, etc.
+
+WHAT “PERFECT” LOOKS LIKE
+A) Marketing Website (public-facing)
+- Must look premium and “agency-grade” (not generic template).
+- Clear value: “AI answers customers instantly, captures leads, routes to booking/payment, and gives you analytics.”
+- Primary CTA: “Get a Demo / Get Started”
+- Secondary CTA: “See Example Bot”
+- Social proof section, feature breakdown, and “how it works” steps.
+- Strong visual identity: dark-luxury, neon-glass, coastal dusk vibe. High-end UI polish, subtle motion, no tacky gradients.
+- Mobile-first must be flawless.
+
+B) Application (logged-in)
+Two main roles:
+1) AGENCY (me and agency staff)
+   - Create organizations (clients)
+   - Create bots per org
+   - Seed knowledge base (templates + AI expansions)
+   - Manage branding and white-label features
+   - Manage custom domain / DNS verification
+   - View system-wide analytics and health
+
+2) CLIENT (business owner / staff)
+   - View leads, conversations, clicks, top topics, traffic
+   - Manage lightweight settings ONLY:
+     * business hours
+     * booking links / payment links per service
+     * service menu (name, price, link)
+     * contact info
+     * maybe “special notices” (holiday hours)
+   - Cannot change core bot logic, cannot access system configuration, cannot see other orgs.
+
+FOUNDATIONAL FEATURES (ALREADY IN PROGRESS / MUST REMAIN TRUE)
+- Step 26: Custom domain DNS verification (TXT verification token, verified/pending/failed states) must remain correct.
+- Step 27: Real multi-tenant membership with OrganizationMember and role-based checks must remain correct.
+- All org-scoped API routes must use the shared getOrgContext helper (no “first org” shortcuts in production).
+- Admin-only token visibility: clients should not see sensitive verification tokens.
+
+THE BOT EXPERIENCE (THE THING THAT SELLS THE PRODUCT)
+The chatbot should feel extremely “smart but safe”:
+1) Truth Mode / Knowledge Base Grounding
+   - Bot should prioritize verified knowledge base sources.
+   - If the answer is not supported by the KB, it should say it doesn’t know (and optionally offer to collect contact info).
+   - No hallucinated facts. Ever.
+
+2) Lead Capture (core)
+   - When user intent = booking / pricing / availability / speak to someone:
+     * ask service selection
+     * ask name
+     * ask phone number
+     * ask email
+     * save lead to DB under the correct organization + bot
+     * show confirmation + present the correct booking/payment link
+
+3) Service → Correct Booking/Payment Link Routing (critical)
+   - Each service has its own target URL.
+   - Example: “Haircut” → haircut booking link
+             “Shave” → shave booking link
+             “Full package” → package link
+   - Bot guides user into selecting the service (buttons or quick replies preferred).
+   - After lead capture, provide the correct link and optionally open it.
+
+4) Analytics that matter to the client
+   - Leads over time
+   - Click-throughs on booking links
+   - Most common topics/questions
+   - Conversation volume
+   - (Optional later) missed-answer rate / KB gaps suggestions
+
+THE “AI DOES EVERYTHING” ONBOARDING (REALISTIC TARGET)
+We want a flow where I enter minimal info, AI builds most of the rest:
+
+Inputs I (agency) can provide (minimum viable set):
+- Business name
+- Business category (barber, salon, gym, etc.)
+- Address / phone / email
+- Website URL (if they have one)
+- Booking URL(s) and/or payment URLs per service (or one main link)
+- Hours (or “pull from site if possible”)
+- Short “about us” sentence (optional)
+
+AI automation goals:
+- Draft a business profile
+- Generate a starter FAQ set
+- Propose a service menu based on category (I approve/edit)
+- Build KB starter entries from:
+  * what I typed
+  * optional scraping of their public website pages (ONLY if allowed and reliable)
+- Identify missing items and ask me to confirm instead of guessing
+
+IMPORTANT: If scraping is not reliable or could violate restrictions, do NOT pretend. Instead, implement:
+- “Website import” that fetches a few allowed pages, extracts text, and creates a draft KB for review.
+- Clear review step before publishing.
+
+CLIENT ACCOUNT PROVISIONING (WHAT YOU WANT)
+Desired:
+- I can create a client, and the system provisions their account.
+- System sends them an email invite with a reset flow.
+
+Implementation reality:
+- Use an invite system (Clerk/whatever auth) rather than emailing “generic passwords.”
+- If emailing passwords is insecure, do NOT do it. Use secure magic-link or password reset link.
+
+PRODUCT REQUIREMENTS (ENGINEERING)
+1) Tenant isolation: orgId required on all data models that are tenant-scoped.
+2) Role-based access control:
+   - Agency owner/admin can manage org settings and domains.
+   - Client role can view analytics/leads and edit limited business settings only.
+3) Audit log for key changes (later, but design for it).
+4) Rate limiting + abuse prevention for public chat endpoints (later, but plan for it).
+5) Reliability:
+   - Deterministic behavior for service routing.
+   - No “random” AI behavior without constraints.
+6) Quality gates must always pass:
+   - pnpm typecheck
+   - pnpm build
+   - unit tests + e2e tests
+   - no new lint errors
+
+UI/UX REQUIREMENTS
+- Must feel premium: spacing, typography, consistent components, smooth interactions, great empty states.
+- Client dashboard should be clean, easy, and “business-owner friendly.”
+- The agency dashboard should be powerful and fast.
+- Widget UI must be fast and mobile-friendly.
+- Provide great microcopy. No “developer text.”
+
+WHAT TO BUILD NEXT (PRIORITY ORDER)
+1) Confirm core roles + permissions are correct everywhere (Step 27 enforcement across org routes).
+2) Build the “Client Settings” panel:
+   - Hours editor
+   - Service menu editor (service name + booking/payment URL)
+   - Contact info editor
+3) Implement deterministic “Service Selection → Lead Capture → Redirect Link” flow in the chatbot.
+4) Implement dashboard analytics views (leads + clicks + topics + conversations).
+5) Upgrade marketing site polish and messaging last (but keep it premium throughout).
+
+DEFINITION OF DONE (FOR EACH FEATURE)
+- Working UI
+- Correct DB writes scoped to org + bot
+- Role checks enforced
+- Tests added (unit + e2e where it matters)
+- Manual QA checklist included
+- Zero regression in existing quality gates
+
+DELIVERABLES
+- Implement features with minimal risk and maximum correctness.
+- If anything is ambiguous, implement a safe “review/approval” step rather than guessing.
+- Provide a short QA Evidence Report after each step:
+  * what changed
+  * commands run
+  * proof outputs
+  * any known limitations
+
+ABSOLUTE “DO NOT”
+- Do NOT bypass auth in production (ever).
+- Do NOT leak tokens or cross-tenant data.
+- Do NOT claim scraping/AI automation works if it doesn’t.
+- Do NOT add insecure password emailing.
+
+START NOW
+- Read the existing repo structure.
+- Identify current gaps relative to this vision.
+- Propose the next 1–2 steps only (baby steps).
+- Implement step 1 fully with tests + QA report, then stop.

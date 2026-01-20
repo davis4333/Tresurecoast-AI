@@ -63,6 +63,9 @@ model Organization {
   // Step 27 — Clerk organization mapping
   clerkOrganizationId String? @unique
 
+  // Step 38 — Client self-service permission
+  allowClientEdits Boolean @default(false)
+
   // White-label branding fields
   whiteLabelEnabled  Boolean @default(false)
   brandCompanyName   String?
@@ -88,6 +91,7 @@ model Organization {
   invites          OrganizationInvite[]
   knowledgeSources BotKnowledgeSource[]
   businessProfile  BusinessProfile?
+  services         OrganizationService[]
 
   @@index([createdAt])
 }
@@ -379,4 +383,22 @@ model DemoRequest {
 
   @@index([email])
   @@index([createdAt])
+}
+
+model OrganizationService {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  name           String
+  priceCents     Int?
+  bookingUrl     String?
+  paymentUrl     String?
+  displayOrder   Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
