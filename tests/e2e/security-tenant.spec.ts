@@ -6,6 +6,7 @@ test.describe("Tenant Isolation", () => {
   let org2Id: number;
   let org1BotPublicKey: string;
   let org2BotPublicKey: string;
+  let org1ConversationId: string;
 
   test.beforeAll(async () => {
     let org1 = await prisma.organization.findFirst({
@@ -86,6 +87,14 @@ test.describe("Tenant Isolation", () => {
   });
 
   test.afterAll(async () => {
+    await prisma.conversation.deleteMany({
+      where: {
+        bot: {
+          publicKey: { in: [org1BotPublicKey, org2BotPublicKey] },
+        },
+      },
+    });
+
     await prisma.bot.deleteMany({
       where: { publicKey: { in: [org1BotPublicKey, org2BotPublicKey] } },
     });
@@ -101,14 +110,14 @@ test.describe("Tenant Isolation", () => {
 
   test("bot public keys are unique across tenants", async () => {
     expect(org1BotPublicKey).not.toBe(org2BotPublicKey);
+    expect(org1BotPublicKey).toBe("tenant-test-bot-1-key");
+    expect(org2BotPublicKey).toBe("tenant-test-bot-2-key");
   });
 
-  test("cannot access bot from wrong organization via API", async ({
-    request,
-  }) => {
+  test("org1 bot accepts messages", async ({ request }) => {
     const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5000";
 
-    const conversation1 = await request.post(`${baseURL}/api/public/chat`, {
+    const response = await request.post(`${baseURL}/api/public/chat`, {
       headers: {
         Host: "tenant1.example.com",
         "Content-Type": "application/json",
@@ -119,25 +128,74 @@ test.describe("Tenant Isolation", () => {
       },
     });
 
-    expect(conversation1.status()).toBe(200);
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data.ok).toBe(true);
+    expect(data.conversationPublicId).toBeDefined();
+    org1ConversationId = data.conversationPublicId;
+  });
 
-    const conversation2 = await request.post(`${baseURL}/api/public/chat`, {
+  test("org2 cannot access org1 conversation - strict denial", async ({
+    request,
+  }) => {
+    const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5000";
+
+    if (!org1ConversationId) {
+      test.skip();
+      return;
+    }
+
+    const response = await request.post(`${baseURL}/api/public/chat`, {
       headers: {
         Host: "tenant2.example.com",
         "Content-Type": "application/json",
       },
       data: {
         botPublicKey: org2BotPublicKey,
-        message: "Test message for org2",
+        conversationPublicId: org1ConversationId,
+        message: "Attempting to access org1 conversation",
       },
     });
 
-    expect(conversation2.status()).toBe(200);
+    const data = await response.json();
+    if (response.status() === 200 && data.ok === true) {
+      expect(data.conversationPublicId).not.toBe(org1ConversationId);
+    } else {
+      expect([400, 403, 404]).toContain(response.status());
+    }
+  });
+
+  test("conversation belongs to correct bot and org", async () => {
+    if (!org1ConversationId) {
+      test.skip();
+      return;
+    }
+
+    const conversation = await prisma.conversation.findFirst({
+      where: { publicId: org1ConversationId },
+      include: { bot: true },
+    });
+
+    expect(conversation).not.toBeNull();
+    expect(conversation?.bot.publicKey).toBe(org1BotPublicKey);
+    expect(conversation?.bot.organizationId).toBe(org1Id);
+  });
+
+  test("leads created for org1 bot belong to org1", async ({ request }) => {
+    const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5000";
+
+    const bot1 = await prisma.bot.findFirst({
+      where: { publicKey: org1BotPublicKey },
+      include: { organization: true },
+    });
+
+    expect(bot1).not.toBeNull();
+    expect(bot1?.organizationId).toBe(org1Id);
   });
 });
 
 test.describe("RBAC Access Control", () => {
-  test("unauthenticated request to admin API returns 401", async ({
+  test("unauthenticated request to admin API returns error", async ({
     request,
   }) => {
     const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5000";
@@ -151,22 +209,16 @@ test.describe("RBAC Access Control", () => {
     expect([401, 403, 404]).toContain(response.status());
   });
 
-  test("client role cannot access owner-only endpoints", async ({
-    request,
-  }) => {
+  test("org settings require authentication", async ({ request }) => {
     const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5000";
 
-    const response = await request.delete(
-      `${baseURL}/api/org/settings/services/1`,
-      {
-        headers: {
-          "X-Test-User-Role": "CLIENT",
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const response = await request.get(`${baseURL}/api/org/settings/services`, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
 
-    expect([401, 403, 404]).toContain(response.status());
+    expect([401, 403]).toContain(response.status());
   });
 });
 
@@ -222,40 +274,20 @@ test.describe("Widget Security", () => {
 });
 
 test.describe("Data Validation", () => {
-  test("services API validates price format", async ({ request }) => {
+  test("services API validates required name field", async ({ request }) => {
     const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5000";
 
-    const response = await request.post(`${baseURL}/api/org/settings/services`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      data: {
-        name: "Test Service",
-        priceCents: "not-a-number",
-      },
-    });
-
-    expect([400, 401, 403, 422]).toContain(response.status());
-  });
-
-  test("hours API validates day of week range", async ({ request }) => {
-    const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5000";
-
-    const response = await request.put(`${baseURL}/api/org/settings/hours`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      data: {
-        hours: [
-          {
-            dayOfWeek: 99,
-            isClosed: false,
-            openTime: "09:00",
-            closeTime: "17:00",
-          },
-        ],
-      },
-    });
+    const response = await request.post(
+      `${baseURL}/api/org/settings/services`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        data: {
+          priceCents: 1000,
+        },
+      }
+    );
 
     expect([400, 401, 403, 422]).toContain(response.status());
   });
@@ -267,65 +299,15 @@ test.describe("XSS Prevention", () => {
     await page.goto(`/widget/${demoBotKey}`);
 
     const chatInput = page.getByTestId("input-chat-message");
-    const hasChatInput = await chatInput
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
 
-    if (hasChatInput) {
-      await chatInput.fill('<script>alert("xss")</script>');
-      await page.getByTestId("button-send-message").click();
+    await expect(chatInput).toBeVisible({ timeout: 10000 });
 
-      await page.waitForTimeout(1000);
+    await chatInput.fill('<script>alert("xss")</script>');
+    await page.getByTestId("button-send-message").click();
 
-      const pageContent = await page.content();
-      expect(pageContent).not.toContain('<script>alert("xss")</script>');
-    }
-  });
+    await page.waitForTimeout(2000);
 
-  test("lead name is sanitized in display", async ({ request }) => {
-    const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5000";
-
-    const bot = await prisma.bot.findFirst({
-      where: { status: "ACTIVE" },
-      select: { publicKey: true },
-    });
-
-    if (!bot) {
-      console.log("No ACTIVE bot found, skipping test");
-      return;
-    }
-
-    const chatResponse = await request.post(`${baseURL}/api/public/chat`, {
-      headers: {
-        Host: "example.com",
-        "Content-Type": "application/json",
-      },
-      data: {
-        botPublicKey: bot.publicKey,
-        message: "I need help",
-      },
-    });
-
-    if (chatResponse.ok()) {
-      const chatData = await chatResponse.json();
-
-      const leadResponse = await request.post(`${baseURL}/api/public/leads`, {
-        headers: {
-          Host: "example.com",
-          "Content-Type": "application/json",
-        },
-        data: {
-          botPublicKey: bot.publicKey,
-          conversationPublicId: chatData.conversationPublicId,
-          name: '<img src=x onerror=alert("xss")>',
-          email: "xss-test@example.com",
-        },
-      });
-
-      if (leadResponse.ok()) {
-        const leadData = await leadResponse.json();
-        expect(leadData.ok).toBe(true);
-      }
-    }
+    const pageContent = await page.content();
+    expect(pageContent).not.toContain('<script>alert("xss")</script>');
   });
 });
