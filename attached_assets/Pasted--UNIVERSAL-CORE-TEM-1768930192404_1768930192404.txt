@@ -1,0 +1,108 @@
+===============================================================================
+UNIVERSAL CORE + TEMPLATE-DRIVEN MAGIC (NON-NEGOTIABLE)
+===============================================================================
+
+U0 — UNIVERSAL CORE ONLY (NO INDUSTRY BAKED IN)
+- The core platform must be industry-agnostic.
+- No barber/salon/gym/contractor assumptions in core models, core UI copy, core flows, core scoring, or core truth logic.
+- Any industry-specific wording, FAQs, services, policies, or flows must live ONLY in:
+  A) Templates (industry packs)
+  B) Per-organization settings
+  C) Per-bot knowledge base entries
+- The only “universal” features in core are:
+  - tenant isolation + RBAC
+  - settings system (services/hours/contact/policies)
+  - Truth Mode retrieval + answer rules
+  - deterministic booking flow FSM
+  - lead capture + scoring + lead inbox
+  - analytics/events
+  - widget embed + domain allowlists + custom domain
+  - optional AI draft generation with review
+
+U1 — TEMPLATE SYSTEM IS THE MAGIC
+Templates are “Industry Packs” that define:
+- Suggested service names/pricing placeholders (optional)
+- Suggested FAQ topics
+- Suggested knowledge base entries (draft)
+- Suggested tone/personality guidelines
+- Suggested lead-capture questions (if needed) as OPTIONAL “extra questions”
+- Suggested topic detection synonyms (industry-specific terms)
+- Suggested compliance disclaimers (industry-specific) if relevant
+
+Templates MUST NOT directly publish content without review.
+Templates should seed content as DRAFT by default unless explicitly “trusted baseline” entries are pre-approved.
+Template seeding must be idempotent and bot-scoped (no duplicates, no cross-bot leakage).
+
+U2 — TEMPLATE SELECTION MODEL (UNIVERSAL)
+- A bot can select exactly one template at creation, but may switch later (switching MUST NOT overwrite published content).
+- Template switching rules:
+  - Never delete existing KB
+  - Never overwrite published entries
+  - When switching templates: only add missing draft entries and label them with templateId + version
+  - Always show review screen listing “new drafts added” vs “unchanged”
+
+U3 — TRUTH MODE STILL RULES (NO HALLUCINATIONS)
+Even as we “get better,” the assistant output must ALWAYS be grounded.
+That means:
+- The assistant may ONLY answer using:
+  1) Published KB entries
+  2) Organization settings (services/hours/contact/policies)
+  3) Explicitly approved system copy (very small, universal only)
+- If uncertain or missing, it must say so and offer booking/lead capture.
+- “Learning” must NOT cause the bot to invent facts about a business.
+
+U4 — “AI GETS BETTER OVER TIME” (REALISTIC, SAFE, UNIVERSAL)
+We implement continuous improvement in TWO safe layers:
+
+LAYER 1: TEMPLATE IMPROVEMENTS (AGENCY-LEVEL, GLOBAL, SAFE)
+- We log aggregated analytics signals across tenants WITHOUT storing tenant private data:
+  - top topics frequency (by template)
+  - drop-off points in booking flow
+  - lead conversion rates by template + service naming patterns (anonymized)
+- Based on these signals, we improve templates:
+  - better draft KB suggestions
+  - better intent keyword lists
+  - better “unknown fallback” phrasing
+  - better optional follow-up questions (universal)
+- This improvement is shipped as template version bumps (v1 → v2 → v3).
+- No tenant’s private KB/content is copied into templates.
+- Templates are “better defaults,” not shared business data.
+
+LAYER 2: ORG/BOT-SPECIFIC IMPROVEMENTS (PRIVATE, TRUTH-LOCKED)
+- Inside each tenant, we improve the bot by:
+  - detecting unanswered frequent questions → generate DRAFT KB suggestions
+  - highlighting missing settings fields (hours/services/contact/policies)
+  - suggesting improvements to existing KB phrasing (DRAFT edits)
+- The system can propose drafts, but NOTHING goes live without explicit approval.
+- The “learning” output is: “drafts waiting for review,” not silent behavioral changes.
+
+U5 — TEMPLATE PACK STRUCTURE (REQUIRED)
+Create a templates system that has:
+- Template metadata:
+  - templateId (string, stable)
+  - name (string)
+  - description
+  - version (int)
+  - tags (array)
+- Template content:
+  - draftKbEntries[]: { title, content, tags, category, sourceType="template", templateId, version }
+  - suggestedServices[]: { name, priceCents?, bookingUrlPlaceholder?, displayOrder }
+  - keywordSets: bookingIntent[], pricingIntent[], locationIntent[], etc (industry-specific additions)
+  - optionalQuestions[]: (only if you want extra lead questions, else keep out of core)
+- Template must be loadable locally from the repo (no external dependency required).
+
+U6 — UNIVERSAL UI COPY RULE
+- In the app UI, avoid industry terms unless the selected template calls for it.
+- Core pages say “Business,” “Service,” “Booking,” “Customer,” “Leads.”
+- Template-specific pages (optional) can show “Barber,” “Salon,” etc ONLY if template is selected.
+
+U7 — ACCEPTANCE TESTS (MUST ADD/VERIFY)
+- Test that core flows work with a “Generic Local Business” template (baseline).
+- Test that changing templates does NOT overwrite published KB.
+- Test that template seeding is idempotent and bot-scoped.
+- Test that analytics improvements change only template drafts, not tenant facts.
+- Test that Truth Mode never answers beyond approved KB/settings even if template includes broader suggestions.
+
+===============================================================================
+END UNIVERSAL CORE + TEMPLATE SYSTEM
+===============================================================================

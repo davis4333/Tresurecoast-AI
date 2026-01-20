@@ -1,0 +1,463 @@
+YOU ARE: Principal Architect + Product Lead + Security Engineer + QA Gatekeeper.
+GOAL: Build a premium, universal, multi-tenant chatbot SaaS for local businesses that:
+- Looks like a multi-million-dollar agency built it (premium design, fast, polished).
+- Provides an embeddable website chat widget that captures leads and routes booking.
+- Uses “Truth Mode” (answers only from approved knowledge base + business settings; no hallucinations).
+- Gives business owners a client dashboard showing leads, conversations, clicks, booking funnel, and top topics.
+- Lets the agency (me) create/setup bots fast with minimal input; AI generates drafts but ALWAYS requires review.
+- Tenants are strictly isolated; RBAC is enforced; production has no dev bypass.
+
+NON-NEGOTIABLE PRODUCT PRINCIPLES
+1) Premium UI/UX: clean, modern, fast, mobile-first; clear CTAs; strong typography/spacing; polished empty states.
+2) Universal template model: works for barbers, salons, gyms, contractors, etc.
+3) Truth Mode: answers must be grounded (KB + settings). If unknown, it says so and offers lead capture/booking.
+4) Booking flow is deterministic: service select → name → phone → email → confirm → booking link.
+5) Business owner value: “I can see it making me money”: leads, hot/warm/cold, funnel conversion, clicks, top topics.
+6) Agency ease: I can create a bot in minutes; AI does heavy lifting but I approve before publishing.
+7) Security: tenant isolation, least privilege RBAC, no cross-org leaks, audit-friendly logging.
+
+STACK (LOCKED)
+- Next.js App Router (Node runtime routes where needed)
+- TypeScript strict
+- Prisma + Postgres
+- Clerk auth
+- Playwright E2E + Vitest unit tests
+- Tailwind + component library used consistently across settings/dashboard
+
+ROLES (RBAC)
+- AGENCY_OWNER (full control)
+- AGENCY_ADMIN (nearly full control)
+- CLIENT (can view; can edit only if organization.allowClientEdits = true)
+
+DATA MODEL (HIGH LEVEL)
+- Organization (tenant)
+- OrganizationMember (clerkUserId + role)
+- Bot (belongs to Organization)
+- KnowledgeBaseEntry (belongs to Bot OR Organization depending on design; must be grounded)
+- Conversation (belongs to Bot; stores bookingState JSONB)
+- Lead (belongs to Organization + Bot; stores serviceId optional; status + temperature + score reasons)
+- OrganizationService (org-level services with booking/payment URLs)
+- OrganizationHours (org-level weekly hours)
+- DataEvent (analytics events; org-scoped; indexed)
+- NotificationLog (later; for email/SMS proof)
+
+BUILD STRATEGY
+- Baby steps only: each step must be small, shippable, and fully tested.
+- Every step must include:
+  (a) schema changes + migration (if needed)
+  (b) API endpoints
+  (c) UI wiring
+  (d) tests (unit + e2e where appropriate)
+  (e) QA Evidence Report with command outputs:
+      pnpm prisma generate
+      pnpm prisma migrate status
+      pnpm typecheck
+      pnpm test (vitest)
+      pnpm test:e2e
+      pnpm build
+
+-----------------------------------------
+PHASE 0 — FOUNDATION (Steps 1–10)
+-----------------------------------------
+
+STEP 1 — Repo + Tooling Baseline
+- Configure pnpm, TypeScript strict, ESLint, Prettier.
+- Add env validation (Zod).
+- Add CI scripts:
+  - pnpm typecheck
+  - pnpm test
+  - pnpm test:e2e
+  - pnpm build
+
+STEP 2 — UI System + Brand Tokens
+- Create a premium design system:
+  - colors, spacing, typography, shadows, radii
+  - consistent buttons, inputs, cards, skeletons, toasts, modals
+- Build base layout shells:
+  - Public layout (marketing)
+  - App layout (authenticated dashboard)
+- Define a “premium” look: clean, minimal, high contrast, smooth animation (subtle).
+
+STEP 3 — Auth + RBAC
+- Integrate Clerk.
+- Build OrganizationMember model + getOrgContext helper (single source of truth).
+- No “first org” pattern in production.
+- Dev bypass allowed only if NODE_ENV != production and DEV_BYPASS_AUTH=true.
+- Add RBAC helpers isAdmin/isOwner.
+
+STEP 4 — Tenant Isolation Contract
+- Every org-scoped route must call getOrgContext.
+- Every org query must include organizationId filter.
+- Add unit tests that attempt cross-org reads/writes and verify denial.
+
+STEP 5 — App Navigation + Settings Hub
+- Build left nav + settings hub page:
+  - Branding
+  - Services
+  - Hours
+  - Analytics
+  - Leads
+  - Bots
+- Premium empty states and tooltips.
+
+STEP 6 — Bot Model + Create Flow (Agency)
+- Agency can create bot under an org.
+- Bot has publicKey for widget embed.
+- Basic bot settings: name, industry template selection.
+
+STEP 7 — Widget Embed Shell
+- Build embeddable widget route /widget/[botPublicKey]
+- Domain allowlist support
+- Chat UI shell: messages, typing, input box, event logging
+
+STEP 8 — Conversations + Persistence
+- Conversation model
+- Store messages + metadata
+- Ensure privacy and tenant scope
+
+STEP 9 — Lead Model + Basic Capture (Non-booking)
+- Lead schema with:
+  - name, phone, email, notes
+  - temperature + score + scoreReasons
+  - status (NEW/CONTACTED/BOOKED/CLOSED)
+  - leadPublicId
+- Basic capture endpoint and storage
+
+STEP 10 — Marketing Pages v1
+- Home, Pricing, Demo, Request Demo
+- Looks premium enough to sell the concept early.
+
+-----------------------------------------
+PHASE 1 — TRUTH MODE CORE (Steps 11–20)
+-----------------------------------------
+
+STEP 11 — Knowledge Base (Grounded Content)
+- KB entry model (title, content, sourceType, tags, status=published/draft)
+- KB retrieval scoped to bot/org
+- Only published KB is used in answers.
+
+STEP 12 — Truth Engine v1
+- Answer generation rules:
+  - Only use KB + business settings
+  - If unknown: say you don’t know, offer lead capture or booking
+- Add unit tests: no hallucination, correct fallback behavior.
+
+STEP 13 — Topic Detection + Event Logging
+- Detect topics (pricing, hours, location, booking, etc.)
+- Write DataEvent logs for analytics (orgId, botId, conversationId, type, payload)
+
+STEP 14 — Template Library
+- Build industry templates (barber, salon, gym, contractor, etc.)
+- Template seeding creates bot-scoped KB entries without duplicates (idempotent)
+- Add integration tests for dedup + bot isolation.
+
+STEP 15 — Admin/Agency Dashboard v1
+- Org list, bot list, create bot, view system health.
+
+STEP 16 — Client Dashboard Shell
+- Read-only overview page that feels premium
+- Shows leads count, clicks, conversations, last activity.
+
+STEP 17 — Invite-only Client Access
+- Agency invites client users to an org as CLIENT role via Clerk
+- No public signup.
+
+STEP 18 — Rate Limiting + Abuse Protection
+- Protect public chat endpoint
+- Prevent spam lead creation
+- Ensure safe input handling
+
+STEP 19 — File/Upload Hygiene (if needed)
+- If logos/images: validate, store safely
+
+STEP 20 — QA + Hardening Pass
+- Run all gates; fix flakiness; lock standards.
+
+-----------------------------------------
+PHASE 2 — WHITE LABEL + CUSTOM DOMAIN (Steps 21–30)
+-----------------------------------------
+
+STEP 21 — Organization Branding (White Label)
+- Org fields:
+  - whiteLabelEnabled, brandCompanyName, brandLogoUrl, brandPrimaryColor, showPoweredBy
+- UI to update these (admin only)
+- Widget reads these settings.
+
+STEP 22 — Custom Domain DNS Verification
+- Domain normalization + validation
+- TXT verification token and status machine (pending/verified/failed)
+- Token must be 64-hex with safety guards
+- Routes runtime nodejs
+- UI with clear DNS instructions
+
+STEP 23 — Production Safety
+- DEV_BYPASS_AUTH never active in production
+- Add tests to ensure bypass disabled when NODE_ENV=production
+
+STEP 24 — Role-Scoped Secrets
+- Only admins can see verification tokens
+- Clients see status only
+
+STEP 25 — UI Polish Pass (Branding/Domain)
+- Premium UI quality: badges, copy buttons, toasts, empty states
+
+STEP 26 — Multi-Tenant Membership Enforcement
+- OrganizationMember model + getOrgContext applied to all org routes
+- Security proof: client cannot perform admin actions
+
+STEP 27 — E2E Coverage for Settings
+- Services/hours/branding/custom-domain flows tested
+
+STEP 28 — “Settings Hub” feels like a product
+- Navigation, icons, descriptions, progress state
+
+STEP 29 — Audit/Events baseline
+- Log settings changes events (optional)
+
+STEP 30 — QA Gate: Zero Cross-Tenant Leaks
+- Add explicit tests attempting to fetch other org data.
+
+-----------------------------------------
+PHASE 3 — BUSINESS SETTINGS (SERVICES + HOURS) (Steps 31–37)
+-----------------------------------------
+
+STEP 31 — OrganizationService (Org-level)
+- Model: name, price optional, bookingUrl, paymentUrl, displayOrder, orgId
+- API CRUD /api/org/settings/services
+- RBAC: owner/admin always; client only if allowClientEdits=true
+- Duplicate prevention (case-insensitive) and unit tests
+
+STEP 32 — Services Editor UI
+- /app/settings/services
+- Add/edit/delete modal
+- reorder up/down
+- locked banner for client if editing not allowed
+- E2E tests: full CRUD, reorder, validation, duplicate handling
+
+STEP 33 — OrganizationHours (Org-level)
+- 7 days with unique constraint
+- Bulk PUT replace in transaction
+- Validation: time format, closed day null times, open before close
+- RBAC identical to services
+
+STEP 34 — Hours Editor UI
+- /app/settings/hours weekly grid
+- open/closed toggles, time inputs, inline validation
+- dirty state detection, revert, save
+- E2E tests for save/persist/validation
+
+STEP 35 — Contact Info Quick Win
+- Org fields: phone/email/address
+- UI editor and use in truth answers
+
+STEP 36 — Settings Used by Truth Engine
+- Truth engine can answer: hours, services, location, contact, pricing
+- If business settings missing: ask for them, or offer lead capture
+
+STEP 37 — QA + UX Polish Pass
+- Everything feels cohesive and premium in settings.
+
+-----------------------------------------
+PHASE 4 — BOOKING FLOW THAT PRINTS LEADS (Steps 38–44)
+-----------------------------------------
+
+STEP 38 — Booking FSM (Deterministic)
+- FSM states:
+  IDLE → SERVICE_SELECTION → LEAD_NAME → LEAD_PHONE → LEAD_EMAIL → COMPLETE
+- Validation hardened for name/phone/email/url
+- Unit tests for validators and transitions
+
+STEP 39 — Booking Runtime Orchestrator + Chat Integration
+- Persist bookingState JSONB in Conversation
+- Booking runs BEFORE truth engine
+- Pull booking URLs ONLY from OrganizationService (no AI hallucination)
+- Idempotent lead creation (API-level + DB-level if possible)
+- Early return with booking directives for UI
+
+STEP 40 — Booking UI Directives in Widget
+- Service buttons for selection
+- Lead capture prompts
+- Booking link button on completion
+
+STEP 41 — Booking Analytics Event Types
+- BOOKING_SERVICE_SELECTED
+- BOOKING_LEAD_CREATED
+- BOOKING_LINK_SHOWN
+- BOOKING_LINK_CLICKED
+- Ensure unique conversation counting for funnel metrics
+
+STEP 42 — Lead Model Enhancements
+- Add serviceId to Lead (nullable FK)
+- Unique constraint (conversationId, serviceId) for idempotency
+
+STEP 43 — Booking Click Tracking Endpoint
+- PATCH /api/public/booking-click to log click events
+
+STEP 44 — QA + Proof
+- Full flow E2E:
+  - intent triggers booking
+  - service select
+  - lead captured
+  - booking link shown
+  - click tracked
+  - lead serviceId attached
+- All gates pass.
+
+-----------------------------------------
+PHASE 5 — ANALYTICS + LEAD INBOX (Steps 45–52)
+-----------------------------------------
+
+STEP 45 — Analytics Aggregation API
+- /api/org/analytics/overview
+- MUST use COUNT(DISTINCT conversationId) where appropriate
+- Funnel: selected → lead → shown → clicked
+- clicks by service
+- top topics
+- org-scoped and indexed (organizationId, type, createdAt)
+
+STEP 46 — Analytics Dashboard UI
+- /app/analytics
+- KPIs + date range (7/30/90)
+- charts for daily trends
+- service breakdown table
+- top topics
+
+STEP 47 — Lead Inbox API
+- /api/org/leads list with:
+  - filters, cursor pagination, tenant scope
+  - summary counts by status/temperature
+- /api/org/leads/[leadPublicId] detail with scoreReasons and answers
+- PATCH update status/notes with RBAC
+- Tests for pagination correctness and org-scope
+
+STEP 48 — Lead Inbox UI
+- /app/leads
+- stats cards
+- filters
+- sortable table + pagination
+- lead detail drawer:
+  - click-to-call/email
+  - service association
+  - score breakdown
+  - status update buttons
+  - notes editor
+  - loading skeletons
+
+STEP 49 — “Business Owner Value” UX Pass
+- Make it obvious it’s making money:
+  - funnel conversion shown clearly
+  - hot leads highlighted
+  - booking clicks highlighted
+  - recent activity / timeline for last 24h
+
+STEP 50 — Agency Workflow Speed Pass
+- “Create client bot” wizard for agency:
+  - choose template
+  - enter services/hours/contact
+  - generate drafts for KB/FAQs/about using AI
+  - ALWAYS review screen before publish
+  - one-click publish to bot
+
+STEP 51 — AI Draft Generator (Optional but aligned with vision)
+- AI generates:
+  - about text
+  - FAQs
+  - suggested KB entries
+- Must cite sources (if website import used) OR mark “draft”
+- Nothing goes live without approval.
+
+STEP 52 — Website Import (Optional)
+- Input business website
+- Fetch public pages and extract text
+- Create draft KB entries for review.
+
+-----------------------------------------
+PHASE 6 — NOTIFICATIONS + “MUST HAVE” FEATURES (Steps 53–60)
+-----------------------------------------
+
+STEP 53 — Hot Lead Notifications (Email first)
+- Notification settings:
+  - enabled
+  - recipients
+  - triggers: hot lead created, booking link clicked
+- NotificationLog for proof + retries
+- UI at /app/settings/notifications
+- Tests: trigger → log → send mocked
+
+STEP 54 — Booking Confirmation + Follow-up
+- Optional: automatic “thanks” message and follow-up tasks for owner
+
+STEP 55 — Hardening: Security + Abuse
+- rate limiting and spam protection
+- input sanitization
+- audit trail for key settings changes
+
+STEP 56 — Performance
+- indexes + query optimization
+- caching where appropriate
+- widget load time and LCP improved
+
+STEP 57 — “Premium Marketing Site” Polish
+- Testimonials, strong messaging, visuals
+- Clear CTA to request demo
+- Case-study style landing pages for niches (barber/salon/gym etc.)
+
+STEP 58 — Production Readiness Checklist
+- env vars locked
+- dev bypass disabled
+- clerk keys configured
+- domain verification works
+- error monitoring setup (basic)
+
+STEP 59 — End-to-End Launch QA
+- Full flow test:
+  agency creates org → creates bot → configures services/hours → publishes widget
+  customer chats → booking flow → lead created → dashboard shows analytics and lead inbox
+  owner receives notification email (if enabled)
+
+STEP 60 — Launch Pack
+- Demo org + demo bot preloaded
+- “How to embed” instructions
+- Sales checklist:
+  - pricing page
+  - feature sheet
+  - screenshot set
+  - cold outreach script
+  - demo script
+
+-----------------------------------------
+DEFINITION OF DONE (FINAL)
+-----------------------------------------
+The product is “sellable” when:
+1) Public marketing site looks premium and converts.
+2) Agency can create a bot quickly with template + services/hours/contact, and optionally AI drafts with review.
+3) Widget is embeddable, grounded in Truth Mode, captures leads, runs booking flow deterministically.
+4) Client dashboard shows:
+   - analytics funnel and top topics
+   - lead inbox with management
+   - settings pages (services/hours/contact) (edit gated)
+5) Tenant isolation and RBAC proven with tests.
+6) All quality gates pass reliably:
+   pnpm prisma generate
+   pnpm prisma migrate status
+   pnpm typecheck
+   pnpm test
+   pnpm test:e2e
+   pnpm build
+
+OUTPUT REQUIREMENT EACH STEP
+At the end of every step, produce a QA Evidence Report including:
+- Files changed list
+- Migration name and status
+- Endpoint smoke tests
+- Role enforcement proof
+- Test outputs
+- Build output
+
+START NOW
+If the codebase already contains later steps, do not rewrite them.
+Instead:
+1) detect what is implemented,
+2) confirm correctness via tests,
+3) proceed to the next missing step in order,
+4) keep changes minimal and consistent with existing patterns.

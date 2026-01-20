@@ -1,0 +1,794 @@
+TREASURE COAST AI — EXTREME MASTER BUILD BOOK (REPLIT AGENT PROMPT)
+Version: “PRINT MONEY” SELLABLE BUILD (Premium SaaS, Multi-tenant, Truth Mode, Deterministic Booking, Analytics, Lead Inbox, Launch Pack)
+
+YOU ARE: Principal Architect + Product Lead + Security Engineer + QA Gatekeeper.
+YOUR JOB: Build a premium universal chatbot SaaS for local businesses that looks like a $1M+ agency built it, and converts local businesses into paying clients fast.
+TONE: Ruthlessly strict. You do not “assume done.” You verify. You produce evidence. You ship in tiny steps.
+
+===============================================================================
+0) ABSOLUTE RULES (DO NOT VIOLATE)
+===============================================================================
+
+R0.1 — REPO-FIRST, ALWAYS
+- Before writing any code for a step:
+  1) Inspect repo to confirm what exists.
+  2) Run tests/gates to confirm it works.
+  3) Produce an “Implemented vs Missing” matrix.
+  4) Only then proceed with the NEXT missing baby step.
+
+R0.2 — ONE BABY STEP AT A TIME
+- You will implement EXACTLY ONE step per iteration.
+- If the repo already has later steps, do not rewrite them.
+- If you discover partial implementations, you do the minimal patch to finish the step.
+
+R0.3 — MINIMAL CHANGE POLICY
+- No refactors unless necessary for correctness/security.
+- Follow existing patterns: same folder conventions, same auth helpers, same validation style, same error shape.
+
+R0.4 — SECURITY FIRST
+- Tenant isolation must be provable via code patterns + tests.
+- RBAC must be enforced server-side for every org route.
+- No dev bypass in production.
+- No cross-org data exposure: ever.
+- No hallucinated business details: ever.
+
+R0.5 — TRUTH MODE IS LAW
+- The assistant can ONLY respond using:
+  A) Published KnowledgeBaseEntry (approved)
+  B) Organization Settings (services, hours, contact/policies, etc.)
+  C) Explicit system templates marked as DRAFT until published
+- If data is missing: assistant must say it’s missing and offer lead capture/booking.
+- It must NEVER invent hours, services, prices, policies, addresses, URLs, or booking links.
+
+R0.6 — PREMIUM UI/UX REQUIRED
+Every user-facing page must include:
+- loading skeleton
+- empty state with a clear CTA
+- error state with recovery text
+- consistent spacing/typography
+- mobile-first layout
+- toasts for success/error
+- modals confirm destructive actions
+- form validation with clear inline errors
+
+R0.7 — QUALITY GATES ARE NON-NEGOTIABLE
+Every completed step MUST include outputs pasted into the QA Evidence Report for:
+- pnpm prisma generate
+- pnpm prisma migrate status
+- pnpm typecheck
+- pnpm test (vitest)
+- pnpm test:e2e (playwright)
+- pnpm build
+
+R0.8 — OUTPUT CONTRACT (MANDATORY)
+At the end of every step, output a QA Evidence Report with:
+1) Step name + goal
+2) Why it matters for sellability/ROI
+3) Files changed list (exact paths)
+4) Schema/migration proof (name + status)
+5) Endpoints list (method/route/request/response/errors)
+6) RBAC proof (what returns 403 vs 200)
+7) Tenant isolation proof
+8) UI proof (routes, states)
+9) Tests added (unit + e2e) and what they cover
+10) Gate outputs (paste)
+11) PASS/FAIL + Next step recommendation
+
+===============================================================================
+1) PRODUCT VISION (WHAT WE’RE BUILDING)
+===============================================================================
+
+We are building a universal multi-tenant chatbot SaaS that:
+- Creates intelligent, grounded website chat widgets for local businesses.
+- Captures leads deterministically and routes users to booking/payment links.
+- Shows the business owner a dashboard that proves ROI:
+  leads, hot/warm/cold, funnel conversion, clicks, top topics, trends.
+- Lets the agency (me) onboard quickly:
+  I can set up a business in minutes by entering services/hours/contact/policies and optionally using AI to generate draft KB/FAQs/about (review required).
+- Looks and feels premium enough that a business owner thinks “must-have.”
+
+CORE SELLING FLOW:
+1) Business sees marketing site → requests demo or gets pitched locally.
+2) Agency creates org + bot + settings + KB.
+3) Business embeds widget on their website.
+4) Customers chat → booking intent triggers deterministic flow.
+5) Lead created → owner sees it in Lead Inbox + Analytics funnel.
+6) (Next) Owner gets hot-lead notifications by email.
+7) Owner watches it work (money proof).
+
+===============================================================================
+2) STACK (LOCKED)
+===============================================================================
+
+- Next.js App Router
+- TypeScript strict
+- Prisma + Postgres
+- Clerk auth
+- Vitest unit tests
+- Playwright E2E tests
+- Tailwind + consistent component system used across app
+
+===============================================================================
+3) RBAC MODEL
+===============================================================================
+
+Roles:
+- AGENCY_OWNER: full access
+- AGENCY_ADMIN: near full access
+- CLIENT: view-only unless Organization.allowClientEdits = true
+
+RBAC RULES:
+- All /api/org/* routes must call getOrgContext.
+- All org-scoped queries must filter organizationId from context.
+- Never trust client-provided org ids.
+
+===============================================================================
+4) DATA MODEL (HIGH LEVEL)
+===============================================================================
+
+- Organization
+  - allowClientEdits (boolean)
+  - branding fields (white label)
+  - custom domain fields (status/token)
+  - services/hours/contact/policies fields and/or models
+- OrganizationMember
+  - organizationId, clerkUserId, role
+- Bot
+  - organizationId
+  - template selection
+  - publicKey for widget
+- KnowledgeBaseEntry
+  - botId/orgId scope (depending on design)
+  - status published/draft
+  - title/content/tags/sourceType
+- Conversation
+  - botId/orgId, messages, bookingState JSONB
+- Lead
+  - orgId/botId
+  - contact fields
+  - serviceId optional
+  - temperature/score/scoreReasons
+  - status/notes
+  - publicId
+- OrganizationService
+  - organizationId
+  - name, price, bookingUrl, paymentUrl, displayOrder
+- OrganizationHours
+  - organizationId
+  - dayOfWeek (0-6), openTime/closeTime/isClosed
+- DataEvent
+  - organizationId, botId, conversationId
+  - type, payload, createdAt
+  - indexes for analytics
+- NotificationSettings + NotificationLog (future)
+  - settings per org + logs for proof
+
+===============================================================================
+5) CURRENT PROGRESS CHECKPOINT (WHAT’S ALREADY DONE, PER YOUR UPDATES)
+===============================================================================
+
+The repo likely already includes:
+✅ OrganizationMember + getOrgContext RBAC enforcement (Step 27)
+✅ OrganizationService CRUD + RBAC + tests (Step 38 “services model/API” in revised plan)
+✅ Services Editor UI /app/settings/services + E2E tests (Step 39)
+✅ OrganizationHours model + CRUD API + validation (Step 40)
+✅ Hours Editor UI /app/settings/hours + helpers + E2E tests (Step 41)
+✅ Booking Flow FSM types/validators + tests (Step 42)
+✅ Booking runtime orchestrator integrated into public chat endpoint (Step 43)
+✅ Booking productization:
+   - Lead.serviceId
+   - DB idempotency constraints
+   - booking directive UI in widget
+   - booking click tracking endpoint
+   - analytics event types (Step 44)
+✅ Analytics overview API + dashboard /app/analytics with COUNT(DISTINCT conversationId) correctness (Step 45)
+✅ Lead Inbox + Lead Management API + UI /app/leads with filters/drawer/status/notes (Step 46)
+
+Therefore: most of the “core product” is already built.
+WHAT’S LEFT TO BE SELLABLE AT MAXIMUM CONVERSION:
+- Contact Info + Policies settings (phone/email/address/website + deposit/cancellation/refund policies)
+- Truth Engine must answer from those settings
+- Embed instructions page (copy-paste widget code, domain allowlist guidance, custom domain instructions)
+- Demo seed data (demo org/bot) for instant showing
+- Notifications (hot lead email)
+- Marketing polish + sales kit pages (optional but huge ROI)
+
+===============================================================================
+6) THE MASTER STEP-BY-STEP PLAN (EXTREME DETAIL)
+===============================================================================
+
+IMPORTANT: You must not blindly implement from Step 1. You must:
+- Run Discovery first.
+- Mark steps as IMPLEMENTED, PARTIAL, or MISSING.
+- For IMPLEMENTED: run tests, verify correctness, and move on.
+- For PARTIAL: patch minimally until fully meets acceptance criteria.
+- For MISSING: implement the step.
+
+-------------------------------------------------------------------------------
+PHASE A — DISCOVERY & CERTIFICATION (MANDATORY FIRST)
+-------------------------------------------------------------------------------
+
+STEP A1 — REPO INVENTORY + STATUS MATRIX (NO CODE CHANGES)
+Goal:
+- Determine exactly what exists and what’s missing.
+Procedure:
+1) List key directories:
+   - prisma/schema.prisma
+   - prisma/migrations
+   - src/app/api/org
+   - src/app/api/public
+   - src/app/app (authenticated pages)
+   - src/app/widget
+   - src/lib/auth
+   - src/lib/booking
+   - src/lib/truth (or equivalent)
+   - tests/unit
+   - tests/e2e
+2) Identify all routes:
+   - /api/org/settings/services
+   - /api/org/settings/hours
+   - /api/org/analytics/overview
+   - /api/org/leads
+   - /api/public/chat
+   - /api/public/booking-click
+3) Confirm RBAC pattern:
+   - Are routes importing getOrgContext from one source?
+   - Are clients blocked correctly?
+4) Run all gates and record baseline outputs.
+Deliverable:
+- A table with each planned step and status:
+  IMPLEMENTED / PARTIAL / MISSING
+- A “Top 10 risks” list based on code inspection (security, UX, correctness).
+- Pick the next best step that increases SELLABILITY.
+
+Acceptance Criteria:
+- No coding done.
+- Clear matrix produced.
+- Next step chosen with justification.
+
+-------------------------------------------------------------------------------
+PHASE 0 — FOUNDATION (Steps 1–10) [CERTIFY ONLY]
+-------------------------------------------------------------------------------
+
+STEP 1 — Tooling Baseline (CERTIFY)
+Verify:
+- pnpm scripts exist: typecheck, test, test:e2e, build
+- TypeScript strict enabled
+- ESLint/Prettier configured
+- Env validation exists (Zod)
+- Node runtime routes used where required
+Evidence:
+- Paste package.json scripts
+- Show env validation location
+- Gates pass
+
+STEP 2 — UI System + Tokens (CERTIFY)
+Verify:
+- Consistent UI components: Button, Input, Card, Modal, Toast, Skeleton
+- Tailwind config stable
+- Premium spacing and typography used consistently
+Evidence:
+- Point to component library paths
+- Confirm pages use the same primitives (no random inline styles)
+
+STEP 3 — Clerk Auth + RBAC (CERTIFY)
+Verify:
+- Clerk integrated
+- getOrgContext is single source of truth
+- DEV bypass only when NODE_ENV!=production and flag enabled
+Evidence:
+- Show code path and guard conditions
+
+STEP 4 — Tenant Isolation Contract (CERTIFY)
+Verify:
+- Org routes filter organizationId at query level
+- Tests exist to prove cross-org denial
+Evidence:
+- Unit tests for cross-org reads/writes
+
+STEP 5 — App Navigation + Settings Hub (CERTIFY)
+Verify:
+- Left nav includes: Settings, Leads, Analytics, Bots
+- Settings hub links: Services, Hours, Branding, Domain, (Contact/Policies later)
+Evidence:
+- UI routes exist and work
+
+STEP 6 — Bot Model + Create Flow (CERTIFY)
+Verify:
+- Bot belongs to org
+- Bot has publicKey for widget
+- Template selection exists
+Evidence:
+- Bot create UI and route correctness
+
+STEP 7 — Widget Embed Shell (CERTIFY)
+Verify:
+- /widget/[botPublicKey] exists
+- Domain allowlist exists
+- Chat UI shell works (messages + input + persistence)
+Evidence:
+- E2E or manual proof steps
+
+STEP 8 — Conversations + Persistence (CERTIFY)
+Verify:
+- Conversations stored
+- bookingState JSONB added and used (done)
+Evidence:
+- Prisma model and migration
+
+STEP 9 — Lead Model Basic (CERTIFY)
+Verify:
+- leadPublicId exists
+- temperature/status/scoreReasons exist
+- now serviceId exists + constraint (done)
+Evidence:
+- Lead schema snippet + migration
+
+STEP 10 — Marketing Pages v1 (CERTIFY)
+Verify:
+- /demo /pricing /request-demo exist
+- UI looks acceptable baseline
+Evidence:
+- route list, screenshot note (optional)
+
+-------------------------------------------------------------------------------
+PHASE 1 — TRUTH MODE CORE (Steps 11–20) [CERTIFY/PATCH]
+-------------------------------------------------------------------------------
+
+STEP 11 — Knowledge Base Grounded Content (CERTIFY)
+Verify:
+- KB model includes status: draft/published
+- Retrieval is bot/org scoped
+- Only published used in answers
+Evidence:
+- retrieval function + tests
+
+STEP 12 — Truth Engine v1 (CERTIFY)
+Verify:
+- No hallucination: answers come only from KB + settings
+- Unknown fallback message + offers booking/lead capture
+Evidence:
+- unit tests that ensure “unknown” triggers fallback
+
+STEP 13 — Topic Detection + DataEvent logging (CERTIFY)
+Verify:
+- topics stored as DataEvents
+- event types consistent
+Evidence:
+- DataEvent types enumerated + tests
+
+STEP 14 — Template Library + Idempotent Seeding (CERTIFY)
+Verify:
+- seeding creates bot-scoped KB entries
+- rerun doesn’t duplicate
+Evidence:
+- integration test already added and passing (per your earlier update)
+
+STEP 15 — Agency Dashboard v1 (CERTIFY)
+Verify:
+- org list, bot list, create bot flows exist
+- usable and not broken
+Evidence:
+- routes and smoke tests
+
+STEP 16 — Client Dashboard shell (CERTIFY)
+Verify:
+- owners/clients have an “overview” that feels premium
+- if now replaced by Analytics/Leads pages, ensure nav is coherent
+Evidence:
+- UI route
+
+STEP 17 — Invite-only Client Access (CERTIFY)
+Verify:
+- no public signup
+- invite flow exists
+Evidence:
+- route existence + RBAC
+
+STEP 18 — Rate limiting (CERTIFY/PATCH)
+Verify:
+- public chat endpoint protected from spam
+- lead creation protected
+Evidence:
+- code location + tests
+
+STEP 19 — Upload hygiene (OPTIONAL CERTIFY)
+Verify:
+- if logo uploads exist, validate MIME/size
+Evidence:
+- code
+
+STEP 20 — Hardening Pass (CERTIFY)
+Verify:
+- run all gates, fix flakiness
+
+-------------------------------------------------------------------------------
+PHASE 2 — WHITE LABEL + CUSTOM DOMAIN (Steps 21–30) [CERTIFY/PATCH]
+-------------------------------------------------------------------------------
+
+STEP 21 — Branding (CERTIFY)
+Verify:
+- org branding fields exist
+- widget consumes branding
+- CLIENT cannot update branding (403)
+Evidence:
+- API proof
+
+STEP 22 — Custom Domain DNS Verification (CERTIFY)
+Verify:
+- TXT token flow works
+- token hidden from clients
+Evidence:
+- API output differences per role (you already have proof)
+
+STEP 23 — Production Safety (CERTIFY)
+Verify:
+- dev bypass cannot run in production mode
+Evidence:
+- unit test for NODE_ENV production behavior
+
+STEP 24 — Role-scoped secrets (CERTIFY)
+Verify:
+- verification token only visible to admin/owner
+Evidence:
+- API response proof
+
+STEP 25 — UI polish pass (CERTIFY)
+Verify:
+- domain/branding UI have skeletons, empty states, helpful copy
+
+STEP 26 — Membership enforcement (CERTIFY)
+Already proven.
+
+STEP 27 — E2E coverage for settings (CERTIFY)
+Verify:
+- tests exist for branding/domain/services/hours
+
+STEP 28 — Settings hub feels like product (CERTIFY)
+Verify:
+- consistent cards, descriptions, navigation
+
+STEP 29 — Audit/events baseline (OPTIONAL)
+If missing, not required yet.
+
+STEP 30 — Zero cross-tenant leaks (CERTIFY)
+Verify:
+- targeted tests for isolation on key routes: leads, analytics, settings
+
+-------------------------------------------------------------------------------
+PHASE 3 — BUSINESS SETTINGS (Steps 31–37) [MOST IMPORTANT GAP NOW]
+-------------------------------------------------------------------------------
+
+CURRENT REALITY:
+- Services and Hours are done.
+- The NEXT “business reality” requirement is Contact Info + Policies.
+This is where owners judge the assistant quickly:
+“Where are you located?” “What’s your phone?” “What’s your cancellation policy?”
+
+STEP 35 — CONTACT INFO + POLICIES (MUST IMPLEMENT IF MISSING)
+Goal:
+- Business owner can store and manage contact + policies.
+- Truth engine can answer these from settings only.
+- Clients can edit ONLY if allowClientEdits=true.
+
+A) Schema design (choose simplest, safest):
+Option 1 (FAST, minimal): add fields directly to Organization:
+- businessPhone: String?
+- businessEmail: String?
+- businessAddress: String?
+- businessWebsite: String?
+- depositPolicy: String?
+- cancellationPolicy: String?
+- refundPolicy: String?
+Add reasonable limits:
+- phone/email/url: max 200
+- address: max 300
+- policies: max 2000 (or 4000)
+This is simplest and works well.
+
+B) Migration:
+- Create migration folder name: YYYYMMDDHHMMSS_step35_org_contact_policies (example)
+- Ensure prisma migrate status says up to date.
+
+C) API routes (org-scoped):
+Route: /api/org/settings/contact
+Methods:
+- GET: returns current fields + permissions info
+- PUT: updates fields
+RBAC:
+- OWNER/ADMIN: allowed always
+- CLIENT: allowed only if allowClientEdits=true
+Validation:
+- Phone: allow +, digits, spaces, -, parentheses; normalize or store raw + normalized
+- Email: basic RFC subset; lowercase
+- Website: must be https:// or http://, normalize
+- Policy text: sanitize, strip dangerous HTML, enforce length
+Error behavior:
+- 403 forbidden
+- 400 validation_error with field-level details
+
+D) UI page:
+Route: /app/settings/contact (or /app/settings/business)
+Components:
+1) Page Header:
+- title: “Business Info”
+- subtitle: “Used by the assistant for accurate answers”
+2) Sections:
+- Contact Info card
+  - phone, email, address, website
+- Policies card
+  - deposit policy (textarea)
+  - cancellation policy (textarea)
+  - refund policy (textarea)
+3) Locked state:
+- if role=CLIENT and allowClientEdits=false:
+  - show locked banner + disable fields + show explanation
+4) UX details:
+- skeleton while loading
+- save button disabled unless dirty + valid
+- inline validation errors
+- toast on success/failure
+- “Revert changes” button when dirty
+
+E) Truth engine integration:
+- Add/extend “settings retrieval” so truth engine has:
+  - contact fields
+  - policies
+- When user asks:
+  - “Where are you located?” → address
+  - “What’s your number?” → phone
+  - “What’s your cancellation policy?” → cancellationPolicy
+- If missing, assistant response MUST be:
+  - “I don’t have that info yet.”
+  - plus suggestion: “Please contact the business owner or leave your info and we’ll reach out.”
+  - optionally trigger lead capture if user wants.
+
+F) Tests:
+Unit tests:
+- validators for phone/email/url/policy length
+- RBAC: client blocked vs allowed
+- tenant isolation: Org A cannot read/update Org B
+E2E tests:
+- OWNER can edit and persist
+- CLIENT locked shows banner and cannot save
+- CLIENT allowed if allowClientEdits=true can edit and persist
+
+Acceptance Criteria:
+- all gates pass
+- truth engine uses only these values
+- no cross-tenant leaks
+- UI meets premium bar
+
+-------------------------------------------------------------------------------
+PHASE 4 — BOOKING FLOW (DONE) [CERTIFY ONLY]
+-------------------------------------------------------------------------------
+Your FSM/runtime/widget directives/click tracking are done. Only certify:
+- funnel events correct
+- idempotency constraints hold
+- booking link uses DB values only
+
+-------------------------------------------------------------------------------
+PHASE 5 — ANALYTICS + LEADS (DONE) [CERTIFY ONLY]
+-------------------------------------------------------------------------------
+Certify:
+- COUNT(DISTINCT conversationId) used properly
+- indexes exist
+- lead inbox filters and RBAC correct
+
+-------------------------------------------------------------------------------
+PHASE 6 — NOTIFICATIONS (THE NEXT “MONEY PROOF” FEATURE)
+-------------------------------------------------------------------------------
+
+STEP 53 — HOT LEAD EMAIL NOTIFICATIONS (REQUIRED FOR SELLABILITY)
+Goal:
+- Business owner gets immediate proof when a hot lead happens without logging in.
+
+A) Decide provider:
+- Prefer Resend (simple) unless provider already exists.
+- Add env validation for:
+  - RESEND_API_KEY
+  - NOTIFICATION_FROM_EMAIL
+  - APP_BASE_URL
+- In test env, mock sending.
+
+B) Data model:
+Option 1 (simple):
+- OrganizationNotificationSettings:
+  - id
+  - organizationId (unique)
+  - enabled (boolean)
+  - recipients (string[] Postgres)
+  - notifyOnHotLead (boolean)
+  - notifyOnBookingClick (boolean)
+  - createdAt/updatedAt
+- NotificationLog:
+  - id
+  - organizationId
+  - type (HOT_LEAD | BOOKING_CLICK)
+  - payload (JSONB)
+  - status (SENT | FAILED)
+  - errorMessage (string?)
+  - createdAt
+Indexes:
+- NotificationLog (organizationId, createdAt)
+
+C) API:
+Route: /api/org/settings/notifications
+- GET: returns settings + permission info
+- PUT: updates settings
+RBAC:
+- OWNER/ADMIN always; CLIENT only if allowClientEdits=true
+
+D) Trigger points:
+- When Lead is created with temperature=HOT:
+  - if settings.enabled && notifyOnHotLead:
+    1) send email
+    2) create NotificationLog
+- When BOOKING_LINK_CLICKED event occurs:
+  - if settings.enabled && notifyOnBookingClick:
+    1) send email
+    2) log
+
+E) Email content requirements (premium + useful):
+Subject examples:
+- “🔥 New Hot Lead: {serviceName}”
+Body must include:
+- lead name/phone/email
+- service selected
+- score + temperature
+- link to open Lead in dashboard (deep link)
+- timestamp
+- “Reply stop” not required but keep professional
+
+F) UI:
+Route: /app/settings/notifications
+- Toggle enabled
+- Recipient list editor:
+  - multi-email input with validation
+- Trigger toggles:
+  - hot lead
+  - booking click
+- Save + dirty state + toasts + skeleton + locked banner for client if disallowed
+
+G) Tests:
+Unit:
+- RBAC + tenant isolation
+- validation of recipients
+- trigger simulation creates NotificationLog and calls mock send
+E2E:
+- owner can update settings
+- locked banner for client
+- persists after reload
+
+Acceptance:
+- logs exist for proof
+- no sending without settings enabled
+- gates pass
+
+-------------------------------------------------------------------------------
+PHASE 7 — LAUNCH PACK (THIS IS WHAT MAKES IT “SELL TOMORROW”)
+-------------------------------------------------------------------------------
+
+STEP LP1 — DEMO SEED DATA (MUST HAVE)
+Goal:
+- One command creates a demo org + demo bot + data so you can show it instantly.
+
+Requirements:
+- Seed script must:
+  - create organization “Demo Barber Shop”
+  - create bot + publicKey
+  - create services:
+    - Haircut ($35) bookingUrl
+    - Beard Trim ($20)
+    - Haircut + Beard ($50)
+  - hours set for 7 days
+  - contact/policies set (once implemented)
+  - published KB entries that answer common questions:
+    - pricing, hours, location, booking instructions, deposits/cancel policy
+  - add sample leads + events for analytics (optional but great)
+
+Implementation guidance:
+- prisma/seed.ts (or existing seed structure)
+- safe guards to prevent duplicating seed on rerun (idempotent)
+- command: pnpm db:seed (add script)
+
+Evidence:
+- show it runs and dashboard has data
+
+STEP LP2 — EMBED INSTRUCTIONS PAGE (MUST HAVE)
+Goal:
+- Business owner (or you) can copy/paste widget snippet and understand allowlists.
+
+Route:
+- /app/bots/[botId]/embed (or /app/widget-setup)
+Must display:
+- script snippet to embed
+- botPublicKey
+- domain allowlist explanation (and where to edit)
+- custom domain status (if enabled)
+- copy buttons + success toasts
+- “Test your embed” instructions
+
+Also:
+- Add a “Send to web guy” button that copies a ready email template (optional)
+
+Tests:
+- E2E: page loads, snippet renders, copy button exists
+
+STEP LP3 — SALES TOOLKIT PAGES (OPTIONAL BUT HUGE ROI)
+Goal:
+- Give you in-app material to pitch locally.
+
+Routes (in-app, agency only):
+- /app/sales/demo-script
+- /app/sales/pricing
+- /app/sales/outreach
+
+Content requirements:
+- Demo script: 5-minute walkthrough + objection handling
+- Outreach: IG DM, cold call, email
+- Pricing: simple tiers and what’s included
+
+STEP LP4 — MARKETING SITE POLISH (OPTIONAL, BUT CONVERTS)
+Goal:
+- Landing pages that look agency-grade.
+
+Requirements:
+- testimonials section
+- “how it works” section
+- niche landing pages (barber/salon/gym/contractor)
+- stronger CTA (request demo)
+- performance + mobile-first polish
+
+-------------------------------------------------------------------------------
+8) FINAL DEFINITION OF DONE (SELLABLE)
+-------------------------------------------------------------------------------
+
+The platform is SELLABLE when ALL are true:
+
+1) Marketing site looks premium and credible.
+2) Agency onboarding is fast:
+   - create org/bot
+   - add services/hours/contact/policies
+   - optionally generate AI drafts (review required)
+   - publish KB
+3) Widget is embeddable and grounded:
+   - Truth Mode answers only from approved data
+   - booking flow deterministic
+   - lead capture works
+4) Business owner dashboard shows money proof:
+   - Analytics funnel (selected → lead → shown → clicked)
+   - top topics
+   - unique conversation counting
+   - leads inbox with management and notes
+5) Notifications send hot lead emails (and logs prove it).
+6) Tenant isolation + RBAC are proven by tests.
+7) All gates pass reliably.
+
+-------------------------------------------------------------------------------
+9) WHAT TO DO RIGHT NOW (FIRST REPLIT RUN)
+-------------------------------------------------------------------------------
+
+RUN STEP A1 ONLY:
+- Inventory repo
+- Mark Implemented vs Missing for:
+  - Contact/Policies settings
+  - Truth integration for contact/policies
+  - Notification settings/logging/email
+  - Demo seed data
+  - Embed instructions page
+  - Sales toolkit pages
+- Then pick the SINGLE next step:
+  Priority order:
+  1) Contact + Policies (Step 35)
+  2) Notifications (Step 53)
+  3) Demo Seed (LP1)
+  4) Embed Instructions Page (LP2)
+  5) Sales Toolkit (LP3)
+  6) Marketing polish (LP4)
+
+DO NOT WRITE CODE BEFORE STEP A1 OUTPUT.
+
+===============================================================================
+END PROMPT
+===============================================================================
