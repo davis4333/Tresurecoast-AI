@@ -141,6 +141,12 @@ Preferred communication style: Simple, everyday language.
 
 ### Booking Flow State Machine (Step 42)
 - **Location**: `src/lib/booking/*` - Enterprise-grade booking flow module
+- **State Machine**: `src/lib/booking/stateMachine.ts` - Pure functional FSM (~650 lines)
+  - `transition()` - Main pure function, zero side effects, deterministic
+  - `initBookingContext()` - Initialize fresh context
+  - `isBookingIntent()`, `isCancel()`, `isRestart()`, `isBack()` - Intent detection
+  - Global commands work from any state: cancel (→IDLE), restart (→SERVICE_SELECTION), back (→previous)
+  - **NO AI HALLUCINATIONS**: Booking URLs come ONLY from `OrganizationService.bookingUrl/paymentUrl`
 - **Types**: `src/lib/booking/types.ts` - 700+ lines of branded types, enums, interfaces
   - `BookingFlowState` enum: IDLE → SERVICE_SELECTION → LEAD_NAME → LEAD_PHONE → LEAD_EMAIL → COMPLETE
   - `ResponseDirectiveType` enum: UI rendering instructions (SHOW_SERVICE_PICKER, ASK_FOR_NAME, etc.)
@@ -157,7 +163,7 @@ Preferred communication style: Simple, everyday language.
   - Sanitization: Unicode NFC normalization, null byte removal, control char stripping
 - **Security Features**: XSS prevention, ReDoS prevention, Unicode bypass prevention, null byte injection prevention
 - **Compliance Annotations**: GDPR/CCPA/PCI DSS ready, PII handling documented
-- **Unit Tests**: `tests/unit/bookingValidators.test.ts` (65 tests), `tests/unit/bookingTypes.test.ts` (21 tests)
+- **Unit Tests**: `tests/unit/bookingStateMachine.test.ts` (26 tests), `tests/unit/bookingValidators.test.ts` (65 tests), `tests/unit/bookingTypes.test.ts` (21 tests)
 
 ### Industry Templates Architecture (Step 37)
 - **Location**: `src/lib/templates/*` - All template logic isolated here
