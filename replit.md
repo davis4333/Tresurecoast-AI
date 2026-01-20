@@ -78,6 +78,14 @@ Preferred communication style: Simple, everyday language.
 
 ### Notifications
 - **Webhooks**: Optional integration for demo request and new lead notifications.
+- **Email Notifications**: Hot lead and booking click alerts via Resend API.
+  - **Provider**: Resend (requires `RESEND_API_KEY` environment variable)
+  - **Triggers**: HOT lead creation, booking link clicks
+  - **Retry Logic**: 3 attempts with exponential backoff
+  - **Logging**: NotificationLog model tracks delivery status per recipient
+  - **Settings UI**: `/app/settings/notifications` (RBAC: admin only for updates)
+  - **Toggle Controls**: Enable/disable notifications, hot lead alerts, booking click alerts
+  - **Multi-recipient**: Supports multiple email addresses per organization
 
 ### Environment Variables
 - `DATABASE_URL`
@@ -88,6 +96,7 @@ Preferred communication style: Simple, everyday language.
 - `NEXT_PUBLIC_DEMO_BOT_KEY` (Optional)
 - `DEMO_REQUEST_WEBHOOK_URL` (Optional)
 - `LEAD_WEBHOOK_URL` (Optional)
+- `RESEND_API_KEY` (Optional, for email notifications)
 
 ### Package Manager
 - **pnpm**: Used for dependency management.
