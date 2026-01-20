@@ -139,7 +139,8 @@ async function persistBookingState(
 }
 
 /**
- * Create lead from booking flow context (idempotent - skips if lead already exists)
+ * Create lead from booking flow context
+ * Idempotent: uses unique(conversationId, serviceId) constraint with upsert pattern
  */
 async function createLeadFromBooking(
   input: BookingFlowInput,
@@ -149,17 +150,14 @@ async function createLeadFromBooking(
     return null;
   }
 
-  const existingLead = await prisma.lead.findFirst({
-    where: { conversationId: input.conversationId },
-    select: { id: true },
-  });
+  const serviceIdInt = context.selectedService?.id
+    ? parseInt(String(context.selectedService.id), 10)
+    : null;
 
-  if (existingLead) {
-    return existingLead.id;
-  }
+  const validServiceId = serviceIdInt !== null && !isNaN(serviceIdInt) ? serviceIdInt : undefined;
 
-  const lead = await prisma.lead.create({
-    data: {
+  try {
+    const leadData = {
       organizationId: input.organizationId,
       workspaceId: input.workspaceId,
       botId: input.botId,
@@ -167,14 +165,101 @@ async function createLeadFromBooking(
       name: context.leadDraft.name,
       email: context.leadDraft.email,
       phone: context.leadDraft.phone ?? null,
-      status: "NEW",
+      status: "NEW" as const,
       score: 70,
-      temperature: "HOT",
+      temperature: "HOT" as const,
       scoreReasons: ["Completed booking flow", "Provided contact information"],
-    },
-  });
+      ...(validServiceId !== undefined && { serviceId: validServiceId }),
+    };
 
-  return lead.id;
+    const lead = await prisma.lead.create({
+      data: leadData as Parameters<typeof prisma.lead.create>[0]["data"],
+    });
+
+    await logGranularBookingEvent(input, "BOOKING_LEAD_CREATED", {
+      leadId: lead.id,
+      serviceId: validServiceId ?? null,
+      serviceName: context.selectedService?.name ?? null,
+    });
+
+    return lead.id;
+  } catch (error: unknown) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code: string }).code === "P2002"
+    ) {
+      const whereClause = {
+        conversationId: input.conversationId,
+        ...(validServiceId !== undefined && { serviceId: validServiceId }),
+      };
+
+      const existingLead = await prisma.lead.findFirst({
+        where: whereClause,
+        select: { id: true },
+      } as Parameters<typeof prisma.lead.findFirst>[0]);
+      return existingLead?.id ?? null;
+    }
+    throw error;
+  }
+}
+
+type BookingAnalyticsEventType = 
+  | "BOOKING_SERVICE_SELECTED"
+  | "BOOKING_LEAD_CREATED"
+  | "BOOKING_LINK_SHOWN"
+  | "BOOKING_LINK_CLICKED";
+
+/**
+ * Log granular booking analytics events
+ */
+async function logGranularBookingEvent(
+  input: BookingFlowInput,
+  eventType: BookingAnalyticsEventType,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  try {
+    const eventData = {
+      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
+      botId: input.botId,
+      conversationId: input.conversationId,
+      type: eventType,
+      topic: "BOOKING",
+      payload: {
+        timestamp: new Date().toISOString(),
+        ...metadata,
+      },
+    };
+
+    await prisma.dataEvent.create({
+      data: eventData as unknown as Parameters<typeof prisma.dataEvent.create>[0]["data"],
+    });
+  } catch (error) {
+    console.error(`[${eventType} LOG ERROR]`, error);
+  }
+}
+
+/**
+ * Log BOOKING_LINK_CLICKED event (exported for click tracking API)
+ */
+export async function logBookingLinkClicked(
+  organizationId: number,
+  workspaceId: number,
+  botId: number,
+  conversationId: number,
+  metadata: { leadId?: number; bookingUrl?: string }
+): Promise<void> {
+  const input: BookingFlowInput = {
+    organizationId,
+    workspaceId,
+    botId,
+    conversationId,
+    conversationPublicId: "",
+    userMessage: "",
+  };
+  await logGranularBookingEvent(input, "BOOKING_LINK_CLICKED", metadata);
 }
 
 /**

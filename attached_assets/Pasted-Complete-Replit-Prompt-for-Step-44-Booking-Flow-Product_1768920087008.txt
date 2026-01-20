@@ -1,0 +1,817 @@
+Complete Replit Prompt for Step 44: Booking Flow Productization
+
+YOU ARE REPLIT AGENT MODE. IMPLEMENT STEP 44 EXACTLY AS SPECIFIED BELOW.
+
+GOAL: Convert booking FSM into fully product-visible widget flow with tracking + DB-level idempotency.
+
+═══════════════════════════════════════════════════════════════════════════════
+PART 1: DATABASE SCHEMA & MIGRATION
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: prisma/migrations/[timestamp]_step44_booking_tracking_idempotency/migration.sql
+
+-- Add unique constraint to prevent duplicate leads per conversation+service
+-- This prevents race conditions from parallel requests
+CREATE UNIQUE INDEX "Lead_conversationId_serviceId_key" 
+ON "Lead"("conversationId", "serviceId");
+
+-- Add index for better query performance
+CREATE INDEX "Lead_conversationId_idx" ON "Lead"("conversationId");
+
+VERIFY: Run `pnpm prisma migrate dev --name step44_booking_tracking_idempotency`
+
+═══════════════════════════════════════════════════════════════════════════════
+PART 2: ENHANCED DATA EVENT TYPES
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: prisma/schema.prisma
+
+Add to DataEventType enum:
+
+enum DataEventType {
+  // ... existing events ...
+  BOOKING_SERVICE_SELECTED
+  BOOKING_LEAD_CREATED
+  BOOKING_LINK_SHOWN
+  BOOKING_LINK_CLICKED
+}
+
+VERIFY: Run `pnpm prisma generate`
+
+═══════════════════════════════════════════════════════════════════════════════
+PART 3: BOOKING RUNTIME ENHANCEMENTS
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: src/lib/booking/runtime.ts
+
+import { prisma } from "@/lib/db";
+import { DataEventType } from "@prisma/client";
+
+export type BookingDirective = {
+  type: "service_buttons" | "prompt" | "input_mode";
+  services?: Array<{ serviceId: string; label: string; price?: string }>;
+  prompt?: string;
+  inputMode?: "text" | "phone" | "email";
+};
+
+export type BookingAction = {
+  kind: "booking_action";
+  action: "select_service" | "cancel" | "restart";
+  serviceId?: string;
+};
+
+async function logBookingEvent(
+  conversationId: string,
+  organizationId: string,
+  eventType: DataEventType,
+  metadata?: Record<string, any>
+) {
+  await prisma.dataEvent.create({
+    data: {
+      conversationId,
+      organizationId,
+      eventType,
+      metadata: metadata || {},
+    },
+  });
+}
+
+export async function processBookingFlow(
+  conversation: any,
+  userMessage: string,
+  organizationId: string,
+  services: any[]
+): Promise<{
+  response: string;
+  directives?: BookingDirective[];
+  bookingState: any;
+}> {
+  const state = conversation.bookingState || { stage: "IDLE" };
+
+  // Handle cancel command
+  if (userMessage.toLowerCase().includes("cancel")) {
+    return {
+      response: "Booking cancelled. Let me know if you'd like to start over!",
+      bookingState: { stage: "IDLE" },
+    };
+  }
+
+  // Handle restart command
+  if (userMessage.toLowerCase().includes("restart booking")) {
+    const serviceButtons = services.map((s) => ({
+      serviceId: s.id,
+      label: s.name,
+      price: s.price ? `$${s.price}` : undefined,
+    }));
+
+    return {
+      response: "Let's start fresh! Which service are you interested in?",
+      directives: [
+        { type: "service_buttons", services: serviceButtons },
+        { type: "input_mode", inputMode: "text" },
+      ],
+      bookingState: { stage: "SERVICE_SELECTION" },
+    };
+  }
+
+  // IDLE -> SERVICE_SELECTION
+  if (state.stage === "IDLE" && /book|appointment|schedule/i.test(userMessage)) {
+    const serviceButtons = services.map((s) => ({
+      serviceId: s.id,
+      label: s.name,
+      price: s.price ? `$${s.price}` : undefined,
+    }));
+
+    return {
+      response: "I'd be happy to help you book! Which service are you interested in?",
+      directives: [
+        { type: "service_buttons", services: serviceButtons },
+        { type: "input_mode", inputMode: "text" },
+      ],
+      bookingState: { stage: "SERVICE_SELECTION" },
+    };
+  }
+
+  // SERVICE_SELECTION -> COLLECT_NAME
+  if (state.stage === "SERVICE_SELECTION") {
+    const selectedService = services.find(
+      (s) => s.id === state.selectedServiceId || s.name.toLowerCase().includes(userMessage.toLowerCase())
+    );
+
+    if (selectedService) {
+      await logBookingEvent(
+        conversation.id,
+        organizationId,
+        DataEventType.BOOKING_SERVICE_SELECTED,
+        { serviceId: selectedService.id, serviceName: selectedService.name }
+      );
+
+      return {
+        response: `Great choice! I'll help you book ${selectedService.name}. What's your name?`,
+        directives: [{ type: "input_mode", inputMode: "text" }],
+        bookingState: {
+          stage: "COLLECT_NAME",
+          selectedServiceId: selectedService.id,
+          serviceName: selectedService.name,
+        },
+      };
+    }
+
+    return {
+      response: "I didn't catch which service you want. Please select from the options above.",
+      bookingState: state,
+    };
+  }
+
+  // COLLECT_NAME -> COLLECT_PHONE
+  if (state.stage === "COLLECT_NAME") {
+    return {
+      response: `Thanks, ${userMessage}! What's the best phone number to reach you?`,
+      directives: [{ type: "input_mode", inputMode: "phone" }],
+      bookingState: { ...state, stage: "COLLECT_PHONE", name: userMessage },
+    };
+  }
+
+  // COLLECT_PHONE -> COLLECT_EMAIL
+  if (state.stage === "COLLECT_PHONE") {
+    return {
+      response: "Perfect! And what's your email address?",
+      directives: [{ type: "input_mode", inputMode: "email" }],
+      bookingState: { ...state, stage: "COLLECT_EMAIL", phone: userMessage },
+    };
+  }
+
+  // COLLECT_EMAIL -> COMPLETE
+  if (state.stage === "COLLECT_EMAIL") {
+    const email = userMessage;
+
+    // Create lead with idempotency protection
+    let lead;
+    try {
+      lead = await prisma.lead.create({
+        data: {
+          conversationId: conversation.id,
+          organizationId,
+          serviceId: state.selectedServiceId,
+          name: state.name,
+          phone: state.phone,
+          email,
+          status: "NEW",
+        },
+      });
+
+      await logBookingEvent(
+        conversation.id,
+        organizationId,
+        DataEventType.BOOKING_LEAD_CREATED,
+        { leadId: lead.id, serviceId: state.selectedServiceId }
+      );
+    } catch (error: any) {
+      // Handle duplicate constraint violation
+      if (error.code === "P2002") {
+        lead = await prisma.lead.findFirst({
+          where: {
+            conversationId: conversation.id,
+            serviceId: state.selectedServiceId,
+          },
+        });
+      } else {
+        throw error;
+      }
+    }
+
+    const bookingUrl = `https://example.com/book/${lead?.id}`;
+
+    await logBookingEvent(
+      conversation.id,
+      organizationId,
+      DataEventType.BOOKING_LINK_SHOWN,
+      { leadId: lead?.id, bookingUrl }
+    );
+
+    return {
+      response: `All set! Click the button below to complete your ${state.serviceName} booking.`,
+      directives: [
+        {
+          type: "booking_link",
+          url: bookingUrl,
+          label: "Book Now",
+        },
+      ],
+      bookingState: { ...state, stage: "COMPLETE", leadId: lead?.id, bookingUrl },
+    };
+  }
+
+  return { response: "I'm here to help! Type 'book' to schedule an appointment.", bookingState: state };
+}
+
+export function handleBookingAction(action: BookingAction, currentState: any): any {
+  if (action.action === "select_service" && action.serviceId) {
+    return {
+      ...currentState,
+      selectedServiceId: action.serviceId,
+    };
+  }
+
+  if (action.action === "cancel") {
+    return { stage: "IDLE" };
+  }
+
+  if (action.action === "restart") {
+    return { stage: "SERVICE_SELECTION" };
+  }
+
+  return currentState;
+}
+
+═══════════════════════════════════════════════════════════════════════════════
+PART 4: CHAT API ENDPOINT UPDATES
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: src/app/api/public/chat/route.ts
+
+import { processBookingFlow, handleBookingAction, type BookingAction } from "@/lib/booking/runtime";
+import { prisma } from "@/lib/db";
+import { DataEventType } from "@prisma/client";
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { message, conversationId, organizationId, bookingAction } = body;
+
+    // Get conversation
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      return Response.json({ error: "Conversation not found" }, { status: 404 });
+    }
+
+    // Get services
+    const services = await prisma.organizationService.findMany({
+      where: { organizationId, isActive: true },
+    });
+
+    let bookingState = conversation.bookingState || { stage: "IDLE" };
+
+    // Handle structured booking action
+    if (bookingAction) {
+      const action = bookingAction as BookingAction;
+      bookingState = handleBookingAction(action, bookingState);
+
+      // Log service selection
+      if (action.action === "select_service" && action.serviceId) {
+        await prisma.dataEvent.create({
+          data: {
+            conversationId,
+            organizationId,
+            eventType: DataEventType.BOOKING_SERVICE_SELECTED,
+            metadata: { serviceId: action.serviceId },
+          },
+        });
+      }
+    }
+
+    // Process booking flow
+    const result = await processBookingFlow(
+      { ...conversation, bookingState },
+      message,
+      organizationId,
+      services
+    );
+
+    // Update conversation with new state
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { bookingState: result.bookingState },
+    });
+
+    return Response.json({
+      message: result.response,
+      directives: result.directives,
+      conversationId,
+    });
+  } catch (error) {
+    console.error("Chat API error:", error);
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+// Handle booking link clicks
+export async function PATCH(req: Request) {
+  try {
+    const { conversationId, organizationId, action } = await req.json();
+
+    if (action === "booking_link_clicked") {
+      await prisma.dataEvent.create({
+        data: {
+          conversationId,
+          organizationId,
+          eventType: DataEventType.BOOKING_LINK_CLICKED,
+          metadata: {},
+        },
+      });
+
+      return Response.json({ success: true });
+    }
+
+    return Response.json({ error: "Invalid action" }, { status: 400 });
+  } catch (error) {
+    console.error("Tracking error:", error);
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+═══════════════════════════════════════════════════════════════════════════════
+PART 5: WIDGET UI COMPONENTS
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: src/components/widget/BookingDirectives.tsx
+
+"use client";
+
+import React from "react";
+
+type BookingDirective = {
+  type: "service_buttons" | "booking_link" | "input_mode";
+  services?: Array<{ serviceId: string; label: string; price?: string }>;
+  url?: string;
+  label?: string;
+  inputMode?: "text" | "phone" | "email";
+};
+
+interface BookingDirectivesProps {
+  directives?: BookingDirective[];
+  onServiceSelect: (serviceId: string) => void;
+  onBookingLinkClick: (url: string) => void;
+}
+
+export function BookingDirectives({
+  directives,
+  onServiceSelect,
+  onBookingLinkClick,
+}: BookingDirectivesProps) {
+  if (!directives || directives.length === 0) return null;
+
+  return (
+    <div className="space-y-2 mt-3">
+      {directives.map((directive, idx) => {
+        if (directive.type === "service_buttons" && directive.services) {
+          return (
+            <div key={idx} className="grid grid-cols-1 gap-2">
+              {directive.services.map((service) => (
+                <button
+                  key={service.serviceId}
+                  onClick={() => onServiceSelect(service.serviceId)}
+                  className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-left"
+                >
+                  <div className="font-medium">{service.label}</div>
+                  {service.price && (
+                    <div className="text-sm opacity-90">{service.price}</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          );
+        }
+
+        if (directive.type === "booking_link" && directive.url) {
+          return (
+            <button
+              key={idx}
+              onClick={() => onBookingLinkClick(directive.url!)}
+              className="w-full px-6 py-4 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold text-lg shadow-lg"
+            >
+              {directive.label || "Book Now"} →
+            </button>
+          );
+        }
+
+        return null;
+      })}
+    </div>
+  );
+}
+
+FILE: src/components/widget/ChatWidget.tsx
+
+"use client";
+
+import React, { useState, useRef, useEffect } from "react";
+import { BookingDirectives } from "./BookingDirectives";
+
+export function ChatWidget({ organizationId }: { organizationId: string }) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [input, setInput] = useState("");
+  const [inputMode, setInputMode] = useState<"text" | "phone" | "email">("text");
+  const [conversationId, setConversationId] = useState<string | null>(null);
+
+  const sendMessage = async (text: string, bookingAction?: any) => {
+    const payload = {
+      message: text,
+      conversationId: conversationId || undefined,
+      organizationId,
+      bookingAction,
+    };
+
+    const response = await fetch("/api/public/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!conversationId) {
+      setConversationId(data.conversationId);
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: text },
+      { role: "assistant", content: data.message, directives: data.directives },
+    ]);
+
+    // Update input mode if directive specifies
+    const inputDirective = data.directives?.find((d: any) => d.type === "input_mode");
+    if (inputDirective?.inputMode) {
+      setInputMode(inputDirective.inputMode);
+    }
+
+    setInput("");
+  };
+
+  const handleServiceSelect = async (serviceId: string) => {
+    await sendMessage("", {
+      kind: "booking_action",
+      action: "select_service",
+      serviceId,
+    });
+  };
+
+  const handleBookingLinkClick = async (url: string) => {
+    // Track click
+    await fetch("/api/public/chat", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversationId,
+        organizationId,
+        action: "booking_link_clicked",
+      }),
+    });
+
+    // Open URL
+    window.open(url, "_blank");
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-white">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((msg, idx) => (
+          <div key={idx}>
+            <div
+              className={`p-3 rounded-lg ${
+                msg.role === "user"
+                  ? "bg-blue-500 text-white ml-auto max-w-[80%]"
+                  : "bg-gray-100 text-gray-900 mr-auto max-w-[80%]"
+              }`}
+            >
+              {msg.content}
+            </div>
+            {msg.role === "assistant" && msg.directives && (
+              <BookingDirectives
+                directives={msg.directives}
+                onServiceSelect={handleServiceSelect}
+                onBookingLinkClick={handleBookingLinkClick}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="p-4 border-t">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (input.trim()) sendMessage(input);
+          }}
+          className="flex gap-2"
+        >
+          <input
+            type={inputMode === "email" ? "email" : inputMode === "phone" ? "tel" : "text"}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type your message..."
+            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="submit"
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          >
+            Send
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+═══════════════════════════════════════════════════════════════════════════════
+PART 6: UNIT TESTS
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: src/lib/booking/__tests__/runtime.test.ts
+
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { processBookingFlow, handleBookingAction } from "../runtime";
+import { prisma } from "@/lib/db";
+
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    lead: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    dataEvent: {
+      create: vi.fn(),
+    },
+  },
+}));
+
+describe("Booking Runtime", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should generate service buttons on booking intent", async () => {
+    const services = [
+      { id: "s1", name: "Haircut", price: "30" },
+      { id: "s2", name: "Shave", price: "20" },
+    ];
+
+    const result = await processBookingFlow(
+      { id: "c1", bookingState: { stage: "IDLE" } },
+      "I want to book",
+      "org1",
+      services
+    );
+
+    expect(result.directives).toBeDefined();
+    expect(result.directives?.[0].type).toBe("service_buttons");
+    expect(result.directives?.[0].services).toHaveLength(2);
+    expect(result.bookingState.stage).toBe("SERVICE_SELECTION");
+  });
+
+  it("should handle cancel command", async () => {
+    const result = await processBookingFlow(
+      { id: "c1", bookingState: { stage: "COLLECT_NAME" } },
+      "cancel",
+      "org1",
+      []
+    );
+
+    expect(result.bookingState.stage).toBe("IDLE");
+    expect(result.response).toContain("cancelled");
+  });
+
+  it("should create lead with idempotency", async () => {
+    const mockLead = { id: "lead1", conversationId: "c1", serviceId: "s1" };
+
+    (prisma.lead.create as any).mockResolvedValueOnce(mockLead);
+
+    const result = await processBookingFlow(
+      {
+        id: "c1",
+        bookingState: {
+          stage: "COLLECT_EMAIL",
+          selectedServiceId: "s1",
+          serviceName: "Haircut",
+          name: "John",
+          phone: "555-1234",
+        },
+      },
+      "john@example.com",
+      "org1",
+      []
+    );
+
+    expect(result.bookingState.stage).toBe("COMPLETE");
+    expect(prisma.lead.create).toHaveBeenCalled();
+  });
+
+  it("should handle duplicate lead gracefully", async () => {
+    const duplicateError: any = new Error("Unique constraint");
+    duplicateError.code = "P2002";
+
+    const existingLead = { id: "lead1", conversationId: "c1", serviceId: "s1" };
+
+    (prisma.lead.create as any).mockRejectedValueOnce(duplicateError);
+    (prisma.lead.findFirst as any).mockResolvedValueOnce(existingLead);
+
+    const result = await processBookingFlow(
+      {
+        id: "c1",
+        bookingState: {
+          stage: "COLLECT_EMAIL",
+          selectedServiceId: "s1",
+          serviceName: "Haircut",
+          name: "John",
+          phone: "555-1234",
+        },
+      },
+      "john@example.com",
+      "org1",
+      []
+    );
+
+    expect(result.bookingState.stage).toBe("COMPLETE");
+    expect(prisma.lead.findFirst).toHaveBeenCalled();
+  });
+
+  it("should handle booking actions", () => {
+    const state = { stage: "SERVICE_SELECTION" };
+
+    const newState = handleBookingAction(
+      { kind: "booking_action", action: "select_service", serviceId: "s1" },
+      state
+    );
+
+    expect(newState.selectedServiceId).toBe("s1");
+  });
+});
+
+═══════════════════════════════════════════════════════════════════════════════
+PART 7: E2E TESTS
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE: tests/e2e/booking-flow.spec.ts
+
+import { test, expect } from "@playwright/test";
+
+test.describe("Booking Flow E2E", () => {
+  test("should complete full booking flow with tracking", async ({ page }) => {
+    // Navigate to widget page
+    await page.goto("/widget/test-org");
+
+    // Wait for widget to load
+    await page.waitForSelector('[data-testid="chat-widget"]');
+
+    // Start booking
+    await page.fill('input[placeholder*="message"]', "I want to book");
+    await page.click('button[type="submit"]');
+
+    // Wait for service buttons to appear
+    await page.waitForSelector('button:has-text("Haircut")', { timeout: 5000 });
+
+    // Click service button
+    await page.click('button:has-text("Haircut")');
+
+    // Enter name
+    await page.waitForSelector('text="What\'s your name?"');
+    await page.fill('input[placeholder*="message"]', "John Doe");
+    await page.click('button[type="submit"]');
+
+    // Enter phone
+    await page.waitForSelector('text="phone number"');
+    await page.fill('input[type="tel"]', "555-1234");
+    await page.click('button[type="submit"]');
+
+    // Enter email
+    await page.waitForSelector('text="email"');
+    await page.fill('input[type="email"]', "john@example.com");
+    await page.click('button[type="submit"]');
+
+    // Wait for Book Now button
+    await page.waitForSelector('button:has-text("Book Now")', { timeout: 5000 });
+
+    // Click Book Now button (mock window.open)
+    await page.evaluate(() => {
+      window.open = () => null;
+    });
+
+    await page.click('button:has-text("Book Now")');
+
+    // Verify tracking event was sent
+    const requests = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/public/chat") && request.method() === "PATCH") {
+        requests.push(request);
+      }
+    });
+
+    await page.waitForTimeout(1000);
+    expect(requests.length).toBeGreaterThan(0);
+  });
+
+  test("should handle cancel command", async ({ page }) => {
+    await page.goto("/widget/test-org");
+    await page.waitForSelector('[data-testid="chat-widget"]');
+
+    await page.fill('input[placeholder*="message"]', "I want to book");
+    await page.click('button[type="submit"]');
+
+    await page.waitForSelector('button:has-text("Haircut")');
+
+    await page.fill('input[placeholder*="message"]', "cancel");
+    await page.click('button[type="submit"]');
+
+    await page.waitForSelector('text*="cancelled"');
+  });
+});
+
+═══════════════════════════════════════════════════════════════════════════════
+PART 8: EXECUTION STEPS
+═══════════════════════════════════════════════════════════════════════════════
+
+Execute in this exact order:
+
+1. Create migration file and run:
+   pnpm prisma migrate dev --name step44_booking_tracking_idempotency
+
+2. Update schema with new DataEventTypes:
+   pnpm prisma generate
+
+3. Run type checking:
+   pnpm typecheck
+
+4. Run unit tests:
+   pnpm vitest run
+
+5. Run E2E tests:
+   pnpm test:e2e
+
+6. Build for production:
+   pnpm build
+
+═══════════════════════════════════════════════════════════════════════════════
+PART 9: QA EVIDENCE CHECKLIST
+═══════════════════════════════════════════════════════════════════════════════
+
+Provide proof of:
+
+✓ Migration applied successfully
+✓ Unique constraint exists in schema.prisma
+✓ Sample API response showing directives
+✓ DataEvent records for BOOKING_LINK_CLICKED
+✓ All quality gates passing
+✓ E2E test showing full booking flow
+
+Run: grep -r "BOOKING_LINK_CLICKED" src/ to verify tracking implementation.
+
+═══════════════════════════════════════════════════════════════════════════════
+END OF STEP 44 SPECIFICATION
+═══════════════════════════════════════════════════════════════════════════════
+
+EXECUTE ALL FILES AND STEPS ABOVE. BABY STEPS. NO REFACTORING.
+
+
+This prompt provides:
+	∙	✅ Complete migration SQL
+	∙	✅ Full TypeScript implementations
+	∙	✅ React component code
+	∙	✅ Unit and E2E tests
+	∙	✅ Quality gate commands
+	∙	✅ QA verification steps
+Copy and paste this entire prompt into Replit Agent Mode, and it will have all the code and instructions needed to implement Step 44 perfectly.​​​​​​​​​​​​​​​​

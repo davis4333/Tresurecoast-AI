@@ -46,6 +46,10 @@ enum DataEventType {
   REDIRECT_CLICK
   LEAD_SCORED
   BOOKING_FLOW_EVENT
+  BOOKING_SERVICE_SELECTED
+  BOOKING_LEAD_CREATED
+  BOOKING_LINK_SHOWN
+  BOOKING_LINK_CLICKED
 }
 
 enum LeadTemperature {
@@ -227,6 +231,7 @@ model Lead {
   workspaceId    Int
   botId          Int
   conversationId Int?
+  serviceId      Int?
 
   status LeadStatus @default(NEW)
 
@@ -242,14 +247,17 @@ model Lead {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  bot          Bot           @relation(fields: [botId], references: [id], onDelete: Cascade)
-  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  bot          Bot                   @relation(fields: [botId], references: [id], onDelete: Cascade)
+  conversation Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  service      OrganizationService?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
+  @@unique([conversationId, serviceId], name: "Lead_conversationId_serviceId_key")
   @@index([organizationId])
   @@index([workspaceId])
   @@index([botId])
+  @@index([conversationId])
   @@index([status])
   @@index([createdAt])
 }
@@ -402,6 +410,7 @@ model OrganizationService {
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leads        Lead[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
