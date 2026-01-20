@@ -123,6 +123,19 @@ Preferred communication style: Simple, everyday language.
 - **Host Policy**: Public endpoints validate origin/host against bot allowlists
 - **Tenant Binding**: `enforceTenantBinding()` prevents cross-tenant access via custom domains
 
+### Organization Settings Architecture (Steps 38-40)
+- **Services Model**: `OrganizationService` stores org-level services with name, priceCents, bookingUrl, paymentUrl, displayOrder, isActive
+- **Hours Model**: `OrganizationHours` stores org-level business hours with dayOfWeek (0-6), isClosed, openTime, closeTime
+- **RBAC Gating**: AGENCY_OWNER/AGENCY_ADMIN always have access; CLIENT access controlled by `Organization.allowClientEdits`
+- **Services API**: `GET/POST/PUT/DELETE /api/org/settings/services` - Full CRUD with case-insensitive duplicate prevention
+- **Hours API**: `GET/PUT /api/org/settings/hours` - Bulk replace (7-day canonical format)
+- **Validation**: `src/lib/validators/orgServices.ts` and `src/lib/validators/orgHours.ts` with Zod schemas
+- **Hours Format**: 24h "HH:MM" strings, open time must be < close time, closed days have null times
+- **Canonical Response**: Hours API always returns exactly 7 days (0=Sunday through 6=Saturday)
+- **Tenant Isolation**: All operations scoped to user's org via `getOrgContext()`
+- **Services UI**: `/app/settings/services` - Full CRUD editor with reorder, locked state for restricted clients
+- **Unit Tests**: `tests/unit/orgServices.route.test.ts`, `tests/unit/orgHours.*.test.ts`
+
 ### Industry Templates Architecture (Step 37)
 - **Location**: `src/lib/templates/*` - All template logic isolated here
 - **Types**: `src/lib/templates/types.ts` - TemplateKey, IndustryTemplate, StarterKnowledge, RecommendedLink
