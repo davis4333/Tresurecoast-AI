@@ -78,7 +78,7 @@ test.describe("Services Settings UI", () => {
 
     test("reorder services with up/down buttons", async ({ page }) => {
       const service1 = `First ${Date.now()}`;
-      const service2 = `Second ${Date.now()}`;
+      const service2 = `Second ${Date.now() + 1}`;
       
       await page.goto("/app/settings/services");
       await page.waitForLoadState("networkidle");
@@ -87,15 +87,20 @@ test.describe("Services Settings UI", () => {
       await page.getByTestId("input-service-name").fill(service1);
       await page.getByTestId("button-save-service").click();
       await expect(page.getByTestId("text-success")).toContainText("Service created");
+      await expect(page.getByTestId("modal-service")).not.toBeVisible();
       
-      await page.waitForTimeout(500);
+      await expect(page.getByText(service1)).toBeVisible();
       
       await page.getByTestId("button-add-service").click();
       await page.getByTestId("input-service-name").fill(service2);
       await page.getByTestId("button-save-service").click();
       await expect(page.getByTestId("text-success")).toContainText("Service created");
+      await expect(page.getByTestId("modal-service")).not.toBeVisible();
+      
+      await expect(page.getByText(service2)).toBeVisible();
       
       const rows = page.locator('[data-testid^="service-row-"]');
+      await expect(rows).toHaveCount(await rows.count());
       const initialCount = await rows.count();
       expect(initialCount).toBeGreaterThanOrEqual(2);
       
@@ -103,20 +108,17 @@ test.describe("Services Settings UI", () => {
       const downButton = firstRow.locator('[data-testid^="button-move-down-"]');
       await downButton.click();
       
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
       
-      const deleteButtons = page.locator('[data-testid^="button-delete-"]');
-      for (let i = 0; i < (await deleteButtons.count()); i++) {
-        const row = rows.nth(i);
-        const hasService1 = await row.getByText(service1).count();
-        const hasService2 = await row.getByText(service2).count();
-        if (hasService1 || hasService2) {
-          await row.locator('[data-testid^="button-delete-"]').click();
-          await page.getByTestId("button-confirm-delete").click();
-          await page.waitForTimeout(300);
-          i--;
-        }
-      }
+      const row1 = page.locator('[data-testid^="service-row-"]').filter({ hasText: service1 });
+      await row1.locator('[data-testid^="button-delete-"]').click();
+      await page.getByTestId("button-confirm-delete").click();
+      await expect(page.getByText(service1)).not.toBeVisible();
+      
+      const row2 = page.locator('[data-testid^="service-row-"]').filter({ hasText: service2 });
+      await row2.locator('[data-testid^="button-delete-"]').click();
+      await page.getByTestId("button-confirm-delete").click();
+      await expect(page.getByText(service2)).not.toBeVisible();
     });
   });
 
