@@ -40,17 +40,17 @@ interface Summary {
   };
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  NEW: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  CONTACTED: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  BOOKED: "bg-green-500/20 text-green-400 border-green-500/30",
-  CLOSED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  NEW: "tca-status-new",
+  CONTACTED: "tca-status-contacted",
+  BOOKED: "tca-status-booked",
+  CLOSED: "tca-status-closed",
 };
 
-const TEMPERATURE_COLORS: Record<string, string> = {
-  HOT: "bg-green-500/20 text-green-400 border-green-500/30",
-  WARM: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  COLD: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+const TEMPERATURE_BADGE_CLASSES: Record<string, string> = {
+  HOT: "tca-status-booked",
+  WARM: "tca-status-contacted",
+  COLD: "tca-status-closed",
 };
 
 export default function LeadsPage() {
@@ -327,29 +327,29 @@ export default function LeadsPage() {
         <TcaCard>
           <TcaCardBody className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full" data-testid="leads-table">
+              <table className="tca-table" data-testid="leads-table">
                 <thead>
-                  <tr className="border-b border-[var(--color-border)] text-left">
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Created</th>
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Contact</th>
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Service</th>
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Temperature</th>
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Status</th>
+                  <tr>
+                    <th>Created</th>
+                    <th>Contact</th>
+                    <th>Service</th>
+                    <th>Temperature</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--color-border)]">
+                <tbody>
                   {leads.map((lead) => (
                     <tr
                       key={lead.leadPublicId}
                       onClick={() => handleLeadClick(lead)}
-                      className="cursor-pointer transition-colors hover:bg-[var(--color-surface-hover)]"
+                      className="cursor-pointer"
                       data-testid={`lead-row-${lead.leadPublicId}`}
                     >
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-[var(--color-text-secondary)]">
+                      <td className="whitespace-nowrap text-[var(--color-text-secondary)]">
                         {formatDate(lead.createdAt)}
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="max-w-xs truncate text-sm font-medium text-[var(--color-text-primary)]">
+                      <td>
+                        <div className="max-w-xs truncate font-medium text-[var(--color-text-primary)]">
                           {getContactInfo(lead)}
                         </div>
                         {lead.email && lead.name && (
@@ -358,13 +358,13 @@ export default function LeadsPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-[var(--color-text-secondary)]">
+                      <td className="text-[var(--color-text-secondary)]">
                         {lead.serviceName || "-"}
                       </td>
-                      <td className="px-6 py-4">
+                      <td>
                         <div className="flex items-center gap-2">
                           <span
-                            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${TEMPERATURE_COLORS[lead.temperature] || ""}`}
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${TEMPERATURE_BADGE_CLASSES[lead.temperature] || ""}`}
                             data-testid={`temp-${lead.leadPublicId}`}
                           >
                             {lead.temperature}
@@ -374,9 +374,9 @@ export default function LeadsPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td>
                         <span
-                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[lead.status] || ""}`}
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[lead.status] || ""}`}
                           data-testid={`status-${lead.leadPublicId}`}
                         >
                           {lead.status}

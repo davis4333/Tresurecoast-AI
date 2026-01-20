@@ -45,17 +45,17 @@ interface LeadDetailDrawerProps {
 
 const STATUSES = ["NEW", "CONTACTED", "BOOKED", "CLOSED"] as const;
 
-const STATUS_COLORS: Record<string, string> = {
-  NEW: "bg-blue-500 text-white",
-  CONTACTED: "bg-yellow-500 text-black",
-  BOOKED: "bg-green-500 text-white",
-  CLOSED: "bg-gray-500 text-white",
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  NEW: "tca-status-new",
+  CONTACTED: "tca-status-contacted",
+  BOOKED: "tca-status-booked",
+  CLOSED: "tca-status-closed",
 };
 
-const TEMPERATURE_COLORS: Record<string, string> = {
-  HOT: "bg-green-500 text-white",
-  WARM: "bg-yellow-500 text-black",
-  COLD: "bg-gray-500 text-white",
+const TEMPERATURE_BADGE_CLASSES: Record<string, string> = {
+  HOT: "tca-status-booked",
+  WARM: "tca-status-contacted",
+  COLD: "tca-status-closed",
 };
 
 export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: LeadDetailDrawerProps) {
@@ -189,7 +189,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
       />
 
       <div
-        className="fixed right-0 top-0 z-50 flex h-full w-full max-w-lg flex-col bg-[var(--color-surface)] shadow-xl"
+        className="fixed right-0 top-0 z-50 flex h-full w-full max-w-lg flex-col border-l border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl"
         data-testid="lead-drawer"
       >
         {toast && (
@@ -198,11 +198,11 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
           </div>
         )}
 
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-4">
-          <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Lead Details</h2>
+        <div className="flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-6 py-4">
+          <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">Lead Details</h2>
           <button
             onClick={() => onOpenChange(false)}
-            className="rounded-lg p-2 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+            className="tca-focus-ring rounded-lg p-2 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
             data-testid="button-close-drawer"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -286,12 +286,12 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                 </h3>
                 <div className="flex items-center gap-4">
                   <span
-                    className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${TEMPERATURE_COLORS[fullLead.temperature]}`}
+                    className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${TEMPERATURE_BADGE_CLASSES[fullLead.temperature]}`}
                     data-testid="lead-temperature"
                   >
                     {fullLead.temperature}
                   </span>
-                  <span className="text-3xl font-bold text-[var(--color-text-primary)]" data-testid="lead-score">
+                  <span className="text-3xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="lead-score">
                     {fullLead.score}
                   </span>
                 </div>
@@ -338,7 +338,7 @@ export function LeadDetailDrawer({ lead, open, onOpenChange, onLeadUpdate }: Lea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add notes about this lead..."
-                  className="tca-input min-h-[120px] w-full resize-none"
+                  className="tca-input tca-focus-ring min-h-[120px] w-full resize-none"
                   data-testid="textarea-notes"
                 />
                 <TcaButton

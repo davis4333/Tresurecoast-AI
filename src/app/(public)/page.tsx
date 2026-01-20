@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Shield, Users, Clock, Code, Quote } from "lucide-react";
 import { TcaButton } from "@/components/tca/TcaButton";
 import { TcaCard, TcaCardBody } from "@/components/tca/TcaCard";
 
@@ -86,29 +87,13 @@ const HOW_IT_WORKS = [
 ];
 
 function FeatureIcon({ icon }: { icon: string }) {
-  const icons: Record<string, JSX.Element> = {
-    shield: (
-      <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-    ),
-    users: (
-      <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-      </svg>
-    ),
-    clock: (
-      <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-    code: (
-      <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-      </svg>
-    ),
+  const iconMap: Record<string, React.ReactNode> = {
+    shield: <Shield className="h-6 w-6" />,
+    users: <Users className="h-6 w-6" />,
+    clock: <Clock className="h-6 w-6" />,
+    code: <Code className="h-6 w-6" />,
   };
-  return icons[icon] ?? null;
+  return iconMap[icon] ?? null;
 }
 
 export default function LandingPage() {
@@ -139,9 +124,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="border-t border-[var(--color-border)] py-20">
+      <section className="border-t border-[var(--color-border)] py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-4 text-center text-3xl font-bold">How It Works</h2>
+          <h2 className="tca-h2 mb-4 text-center">How It Works</h2>
           <p className="mx-auto mb-12 max-w-xl text-center text-[var(--color-text-secondary)]">
             We set up and manage your AI chatbot. You get the leads.
           </p>
@@ -159,9 +144,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="border-t border-[var(--color-border)] bg-[var(--color-surface)] py-20">
+      <section className="border-t border-[var(--color-border)] bg-[var(--color-surface)] py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-4 text-center text-3xl font-bold">Features</h2>
+          <h2 className="tca-h2 mb-4 text-center">Features</h2>
           <p className="mx-auto mb-12 max-w-xl text-center text-[var(--color-text-secondary)]">
             Everything you need to capture and convert more leads.
           </p>
@@ -181,25 +166,23 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="border-t border-[var(--color-border)] py-20" data-testid="section-testimonials">
+      <section className="border-t border-[var(--color-border)] py-24" data-testid="section-testimonials">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-4 text-center text-3xl font-bold" data-testid="heading-testimonials">What Our Clients Say</h2>
+          <h2 className="tca-h2 mb-4 text-center" data-testid="heading-testimonials">What Our Clients Say</h2>
           <p className="mx-auto mb-12 max-w-xl text-center text-[var(--color-text-secondary)]">
             Real results from real businesses using Treasure Coast AI.
           </p>
           <div className="grid gap-6 md:grid-cols-3">
             {TESTIMONIALS.map((testimonial, index) => (
-              <TcaCard key={index} data-testid={`card-testimonial-${index}`}>
-                <TcaCardBody>
+              <TcaCard key={index} className="flex h-full flex-col" data-testid={`card-testimonial-${index}`}>
+                <TcaCardBody className="flex flex-1 flex-col">
                   <div className="mb-4 flex h-8 w-8 items-center justify-center text-[var(--color-brand-primary)]" data-testid={`icon-quote-${index}`}>
-                    <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M3 21c3 0 7-1 7-8V5c0-1.25-4.75-5-7-5S0 3.75 0 5c0 1.25 0 2.5.75 4 .25 1 2 4 2.5 6 0 0-3 1-3 6s1 8 7 8z" />
-                    </svg>
+                    <Quote className="h-6 w-6" />
                   </div>
-                  <p className="mb-6 text-sm italic text-[var(--color-text-secondary)]" data-testid={`text-quote-${index}`}>
+                  <p className="mb-6 flex-1 text-sm italic text-[var(--color-text-secondary)]" data-testid={`text-quote-${index}`}>
                     "{testimonial.quote}"
                   </p>
-                  <div data-testid={`section-author-${index}`}>
+                  <div className="mt-auto" data-testid={`section-author-${index}`}>
                     <p className="font-semibold" data-testid={`text-author-${index}`}>{testimonial.author}</p>
                     <p className="mb-3 text-sm text-[var(--color-text-secondary)]" data-testid={`text-role-${index}`}>{testimonial.role}</p>
                     <span className="inline-block rounded-full bg-[var(--color-brand-primary)]/10 px-3 py-1 text-xs font-medium text-[var(--color-brand-primary)]" data-testid={`badge-industry-${index}`}>
@@ -213,9 +196,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="border-t border-[var(--color-border)] bg-gradient-to-b from-[var(--color-brand-primary)]/5 to-transparent py-20" data-testid="section-results">
+      <section className="border-t border-[var(--color-border)] bg-gradient-to-b from-[var(--color-brand-primary)]/5 to-transparent py-24" data-testid="section-results">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-4 text-center text-3xl font-bold" data-testid="heading-results">Real Results for Real Businesses</h2>
+          <h2 className="tca-h2 mb-4 text-center" data-testid="heading-results">Real Results for Real Businesses</h2>
           <p className="mx-auto mb-12 max-w-xl text-center text-[var(--color-text-secondary)]">
             Proven metrics that demonstrate the impact of Treasure Coast AI.
           </p>
@@ -233,9 +216,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="border-t border-[var(--color-border)] py-20">
+      <section className="border-t border-[var(--color-border)] py-24">
         <div className="mx-auto max-w-3xl px-6">
-          <h2 className="mb-4 text-center text-3xl font-bold">Frequently Asked Questions</h2>
+          <h2 className="tca-h2 mb-4 text-center">Frequently Asked Questions</h2>
           <p className="mx-auto mb-12 max-w-xl text-center text-[var(--color-text-secondary)]">
             Common questions about Treasure Coast AI.
           </p>
@@ -252,9 +235,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="border-t border-[var(--color-border)] bg-[var(--color-surface)] py-20">
+      <section className="border-t border-[var(--color-border)] bg-[var(--color-surface)] py-24">
         <div className="mx-auto max-w-2xl px-6 text-center">
-          <h2 className="mb-4 text-3xl font-bold">Ready to capture more leads?</h2>
+          <h2 className="tca-h2 mb-4">Ready to capture more leads?</h2>
           <p className="mb-8 text-[var(--color-text-secondary)]">
             Book a demo to see how Treasure Coast AI can work for your business.
           </p>

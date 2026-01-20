@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 import { resolveDemoBotKey } from "@/lib/public/demoKey";
 import { TcaButton } from "@/components/tca/TcaButton";
 import { TcaCard, TcaCardBody } from "@/components/tca/TcaCard";
@@ -20,10 +21,10 @@ export default async function DemoPage() {
   const demoBotKey = await resolveDemoBotKey();
 
   return (
-    <div className="py-20">
+    <div className="py-24">
       <div className="mx-auto max-w-4xl px-6">
         <div className="mb-12 text-center">
-          <h1 className="mb-4 text-4xl font-extrabold tracking-tight">
+          <h1 className="tca-h1 mb-4">
             <span className="tca-gradient-text">Live Demo</span>
           </h1>
           <p className="mx-auto max-w-xl text-lg text-[var(--color-text-secondary)]">
@@ -34,7 +35,7 @@ export default async function DemoPage() {
         {demoBotKey ? (
           <div className="grid gap-8 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <TcaCard elevated className="overflow-hidden">
+              <TcaCard elevated className="overflow-hidden shadow-lg">
                 <iframe
                   src={`/widget/${demoBotKey}`}
                   className="h-[600px] w-full border-0"
@@ -47,7 +48,7 @@ export default async function DemoPage() {
             <div className="space-y-6">
               <TcaCard>
                 <TcaCardBody>
-                  <h3 className="mb-3 font-semibold">Try asking:</h3>
+                  <h3 className="tca-h4 mb-3">Try asking:</h3>
                   <div className="flex flex-wrap gap-2">
                     {SUGGESTION_CHIPS.map((chip) => (
                       <button
@@ -65,18 +66,18 @@ export default async function DemoPage() {
 
               <TcaCard>
                 <TcaCardBody>
-                  <h3 className="mb-3 font-semibold">What you are seeing:</h3>
-                  <ul className="space-y-2 text-sm text-[var(--color-text-secondary)]">
-                    <li className="flex gap-2">
-                      <span className="text-[var(--color-success)]">1.</span>
+                  <h3 className="tca-h4 mb-3">What you are seeing:</h3>
+                  <ul className="space-y-3 text-sm text-[var(--color-text-secondary)]">
+                    <li className="flex gap-3">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-success)]/10 text-xs font-semibold text-[var(--color-success)]">1</span>
                       AI answers ONLY from verified data
                     </li>
-                    <li className="flex gap-2">
-                      <span className="text-[var(--color-success)]">2.</span>
+                    <li className="flex gap-3">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-success)]/10 text-xs font-semibold text-[var(--color-success)]">2</span>
                       Lead capture when info is missing
                     </li>
-                    <li className="flex gap-2">
-                      <span className="text-[var(--color-success)]">3.</span>
+                    <li className="flex gap-3">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-success)]/10 text-xs font-semibold text-[var(--color-success)]">3</span>
                       Smart routing to booking/payment
                     </li>
                   </ul>
@@ -93,12 +94,10 @@ export default async function DemoPage() {
         ) : (
           <TcaCard>
             <TcaCardBody className="py-12 text-center">
-              <div className="mb-4 text-4xl">
-                <svg className="mx-auto h-16 w-16 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
+              <div className="mb-4">
+                <MessageCircle className="mx-auto h-16 w-16 text-[var(--color-text-muted)]" strokeWidth={1.5} />
               </div>
-              <h2 className="mb-2 text-xl font-semibold" data-testid="text-demo-not-configured">
+              <h2 className="tca-h3 mb-2" data-testid="text-demo-not-configured">
                 Demo Not Configured
               </h2>
               <p className="mb-6 text-[var(--color-text-secondary)]">

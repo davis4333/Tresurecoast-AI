@@ -293,13 +293,16 @@ export default function ServicesSettingsPage() {
 
       {!canEdit && (
         <div 
-          className="mb-6 max-w-4xl rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 flex items-center gap-3"
+          className="tca-card mb-6 max-w-4xl flex items-center gap-4 p-4"
+          style={{ borderColor: 'rgb(251 191 36 / 0.3)', background: 'rgb(251 191 36 / 0.08)' }}
           data-testid="banner-locked"
         >
-          <Lock className="w-5 h-5 text-amber-400" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/20">
+            <Lock className="h-5 w-5 text-amber-400" />
+          </div>
           <div>
-            <p className="text-sm font-medium text-amber-400">Editing is locked</p>
-            <p className="text-xs text-amber-400/70 mt-0.5">
+            <p className="text-sm font-semibold text-amber-400">Editing is locked</p>
+            <p className="text-sm text-amber-400/80 mt-0.5">
               Your agency has restricted editing for this account. Contact them for changes.
             </p>
           </div>
@@ -498,8 +501,8 @@ export default function ServicesSettingsPage() {
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
           data-testid="modal-service"
         >
-          <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl border border-[var(--color-border)]">
-            <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-4">
+          <div className="tca-card bg-[var(--color-surface)] p-6 w-full max-w-md mx-4 shadow-2xl">
+            <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)] mb-6">
               {editingService ? "Edit Service" : "Add Service"}
             </h2>
             
@@ -513,7 +516,7 @@ export default function ServicesSettingsPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., Men's Haircut"
-                  className={`tca-input ${formErrors.name ? "border-red-500" : ""}`}
+                  className={`tca-input tca-focus-ring ${formErrors.name ? "border-red-500" : ""}`}
                   data-testid="input-service-name"
                 />
                 {formErrors.name && (
@@ -534,7 +537,7 @@ export default function ServicesSettingsPage() {
                     value={formData.priceInput}
                     onChange={(e) => setFormData({ ...formData, priceInput: e.target.value })}
                     placeholder="25.00"
-                    className={`tca-input pl-7 ${formErrors.priceInput ? "border-red-500" : ""}`}
+                    className={`tca-input tca-focus-ring pl-7 ${formErrors.priceInput ? "border-red-500" : ""}`}
                     data-testid="input-service-price"
                   />
                 </div>
@@ -554,7 +557,7 @@ export default function ServicesSettingsPage() {
                   value={formData.bookingUrl}
                   onChange={(e) => setFormData({ ...formData, bookingUrl: e.target.value })}
                   placeholder="https://calendly.com/..."
-                  className={`tca-input ${formErrors.bookingUrl ? "border-red-500" : ""}`}
+                  className={`tca-input tca-focus-ring ${formErrors.bookingUrl ? "border-red-500" : ""}`}
                   data-testid="input-booking-url"
                 />
                 {formErrors.bookingUrl && (
@@ -573,7 +576,7 @@ export default function ServicesSettingsPage() {
                   value={formData.paymentUrl}
                   onChange={(e) => setFormData({ ...formData, paymentUrl: e.target.value })}
                   placeholder="https://pay.stripe.com/..."
-                  className={`tca-input ${formErrors.paymentUrl ? "border-red-500" : ""}`}
+                  className={`tca-input tca-focus-ring ${formErrors.paymentUrl ? "border-red-500" : ""}`}
                   data-testid="input-payment-url"
                 />
                 {formErrors.paymentUrl && (
@@ -611,10 +614,10 @@ export default function ServicesSettingsPage() {
               </div>
             </div>
             
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--color-border-subtle)]">
               <button
                 onClick={closeModal}
-                className="px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                className="tca-btn-secondary tca-focus-ring"
                 data-testid="button-cancel"
               >
                 Cancel
@@ -622,7 +625,7 @@ export default function ServicesSettingsPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="tca-btn-primary"
+                className="tca-btn-primary tca-focus-ring disabled:opacity-50"
                 data-testid="button-save-service"
               >
                 {saving ? "Saving..." : editingService ? "Save Changes" : "Add Service"}
@@ -638,17 +641,17 @@ export default function ServicesSettingsPage() {
           onClick={(e) => { if (e.target === e.currentTarget) setDeleteConfirmId(null); }}
           data-testid="modal-delete-confirm"
         >
-          <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl border border-[var(--color-border)]">
-            <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">
+          <div className="tca-card bg-[var(--color-surface)] p-6 w-full max-w-sm mx-4 shadow-2xl">
+            <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)] mb-2">
               Delete Service?
             </h2>
-            <p className="text-sm text-[var(--color-text-muted)] mb-6">
+            <p className="text-sm text-[var(--color-text-secondary)] mb-6">
               This action cannot be undone. The service will be permanently removed.
             </p>
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 pt-4 border-t border-[var(--color-border-subtle)]">
               <button
                 onClick={() => setDeleteConfirmId(null)}
-                className="px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                className="tca-btn-secondary tca-focus-ring"
                 data-testid="button-cancel-delete"
               >
                 Cancel
@@ -656,7 +659,7 @@ export default function ServicesSettingsPage() {
               <button
                 onClick={() => handleDelete(deleteConfirmId)}
                 disabled={deleting}
-                className="px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg"
+                className="tca-focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
                 data-testid="button-confirm-delete"
               >
                 {deleting ? "Deleting..." : "Delete"}

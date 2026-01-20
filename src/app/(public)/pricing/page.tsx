@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Check } from "lucide-react";
 import { TcaCard, TcaCardBody, TcaCardFooter, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaButton } from "@/components/tca/TcaButton";
 import { TcaBadge } from "@/components/tca/TcaBadge";
@@ -35,12 +36,16 @@ const AGENCY_FEATURES = [
   "API access",
 ];
 
+function CheckIcon() {
+  return <Check className="h-4 w-4" />;
+}
+
 export default function PricingPage() {
   return (
-    <div className="py-20">
+    <div className="py-24">
       <div className="mx-auto max-w-6xl px-6">
         <div className="mb-16 text-center">
-          <h1 className="mb-4 text-4xl font-extrabold tracking-tight">
+          <h1 className="tca-h1 mb-4">
             <span className="tca-gradient-text">Simple, Transparent</span> Pricing
           </h1>
           <p className="mx-auto max-w-xl text-lg text-[var(--color-text-secondary)]">
@@ -50,9 +55,9 @@ export default function PricingPage() {
         </div>
 
         <div className="grid gap-8 md:grid-cols-3">
-          <TcaCard>
+          <TcaCard className="flex flex-col transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
             <TcaCardHeader>
-              <div className="mb-2 text-lg font-bold">Starter</div>
+              <div className="tca-h4 mb-2">Starter</div>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-extrabold">$99</span>
                 <span className="text-sm text-[var(--color-text-secondary)]">/month</span>
@@ -61,14 +66,12 @@ export default function PricingPage() {
                 Perfect for small businesses getting started.
               </p>
             </TcaCardHeader>
-            <TcaCardBody>
+            <TcaCardBody className="flex-1">
               <ul className="space-y-3">
                 {STARTER_FEATURES.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
-                    <span className="mt-0.5 text-[var(--color-success)]">
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                    <span className="mt-0.5 shrink-0 text-[var(--color-success)]">
+                      <CheckIcon />
                     </span>
                     <span className="text-[var(--color-text-secondary)]">{f}</span>
                   </li>
@@ -82,10 +85,10 @@ export default function PricingPage() {
             </TcaCardFooter>
           </TcaCard>
 
-          <TcaCard elevated>
+          <TcaCard elevated className="flex flex-col transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
             <TcaCardHeader className="relative">
               <TcaBadge className="absolute right-4 top-4">Most Popular</TcaBadge>
-              <div className="mb-2 text-lg font-bold">Professional</div>
+              <div className="tca-h4 mb-2">Professional</div>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-extrabold text-[var(--color-brand-primary)]">$249</span>
                 <span className="text-sm text-[var(--color-text-secondary)]">/month</span>
@@ -94,14 +97,12 @@ export default function PricingPage() {
                 For growing businesses with multiple locations.
               </p>
             </TcaCardHeader>
-            <TcaCardBody>
+            <TcaCardBody className="flex-1">
               <ul className="space-y-3">
                 {PRO_FEATURES.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
-                    <span className="mt-0.5 text-[var(--color-success)]">
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                    <span className="mt-0.5 shrink-0 text-[var(--color-success)]">
+                      <CheckIcon />
                     </span>
                     <span className="text-[var(--color-text-secondary)]">{f}</span>
                   </li>
@@ -115,9 +116,9 @@ export default function PricingPage() {
             </TcaCardFooter>
           </TcaCard>
 
-          <TcaCard>
+          <TcaCard className="flex flex-col transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
             <TcaCardHeader>
-              <div className="mb-2 text-lg font-bold">Agency</div>
+              <div className="tca-h4 mb-2">Agency</div>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-extrabold">Custom</span>
               </div>
@@ -125,14 +126,12 @@ export default function PricingPage() {
                 For agencies managing multiple client accounts.
               </p>
             </TcaCardHeader>
-            <TcaCardBody>
+            <TcaCardBody className="flex-1">
               <ul className="space-y-3">
                 {AGENCY_FEATURES.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
-                    <span className="mt-0.5 text-[var(--color-success)]">
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                    <span className="mt-0.5 shrink-0 text-[var(--color-success)]">
+                      <CheckIcon />
                     </span>
                     <span className="text-[var(--color-text-secondary)]">{f}</span>
                   </li>
