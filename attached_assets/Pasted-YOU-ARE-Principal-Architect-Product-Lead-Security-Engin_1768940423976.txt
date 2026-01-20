@@ -1,0 +1,109 @@
+YOU ARE: Principal Architect + Product Lead + Security Engineer + QA Gatekeeper.
+
+GOAL
+Add an owner-only Demo Reset feature so I can instantly reset a demo organization to a clean state before showing prospects.
+
+NON-NEGOTIABLES
+1) RBAC: Only AGENCY_OWNER (NOT admin, not client).
+2) Tenant isolation: Only affects the current organization.
+3) Safety: Requires explicit confirmation:
+   - User must type: RESET DEMO
+   - And click a final confirm button
+4) Auditability: Must create a DataEvent (or AuditLog if you have it) recording who triggered reset + timestamp.
+5) Idempotent: Running multiple times should not break.
+6) No destructive reset in production unless explicitly enabled:
+   - Only allow if NODE_ENV != "production" OR DEMO_RESET_ENABLED=true
+   - In production with DEMO_RESET_ENABLED!=true, return 403 with message.
+
+WHAT TO BUILD
+
+A) API Endpoint: POST /api/org/demo-reset
+- File: src/app/api/org/demo-reset/route.ts
+- Enforce:
+  - getOrgContext
+  - role === AGENCY_OWNER only
+  - env gate: allow only if (NODE_ENV !== "production" || DEMO_RESET_ENABLED === "true")
+- Request body:
+  { confirmText: string }
+  Must equal "RESET DEMO" else 400.
+- Behavior (transaction):
+  1) Delete demo-generated data for this org:
+     - Leads for org
+     - Conversations for bots in org (and their messages if separate table)
+     - DataEvents for org (optionally keep last 1 day; but default wipe all)
+     - NotificationLog entries for org (if exists)
+  2) Keep core configuration:
+     - Organization record stays
+     - Members stay
+     - Services stay (optional: keep; OR reset to a default set if DEMO_SEED=true)
+     - Hours stay (optional)
+     - Bots stay (optional) but wipe conversations + analytics
+  3) Optional seeding:
+     - If DEMO_SEED=true:
+       - Ensure at least 3 services exist (with example booking URLs)
+       - Ensure hours configured (7 days)
+       - Ensure at least 1 bot exists and has template seeded KB entries (draft or published depending on your system)
+  4) Log an audit DataEvent:
+     - type: DEMO_RESET
+     - payload: { clerkUserId, organizationId, deletedCounts, seeded: boolean }
+
+- Response:
+{
+  ok: true,
+  deleted: { leads: number, conversations: number, dataEvents: number, notificationLogs: number },
+  seeded: boolean
+}
+
+B) UI Integration (Premium)
+- Add a page or section:
+  Option 1: /app/settings/demo
+  Option 2: /app/qa-checklist includes a “Demo Reset” section (only for owner)
+Choose whichever matches your navigation.
+- UI must include:
+  - Danger zone styling
+  - Explanation of what will be wiped
+  - Input field requiring "RESET DEMO"
+  - Disabled confirm button until match
+  - Final confirm modal
+  - Toast success
+  - Show deleted counts returned by API
+
+Add testids:
+- demo-reset-input
+- demo-reset-button
+- demo-reset-confirm
+
+C) Tests
+
+Unit Tests:
+- tests/unit/demoReset.route.test.ts
+Cover:
+  1) OWNER allowed with env gate on
+  2) ADMIN forbidden
+  3) CLIENT forbidden
+  4) Production mode with DEMO_RESET_ENABLED!=true forbidden
+  5) confirmText mismatch -> 400
+  6) deletes only org-scoped records (create org A + org B fixtures)
+
+E2E:
+- tests/e2e/demo-reset.spec.ts
+Cover:
+  1) Owner can open page/section
+  2) Button disabled until correct confirm text typed
+  3) Successful reset returns toast and counts displayed
+
+D) QA Evidence Report
+Provide:
+- Files changed list
+- Any migration name (if added)
+- Command outputs:
+  pnpm prisma generate
+  pnpm prisma migrate status
+  pnpm typecheck
+  pnpm test
+  pnpm test:e2e
+  pnpm build
+
+START NOW
+- Match existing patterns for routes, RBAC, error shape, toasts, skeletons.
+- Keep changes minimal and consistent.
