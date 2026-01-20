@@ -139,6 +139,26 @@ Preferred communication style: Simple, everyday language.
 - **Unit Tests**: `tests/unit/orgServices.route.test.ts`, `tests/unit/orgHours.*.test.ts`, `tests/unit/hoursHelpers.test.ts`
 - **E2E Tests**: `tests/e2e/services-settings.spec.ts`, `tests/e2e/hours-settings.spec.ts`
 
+### Booking Flow State Machine (Step 42)
+- **Location**: `src/lib/booking/*` - Enterprise-grade booking flow module
+- **Types**: `src/lib/booking/types.ts` - 700+ lines of branded types, enums, interfaces
+  - `BookingFlowState` enum: IDLE → SERVICE_SELECTION → LEAD_NAME → LEAD_PHONE → LEAD_EMAIL → COMPLETE
+  - `ResponseDirectiveType` enum: UI rendering instructions (SHOW_SERVICE_PICKER, ASK_FOR_NAME, etc.)
+  - Branded types: `ServiceId`, `EmailAddress`, `PhoneNumber`, `Url` for compile-time safety
+  - Type guards: `isBookingFlowState()`, `isResponseDirectiveType()`
+  - Config: `BOOKING_FLOW_CONFIG` with validation limits, timeouts, rate limits
+  - Keywords: `BOOKING_INTENT_KEYWORDS`, `CANCEL_KEYWORDS`, `RESTART_KEYWORDS`, `BACK_KEYWORDS`
+- **Validators**: `src/lib/booking/validators.ts` - 700+ lines of security-hardened validation
+  - `validateName()` - Unicode-aware, XSS prevention, 2-100 chars, no consecutive special chars
+  - `validatePhone()` - E.164 normalization, 10-15 digits, international support
+  - `validateEmail()` - RFC 5322 subset, lowercase normalization, domain validation
+  - `validateUrl()` - Protocol allowlist, domain allowlist, HTTPS enforcement
+  - `looksLikeServiceSelection()` - Heuristic for distinguishing service names from sentences
+  - Sanitization: Unicode NFC normalization, null byte removal, control char stripping
+- **Security Features**: XSS prevention, ReDoS prevention, Unicode bypass prevention, null byte injection prevention
+- **Compliance Annotations**: GDPR/CCPA/PCI DSS ready, PII handling documented
+- **Unit Tests**: `tests/unit/bookingValidators.test.ts` (65 tests), `tests/unit/bookingTypes.test.ts` (21 tests)
+
 ### Industry Templates Architecture (Step 37)
 - **Location**: `src/lib/templates/*` - All template logic isolated here
 - **Types**: `src/lib/templates/types.ts` - TemplateKey, IndustryTemplate, StarterKnowledge, RecommendedLink
