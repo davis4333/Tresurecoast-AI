@@ -1,0 +1,214 @@
+Perfect. Step 39 being green with 305 unit / 29 e2e / build clean means you’re moving like a real product team now.
+
+Best next move: Step 40 — Organization Hours model + API (RBAC + isolation + duplicates + tests)
+
+Why this next:
+	•	Hours is the second “clients actually change this” setting after services.
+	•	Booking intent + “Are you open?” is one of the highest-volume questions bots get.
+	•	You already nailed the UI patterns and RBAC gating—Step 40 should mirror Step 38’s structure so it stays predictable and bulletproof.
+
+Below is the exact Replit prompt to implement Step 40 the same way Step 38/39 were done.
+
+⸻
+
+REPLIT PROMPT — STEP 40 (ORG HOURS MODEL + API)
+
+TITLE: Step 40 — Organization Hours (Org-Level) Model + CRUD API + RBAC + QA Evidence
+
+ROLE
+
+Act as Senior Backend Engineer + QA Gatekeeper. Implement OrganizationHours as an org-level setting with the same tenant isolation + RBAC conventions used in Step 38 services and Step 27 org context.
+
+⸻
+
+OBJECTIVE
+
+Add organization-level business hours storage and a fully tested CRUD API:
+
+Endpoint:
+	•	GET /api/org/settings/hours
+	•	PUT /api/org/settings/hours (bulk replace is preferred)
+Optional:
+	•	POST/DELETE not needed if you do a clean bulk replace
+
+RBAC:
+	•	AGENCY_OWNER / AGENCY_ADMIN: always allowed
+	•	CLIENT: allowed only if Organization.allowClientEdits = true
+	•	Otherwise CLIENT is read-only (GET allowed, writes forbidden)
+
+Tenant isolation:
+	•	User can only read/write hours for their org from getOrgContext.
+
+⸻
+
+NON-NEGOTIABLE RULES
+	1.	Org-level only (hours belong to organizationId, not botId)
+	2.	Deterministic canonical shape: always 7 days in API response (Mon–Sun or 0–6) even if DB rows missing.
+	3.	No partial chaos: use bulk replace or upsert strategy so hours stay consistent.
+	4.	Validation must reject impossible times and malformed payloads.
+	5.	Tests first-class: unit + route tests must prove RBAC, isolation, and correctness.
+
+⸻
+
+A) PRISMA SCHEMA CHANGES
+
+1) Add model: OrganizationHours
+
+Fields:
+	•	id Int @id @default(autoincrement())
+	•	organizationId Int
+	•	dayOfWeek Int // 0-6 (0=Sunday OR 1-7; pick one and document it)
+	•	isClosed Boolean @default(false)
+	•	openTime String? // “HH:MM” 24h
+	•	closeTime String? // “HH:MM” 24h
+	•	createdAt DateTime @default(now())
+	•	updatedAt DateTime @updatedAt
+
+Relations:
+	•	organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+Constraints:
+	•	Unique: @@unique([organizationId, dayOfWeek])
+	•	Index: @@index([organizationId])
+
+2) Create migration
+
+Name: step40_org_hours
+
+⸻
+
+B) VALIDATION LAYER
+
+Create:
+	•	src/lib/validators/orgHours.ts
+
+Zod rules:
+	•	dayOfWeek must be int in allowed range
+	•	isClosed boolean
+	•	if isClosed=true → openTime/closeTime must be null/undefined
+	•	if isClosed=false → openTime & closeTime required
+	•	time format must be ^\d{2}:\d{2}$
+	•	openTime must be < closeTime (simple string compare works for HH:MM)
+
+Define:
+	•	OrganizationHoursDaySchema
+	•	OrganizationHoursBulkSchema (array of 7 days)
+
+Include helper:
+	•	normalize payload to guarantee 7 days returned in consistent order
+
+⸻
+
+C) API ROUTE
+
+Create:
+	•	src/app/api/org/settings/hours/route.ts
+
+Exports:
+	•	export const runtime = "nodejs"
+	•	export const dynamic = "force-dynamic"
+
+Use:
+	•	getOrgContext for org + role
+	•	RBAC check same as Step 38 services
+
+GET behavior
+
+Return:
+
+{
+  "ok": true,
+  "hours": [
+    { "dayOfWeek": 0, "isClosed": false, "openTime": "09:00", "closeTime": "17:00" },
+    ...
+  ],
+  "permissions": { "canEdit": boolean, "role": "...", "allowClientEdits": boolean }
+}
+
+If DB missing days, fill defaults:
+	•	default: closed OR 09:00-17:00 (pick one; I recommend closed default to avoid lying)
+
+PUT behavior (bulk replace)
+
+Input:
+
+{ "hours": [7 items...] }
+
+Algorithm:
+	•	Validate payload
+	•	RBAC enforce
+	•	Transaction:
+	•	delete existing org hours
+	•	insert 7 normalized rows with compact deterministic ordering
+Return updated hours
+
+Reject:
+	•	invalid time formats
+	•	duplicates days
+	•	not 7 days
+	•	open >= close
+	•	CLIENT with allowClientEdits=false → 403
+
+⸻
+
+D) TESTS
+
+Unit tests
+
+Create:
+	•	tests/unit/orgHours.validator.test.ts
+Cover:
+	•	valid 7-day payload
+	•	closed day rules
+	•	open/close ordering
+	•	bad formats
+	•	duplicates/missing days
+
+Route tests
+
+Create:
+	•	tests/unit/orgHours.route.test.ts
+Mock:
+	•	prisma
+	•	getOrgContext success with roles
+Prove:
+
+	1.	OWNER PUT succeeds
+	2.	CLIENT PUT blocked when allowClientEdits=false
+	3.	tenant isolation: org A writes don’t affect org B reads
+	4.	GET returns 7-day canonical response even if DB has partial data
+
+⸻
+
+E) QUALITY GATES + QA EVIDENCE REPORT
+
+Run and paste outputs:
+	1.	pnpm prisma generate
+	2.	pnpm prisma migrate dev --name step40_org_hours
+	3.	pnpm typecheck
+	4.	pnpm vitest run
+	5.	pnpm test:e2e (should stay green)
+	6.	pnpm build
+
+Evidence report must include:
+	•	prisma model snippet
+	•	migration created + applied
+	•	curl proof:
+	•	CLIENT PUT blocked
+	•	OWNER PUT success
+	•	Org B GET returns only its data
+	•	canonical 7-day output example
+
+Commit message:
+Step 40: org hours settings API with RBAC and canonical weekly schedule
+
+STOP after Step 40.
+
+⸻
+
+After Step 40 (next, so you’re lined up)
+
+Step 41 = Hours Editor UI (copy Step 39 polish: locked banner, weekly grid, toggles, time pickers)
+Then we can do Booking Flow State Machine (service selection → lead capture → correct booking link) and it’ll feel “enterprise-grade”.
+
+If you paste back the Step 40 QA report when it’s done, I’ll do a strict gatekeeper review and tell you exactly what Step 41 should implement to match the premium standard.

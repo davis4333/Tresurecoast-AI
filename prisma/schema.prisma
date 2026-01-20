@@ -92,6 +92,7 @@ model Organization {
   knowledgeSources BotKnowledgeSource[]
   businessProfile  BusinessProfile?
   services         OrganizationService[]
+  hours            OrganizationHours[]
 
   @@index([createdAt])
 }
@@ -400,5 +401,21 @@ model OrganizationService {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model OrganizationHours {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  dayOfWeek      Int      // 0=Sunday, 1=Monday, ..., 6=Saturday
+  isClosed       Boolean  @default(false)
+  openTime       String?  // "HH:MM" 24h format
+  closeTime      String?  // "HH:MM" 24h format
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, dayOfWeek])
   @@index([organizationId])
 }
