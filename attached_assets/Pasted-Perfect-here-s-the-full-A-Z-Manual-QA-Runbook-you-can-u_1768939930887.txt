@@ -1,0 +1,519 @@
+Perfect — here’s the full A→Z Manual QA Runbook you can use before every release. It’s designed so you (or anyone) can run it page-by-page, testing every button, field, form, link, and layout detail, including the widget. It also includes a premium UI checklist so the platform looks like a $100k agency built it.
+
+⸻
+
+Treasure Coast AI — A→Z Manual QA Runbook (Ship-Grade)
+
+0) Rules of the Runbook (non-negotiable)
+	•	No “looks fine” approvals. Everything must be verified with an expected outcome.
+	•	Every click must do something correct (or be intentionally disabled with an explanation).
+	•	Every form must validate + error message must be clear + not ugly.
+	•	Every page must be premium (spacing, typography, colors, states, responsiveness).
+	•	Any broken link, misaligned UI, or confusing copy is a fail.
+	•	Capture evidence: screenshots/video of any failure.
+
+⸻
+
+1) Test Environment Setup
+
+1.1 Devices + Browsers to test (minimum)
+	•	Desktop:
+	•	Chrome (latest)
+	•	Safari (if you can) OR Firefox (latest)
+	•	Mobile:
+	•	iPhone sized viewport (390×844)
+	•	Small Android sized viewport (360×800)
+
+1.2 Viewports to test (minimum)
+	•	1440×900 (desktop baseline)
+	•	1280×720 (smaller laptop)
+	•	768×1024 (tablet)
+	•	390×844 (mobile)
+
+1.3 Accounts to have ready
+	•	Agency Owner (full rights)
+	•	Agency Admin (near-full rights)
+	•	Client in an org with:
+	•	allowClientEdits = false (locked mode)
+	•	allowClientEdits = true (editable mode)
+
+1.4 Test data you must have
+
+Create two organizations:
+	•	Org A: “Demo Barber” (or any test business)
+	•	Org B: “Tenant B” (empty or separate)
+
+Org A must have:
+	•	At least 3 services (with booking URLs)
+	•	Hours set (mix of open + closed days)
+	•	At least 1 bot with widget public key
+	•	At least 3 conversations
+	•	At least 3 leads:
+	•	one HOT, one WARM, one COLD
+	•	different statuses (NEW, CONTACTED, BOOKED)
+	•	Analytics events must exist (booking funnel events)
+
+Org B must have:
+	•	At least 1 bot
+	•	At least 1 service (different from Org A)
+	•	Confirm Org B cannot see Org A data
+
+⸻
+
+2) Global “Every Page” Checklist (run this on every screen)
+
+2.1 Layout + polish (premium gate)
+	•	Header/nav spacing consistent
+	•	Typography consistent (same font family + weights)
+	•	Buttons: consistent sizing, corners, hover states
+	•	Cards: consistent padding, shadows, borders
+	•	Empty states: not awkward, includes CTA
+	•	Loading states: skeletons or spinners look intentional
+	•	Toasts: readable, not overlapping UI
+	•	No weird scroll bars, no horizontal overflow
+	•	No “unstyled” default HTML vibes anywhere
+
+2.2 Accessibility basics (fast pass)
+	•	Can navigate primary UI with Tab
+	•	Focus ring visible (not hidden)
+	•	Labels exist for inputs (or accessible name)
+	•	Color contrast: text readable on backgrounds
+
+2.3 Responsiveness basics
+	•	No clipped text
+	•	No buttons off-screen
+	•	Modals fit on mobile (scroll inside modal, not broken)
+	•	Tables degrade gracefully (stack, scroll, or compact)
+
+2.4 Error handling
+	•	If API fails: user sees clean error message + retry path
+	•	No raw stack traces, no JSON dumps to the user
+	•	404 page exists and looks branded
+
+⸻
+
+3) Public Marketing Site Manual QA (the “money pages”)
+
+Pages to test:
+	•	Home
+	•	Pricing
+	•	Demo
+	•	Request Demo (or contact)
+	•	Any niche landing pages (if present)
+
+3.1 Global nav + footer
+	•	Click logo → returns to Home
+	•	All top nav links go to correct pages
+	•	Footer links work (no 404)
+	•	“Request Demo” CTA works everywhere
+	•	Mobile hamburger menu works (if exists)
+
+3.2 Home page conversions
+	•	Hero: clear promise, not vague
+	•	CTA buttons:
+	•	Primary CTA works
+	•	Secondary CTA works
+	•	Testimonials section:
+	•	Cards aligned, no overflow
+	•	Stats section:
+	•	Numbers formatted properly
+	•	Demo widget section (if embedded):
+	•	Widget loads fast and doesn’t shift layout
+
+3.3 Pricing page
+	•	Prices formatted correctly
+	•	“Start / Request Demo” buttons go to correct place
+	•	Plan comparison table (if any) is readable on mobile
+	•	No confusing disclaimers or broken tooltips
+
+3.4 Demo page
+	•	Widget works
+	•	No weird “test data” text visible
+	•	Page still looks premium even if widget fails (fallback state)
+
+⸻
+
+4) Auth + Access Control QA
+
+4.1 Invite-only access
+	•	No public signup path (unless intentional)
+	•	Unauthenticated user tries to access /app → redirected to login
+	•	Unauthenticated user tries API endpoints → denied cleanly
+
+4.2 Role checks
+
+For each role (Owner/Admin/Client locked/Client editable):
+	•	Confirm access matches expectations:
+	•	Client locked: view only + locked banners
+	•	Client editable: can edit allowed settings
+	•	Admin/Owner: full access
+
+⸻
+
+5) App Shell + Navigation QA (Authenticated UI)
+
+5.1 Sidebar / top nav
+	•	Every nav item works:
+	•	Dashboard
+	•	Bots
+	•	Settings hub
+	•	Services
+	•	Hours
+	•	Analytics
+	•	Leads
+	•	Notifications (if present)
+	•	Active route highlight correct
+	•	Collapsed sidebar behavior (if present) works
+	•	Logo click takes you to the correct “app home”
+
+5.2 Settings hub page
+	•	Each card navigates correctly
+	•	Descriptions accurate
+	•	Locked/permission messaging correct for client locked role
+	•	Empty states look premium
+
+⸻
+
+6) Settings: Services QA (Editor + RBAC)
+
+6.1 Read-only behavior (Client locked)
+	•	Page loads
+	•	Shows locked banner
+	•	Add/Edit/Delete controls disabled or hidden
+	•	If user attempts edits (if still clickable), receives 403 handled cleanly
+
+6.2 CRUD tests (Owner/Admin + Client editable)
+
+Create service
+	•	Click “Add service”
+	•	Validate required fields:
+	•	name required
+	•	booking URL required (if required in your rules)
+	•	Enter invalid URL → clear inline error
+	•	Save → toast success → service appears
+	•	Service displays in correct order
+	•	Price formatting (if used) correct
+
+Duplicate prevention
+	•	Create “Haircut”
+	•	Try create “haircut” (case difference) → blocked with clear message
+
+Edit service
+	•	Edit name/URL/price
+	•	Save → persists after refresh
+
+Reorder
+	•	Move service up/down
+	•	Confirm displayOrder persists after refresh
+
+Delete
+	•	Delete confirmation modal appears
+	•	Cancel leaves it unchanged
+	•	Confirm delete removes service and persists after refresh
+
+⸻
+
+7) Settings: Hours QA (Editor + Validation)
+
+7.1 Read-only (Client locked)
+	•	Locked banner displayed
+	•	All inputs disabled (toggle + time inputs)
+	•	Save disabled
+
+7.2 Edit behavior (Owner/Admin + Client editable)
+
+Toggle closed/open
+	•	Mark a day closed → open/close times null/disabled
+	•	Save → persists after refresh
+
+Time validation
+	•	Put close time earlier than open time → inline error + save blocked
+	•	Bad format not allowed (native input should prevent, still verify)
+	•	Exactly 7 days always represented (no missing days)
+
+Dirty-state UX
+	•	Change a value → Save becomes enabled
+	•	Revert changes works and returns to last saved state
+
+⸻
+
+8) Contact Info / Business Profile QA (if present)
+	•	Phone/email/address save correctly
+	•	Validation works:
+	•	invalid email blocked
+	•	invalid phone blocked (if enforced)
+	•	Truth engine uses updated contact info (verify via widget Q&A)
+
+⸻
+
+9) Bots + Templates QA (Agency workflow)
+
+9.1 Bot list
+	•	Bots list loads quickly
+	•	Empty state if none
+	•	Create bot CTA works
+
+9.2 Create bot flow
+	•	Required fields validated
+	•	Template selection works (universal core, templates drive behavior)
+	•	Bot created and appears in list
+	•	Bot has public key / embed link accessible
+
+9.3 Template seeding integrity
+	•	Create Bot A with Template X
+	•	Create Bot B with same Template X
+	•	Confirm KB entries are bot-scoped (no cross-bot leakage)
+	•	Re-run seed (if supported) doesn’t duplicate entries
+
+⸻
+
+10) Knowledge Base QA (Truth Mode backbone)
+
+10.1 CRUD behaviors
+	•	Create KB entry
+	•	Edit KB entry
+	•	Draft vs Published behavior:
+	•	Draft should NOT be used in answers (if that’s your rule)
+	•	Published IS used
+
+10.2 Safety behavior
+	•	Verify no HTML/script injection renders in UI
+	•	Long content wraps properly and doesn’t break layout
+
+⸻
+
+11) Widget QA (The money feature)
+
+11.1 Embed + load
+	•	Widget loads at /widget/[botPublicKey]
+	•	No layout shifts, no broken fonts
+	•	Domain allowlist behavior:
+	•	allowed domain works
+	•	disallowed domain is blocked cleanly with a professional message
+
+11.2 Conversation basics
+	•	Send message → response appears
+	•	Refresh page → conversation persists (if expected)
+	•	Loading states look premium
+	•	Input disabled while processing (if expected)
+
+11.3 Truth Mode behavior (must verify)
+
+Ask questions that should be grounded:
+	•	“What are your hours?”
+	•	“Do you offer [service name]?”
+	•	“Where are you located?”
+	•	“How much is a haircut?”
+
+Expected:
+	•	Answers only from:
+	•	services/hours/contact/KB
+	•	If unknown → it says it doesn’t know AND offers:
+	•	booking or lead capture path
+
+Test unknown question:
+	•	“Do you do helicopter lessons?”
+Expected: no hallucination, clean fallback.
+
+⸻
+
+12) Booking Flow QA (Deterministic FSM)
+
+12.1 Trigger intent
+
+Type:
+	•	“I want to book”
+	•	“Schedule an appointment”
+Expected: flow starts and shows service selection UI.
+
+12.2 Service selection UI
+	•	Buttons show services
+	•	Selecting service advances state
+	•	Analytics event logged (verify later via dashboard funnel)
+
+12.3 Lead capture steps
+
+Expected strict order:
+	1.	Name
+	2.	Phone
+	3.	Email
+
+Validation:
+	•	Name too short → error
+	•	Phone invalid → error
+	•	Email invalid → error
+
+12.4 Completion
+	•	Booking link shown
+	•	Click booking link:
+	•	Click tracking fired
+	•	Link opens correctly
+	•	Lead created once (idempotent)
+
+12.5 Idempotency checks
+	•	Repeat “book haircut” within same conversation:
+	•	Should NOT create duplicate lead for same (conversationId, serviceId)
+	•	Refresh and continue:
+	•	Booking state persists correctly
+
+⸻
+
+13) Analytics Dashboard QA (Owner value proof)
+
+13.1 KPI correctness
+	•	KPIs show numbers (or empty state)
+	•	Date range selector changes numbers deterministically
+	•	Unique conversation counting sanity:
+	•	Spam refresh doesn’t inflate “conversations” incorrectly
+
+13.2 Funnel correctness
+
+Verify stage counts:
+	•	Service selected
+	•	Lead created
+	•	Link shown
+	•	Link clicked
+
+Expected:
+	•	counts make sense relative to your test actions
+	•	conversion rate computed correctly (no divide-by-zero ugliness)
+
+13.3 Service breakdown
+	•	Clicks by service matches expected service interactions
+	•	Top topics list matches real chat behavior
+
+13.4 Visual polish
+	•	Charts readable on mobile
+	•	Axis labels not cut off
+	•	Empty states look intentional
+
+⸻
+
+14) Leads Inbox + Lead Management QA
+
+14.1 Leads list page
+	•	Loads with skeletons then data
+	•	Filters:
+	•	date range
+	•	status
+	•	temperature
+	•	service filter
+	•	search text
+
+Expected:
+	•	filters update results correctly
+	•	pagination works
+	•	empty state is premium and informative
+
+14.2 Lead detail drawer
+	•	Opens from row click
+	•	Shows:
+	•	name/phone/email (click-to-call/email works)
+	•	status
+	•	notes
+	•	score + reasons
+	•	service association
+	•	Updates:
+	•	change status → persists after refresh
+	•	edit notes → persists
+
+14.3 Export CSV (if present)
+	•	Export button works
+	•	CSV columns correct
+	•	Values properly escaped (commas, quotes)
+
+⸻
+
+15) Notifications QA (Hot lead email)
+
+15.1 Settings (if UI exists)
+	•	Turn on notifications
+	•	Add recipient email
+	•	Validation: invalid email blocked
+
+15.2 Trigger behavior
+	•	Create HOT lead via widget flow
+Expected:
+	•	notification sent (or logged)
+	•	NotificationLog entry exists (if viewable)
+	•	No duplicate spam sends for same lead (idempotency if implemented)
+
+⸻
+
+16) Security Manual QA (human sanity checks)
+
+16.1 Tenant isolation manual checks
+
+While logged into Org A:
+	•	Try to access Org B bot/lead by URL guessing (if possible)
+Expected: 403/404 clean.
+
+16.2 RBAC manual checks
+
+Client locked should not be able to:
+	•	modify services
+	•	modify hours
+	•	view secrets/tokens
+	•	rotate tokens or verify custom domains (if those exist)
+
+16.3 Public endpoint hygiene
+	•	Public chat endpoint should rate-limit or handle spam gracefully
+	•	No raw error objects returned
+
+⸻
+
+17) Performance + “Feels Expensive” Check
+
+17.1 Basic speed feel
+	•	Marketing pages load fast
+	•	App navigation feels instant after initial load
+	•	Widget opens quickly and doesn’t lag
+
+17.2 Premium feel checklist
+
+Fail if you see:
+	•	tiny default fonts
+	•	inconsistent spacing
+	•	misaligned icons
+	•	cheap-looking buttons
+	•	harsh borders
+	•	unstyled empty states
+	•	jumps/CLS when content loads
+
+Pass requires:
+	•	consistent spacing rhythm
+	•	deliberate typography hierarchy
+	•	smooth hover/focus states
+	•	subtle shadows and borders
+	•	good empty states + microcopy
+
+⸻
+
+18) Release “Greenlight” Criteria (ship/no-ship)
+
+You ship only if:
+	•	All major flows pass:
+	•	widget → booking → lead → analytics → inbox → notifications
+	•	No broken links anywhere
+	•	No permission leaks
+	•	Mobile views are clean on core pages
+	•	Errors are handled professionally
+	•	UI looks premium (not “dev tool”)
+
+⸻
+
+19) What I want you to do next (so this is usable every release)
+
+If you want this runbook to be even more savage and foolproof, tell Replit to add:
+	1.	A hidden internal route: /app/qa-checklist
+	•	shows “green/red” flags for:
+	•	org has services/hours/bot
+	•	widget reachable
+	•	analytics events exist
+	•	email configured
+	2.	A “Demo Reset” button for the demo org (owner-only)
+	•	resets demo leads/convos safely so demos are clean
+
+If you want, I’ll write the exact Replit prompt for those two upgrades too.
+
+Just say: “Write the prompt for QA Checklist + Demo Reset”.

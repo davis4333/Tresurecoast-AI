@@ -1,0 +1,78 @@
+YOU ARE: Principal QA Architect + Reliability Engineer + Visual QA Gatekeeper.
+
+CURRENT STATUS:
+- Unit tests: 626 pass
+- E2E: 85+ tests across 11 files
+- Tenant isolation & RBAC are DB-backed and strict
+- analytics-leads.spec.ts + security-tenant.spec.ts updated and verified
+
+GOAL (NEXT ITERATION):
+Move from “feature coverage” to “ship-grade confidence” by adding:
+1) Determinism & anti-flake hardening
+2) Automatic failure artifacts (trace/video/screenshot)
+3) Smoke vs Full vs Security vs Visual suites
+4) A-to-Z navigation/click coverage for global UI
+5) Visual regression tests for premium UI quality
+
+NON-NEGOTIABLE RULES:
+- Do NOT weaken security assertions.
+- Use ONLY data-testid selectors (add testids to UI where missing).
+- Keep tests fast: avoid long sleeps; wait on deterministic signals.
+- Every failing E2E must produce trace + screenshot + video artifacts.
+- Do not refactor product code unless necessary for test stability or adding testids.
+
+DELIVERABLES:
+A) playwright.config.ts updated:
+   - trace: "on-first-retry"
+   - video: "retain-on-failure"
+   - screenshot: "only-on-failure"
+   - retries: 2 in CI, 0 locally
+   - reporters: html + list
+B) New npm/pnpm scripts:
+   - test:e2e:smoke (fast critical paths)
+   - test:e2e:full (entire suite)
+   - test:e2e:security (tenant + auth denial only)
+   - test:e2e:visual (snapshot tests)
+C) New E2E specs:
+   1) tests/e2e/nav-global.spec.ts
+      - public pages: logo click -> home
+      - app pages: logo click -> app home/dashboard
+      - all sidebar links navigate correctly
+      - footer links not broken (public)
+      - keyboard tabbing hits major nav items (basic accessibility)
+   2) tests/e2e/forms-validation.spec.ts
+      - services: required fields, url validation, duplicate prevention
+      - hours: invalid time ordering blocks save, closed-day null times
+      - leads: notes save + persistence
+      - notifications: invalid email blocks save (if exists)
+D) Visual regression:
+   - screenshot baselines for:
+     /, /pricing, /demo,
+     /app, /app/settings,
+     /app/settings/services, /app/settings/hours,
+     /app/analytics, /app/leads,
+     /widget/[botPublicKey]
+   - Mask dynamic content (timestamps, IDs) as needed.
+E) Coverage map docs:
+   - docs/QA_COVERAGE_MATRIX.md listing routes + interactions + spec file that covers it
+F) Reliability check:
+   - Run FULL E2E suite 3 consecutive times; report if any flakes.
+   - If flakes exist, fix root cause (timeouts, race conditions, unstable selector) and re-run until stable.
+
+QUALITY GATES TO INCLUDE IN FINAL REPORT:
+- pnpm typecheck
+- pnpm test
+- pnpm test:e2e:smoke
+- pnpm test:e2e:security
+- pnpm test:e2e:full (run x3)
+- pnpm test:e2e:visual
+- pnpm build
+
+OUTPUT:
+Provide a QA Evidence Report with:
+- files changed
+- scripts added
+- artifact config proof
+- flake-run results (3 full passes)
+- screenshot baseline list
+- coverage matrix summary
