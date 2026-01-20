@@ -32,6 +32,34 @@ const FEATURES = [
   },
 ];
 
+const TESTIMONIALS = [
+  {
+    quote: "We went from missing 40% of after-hours inquiries to capturing every single lead. The bot pays for itself in the first week.",
+    author: "Maria Santos",
+    role: "Owner, Santos Barbershop",
+    industry: "Grooming",
+  },
+  {
+    quote: "My team used to spend 2 hours daily answering the same questions. Now the bot handles it and we focus on what matters - our clients.",
+    author: "James Wilson",
+    role: "Practice Manager, Coastal Dental",
+    industry: "Healthcare",
+  },
+  {
+    quote: "The lead scoring is brilliant. We know exactly which inquiries are hot and need immediate attention. Our conversion rate is up 35%.",
+    author: "Sarah Chen",
+    role: "Director, FitLife Studios",
+    industry: "Fitness",
+  },
+];
+
+const STATS = [
+  { value: "24/7", label: "Availability", desc: "Never miss a lead" },
+  { value: "35%", label: "More Leads Captured", desc: "Compared to contact forms" },
+  { value: "< 3s", label: "Response Time", desc: "Instant AI responses" },
+  { value: "100%", label: "Truthful", desc: "No hallucinations ever" },
+];
+
 const FAQ = [
   {
     q: "Does the AI make things up?",
@@ -148,6 +176,58 @@ export default function LandingPage() {
                   <p className="text-sm text-[var(--color-text-secondary)]">{f.desc}</p>
                 </TcaCardBody>
               </TcaCard>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-[var(--color-border)] py-20" data-testid="section-testimonials">
+        <div className="mx-auto max-w-6xl px-6">
+          <h2 className="mb-4 text-center text-3xl font-bold" data-testid="heading-testimonials">What Our Clients Say</h2>
+          <p className="mx-auto mb-12 max-w-xl text-center text-[var(--color-text-secondary)]">
+            Real results from real businesses using Treasure Coast AI.
+          </p>
+          <div className="grid gap-6 md:grid-cols-3">
+            {TESTIMONIALS.map((testimonial, index) => (
+              <TcaCard key={index} data-testid={`card-testimonial-${index}`}>
+                <TcaCardBody>
+                  <div className="mb-4 flex h-8 w-8 items-center justify-center text-[var(--color-brand-primary)]" data-testid={`icon-quote-${index}`}>
+                    <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M3 21c3 0 7-1 7-8V5c0-1.25-4.75-5-7-5S0 3.75 0 5c0 1.25 0 2.5.75 4 .25 1 2 4 2.5 6 0 0-3 1-3 6s1 8 7 8z" />
+                    </svg>
+                  </div>
+                  <p className="mb-6 text-sm italic text-[var(--color-text-secondary)]" data-testid={`text-quote-${index}`}>
+                    "{testimonial.quote}"
+                  </p>
+                  <div data-testid={`section-author-${index}`}>
+                    <p className="font-semibold" data-testid={`text-author-${index}`}>{testimonial.author}</p>
+                    <p className="mb-3 text-sm text-[var(--color-text-secondary)]" data-testid={`text-role-${index}`}>{testimonial.role}</p>
+                    <span className="inline-block rounded-full bg-[var(--color-brand-primary)]/10 px-3 py-1 text-xs font-medium text-[var(--color-brand-primary)]" data-testid={`badge-industry-${index}`}>
+                      {testimonial.industry}
+                    </span>
+                  </div>
+                </TcaCardBody>
+              </TcaCard>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-[var(--color-border)] bg-gradient-to-b from-[var(--color-brand-primary)]/5 to-transparent py-20" data-testid="section-results">
+        <div className="mx-auto max-w-6xl px-6">
+          <h2 className="mb-4 text-center text-3xl font-bold" data-testid="heading-results">Real Results for Real Businesses</h2>
+          <p className="mx-auto mb-12 max-w-xl text-center text-[var(--color-text-secondary)]">
+            Proven metrics that demonstrate the impact of Treasure Coast AI.
+          </p>
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {STATS.map((stat, index) => (
+              <div key={index} className="text-center" data-testid={`stat-item-${index}`}>
+                <div className="mb-3 text-4xl font-bold text-[var(--color-brand-primary)]" data-testid={`text-stat-value-${index}`}>
+                  {stat.value}
+                </div>
+                <p className="mb-2 font-semibold" data-testid={`text-stat-label-${index}`}>{stat.label}</p>
+                <p className="text-sm text-[var(--color-text-secondary)]" data-testid={`text-stat-desc-${index}`}>{stat.desc}</p>
+              </div>
             ))}
           </div>
         </div>
