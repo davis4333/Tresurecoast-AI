@@ -375,6 +375,12 @@ model OrganizationInvite {
   @@index([token])
 }
 
+enum KnowledgeSourceStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model BotKnowledgeSource {
   id             Int      @id @default(autoincrement())
   botId          Int
@@ -385,6 +391,10 @@ model BotKnowledgeSource {
   content     String
   contentHash String
 
+  status      KnowledgeSourceStatus @default(DRAFT)
+  publishedAt DateTime?
+  publishedBy String?  // Clerk user ID who published
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -394,6 +404,7 @@ model BotKnowledgeSource {
   @@unique([botId, contentHash])
   @@index([botId])
   @@index([organizationId])
+  @@index([status])
 }
 
 model BusinessProfile {

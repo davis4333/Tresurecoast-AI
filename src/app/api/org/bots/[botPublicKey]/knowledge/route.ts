@@ -48,7 +48,14 @@ export async function GET(
 
     const sources = await prisma.botKnowledgeSource.findMany({
       where: { botId: bot.id, organizationId: ctx.org.id },
-      select: { id: true, title: true, type: true, createdAt: true },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        status: true,
+        publishedAt: true,
+        createdAt: true,
+      },
       orderBy: { createdAt: "desc" },
     });
 
@@ -58,6 +65,8 @@ export async function GET(
         id: s.id,
         title: s.title,
         type: s.type,
+        status: s.status,
+        publishedAt: s.publishedAt?.toISOString(),
         createdAt: s.createdAt.toISOString(),
       })),
     });
@@ -148,7 +157,14 @@ export async function POST(
 
     const sources = await prisma.botKnowledgeSource.findMany({
       where: { botId: bot.id, organizationId: ctx.org.id },
-      select: { id: true, title: true, type: true, createdAt: true },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        status: true,
+        publishedAt: true,
+        createdAt: true,
+      },
       orderBy: { createdAt: "desc" },
     });
 
@@ -158,6 +174,8 @@ export async function POST(
         id: s.id,
         title: s.title,
         type: s.type,
+        status: s.status,
+        publishedAt: s.publishedAt?.toISOString(),
         createdAt: s.createdAt.toISOString(),
       })),
     });
@@ -165,6 +183,99 @@ export async function POST(
     console.error("[knowledge/POST] Error:", error);
     return NextResponse.json(
       { ok: false, error: "internal_error", message: "Failed to save knowledge source" },
+      { status: 500 }
+    );
+  }
+}
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ botPublicKey: string }> }
+) {
+  try {
+    const { botPublicKey } = await params;
+    const testUserId = getTestUserId(request);
+    const ctx = await getOrgContext({ request, testUserId });
+
+    if (!ctx.ok) {
+      return NextResponse.json(
+        { ok: false, error: ctx.error, message: ctx.message },
+        { status: ctx.status }
+      );
+    }
+
+    if (!isAdmin(ctx.role)) {
+      return NextResponse.json(
+        { ok: false, error: "forbidden", message: "Admin access required" },
+        { status: 403 }
+      );
+    }
+
+    const bot = await getBotByPublicKey(botPublicKey, ctx.org.id);
+    if (!bot) {
+      return NextResponse.json(
+        { ok: false, error: "not_found", message: "Bot not found" },
+        { status: 404 }
+      );
+    }
+
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body.sourceId !== 'number' || typeof body.status !== 'string') {
+      return NextResponse.json(
+        { ok: false, error: "invalid_body", message: "Missing sourceId or status" },
+        { status: 400 }
+      );
+    }
+
+    const { sourceId, status } = body;
+
+    // Validate status value
+    if (!['DRAFT', 'PUBLISHED', 'ARCHIVED'].includes(status)) {
+      return NextResponse.json(
+        { ok: false, error: "invalid_status", message: "Status must be DRAFT, PUBLISHED, or ARCHIVED" },
+        { status: 400 }
+      );
+    }
+
+    // Verify source belongs to this bot/org
+    const existingSource = await prisma.botKnowledgeSource.findFirst({
+      where: {
+        id: sourceId,
+        botId: bot.id,
+        organizationId: ctx.org.id,
+      },
+    });
+
+    if (!existingSource) {
+      return NextResponse.json(
+        { ok: false, error: "not_found", message: "Knowledge source not found" },
+        { status: 404 }
+      );
+    }
+
+    // Update status
+    const updatedSource = await prisma.botKnowledgeSource.update({
+      where: { id: sourceId },
+      data: {
+        status: status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED',
+        publishedAt: status === 'PUBLISHED' ? new Date() : existingSource.publishedAt,
+        publishedBy: status === 'PUBLISHED' ? ctx.userId : existingSource.publishedBy,
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      source: {
+        id: updatedSource.id,
+        title: updatedSource.title,
+        status: updatedSource.status,
+        publishedAt: updatedSource.publishedAt?.toISOString(),
+        publishedBy: updatedSource.publishedBy,
+      },
+    });
+  } catch (error) {
+    console.error("[knowledge/PATCH] Error:", error);
+    return NextResponse.json(
+      { ok: false, error: "internal_error", message: "Failed to update knowledge source status" },
       { status: 500 }
     );
   }

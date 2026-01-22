@@ -146,7 +146,11 @@ export async function retrieve(
   question: string
 ): Promise<RetrievalResult> {
   const sources = await prisma.botKnowledgeSource.findMany({
-    where: { botId, organizationId: orgId },
+    where: {
+      botId,
+      organizationId: orgId,
+      status: 'PUBLISHED', // CRITICAL: Only use published content in Truth Mode
+    },
     select: { id: true, title: true, content: true },
   });
 
