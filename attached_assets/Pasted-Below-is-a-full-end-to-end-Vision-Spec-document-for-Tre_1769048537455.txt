@@ -1,0 +1,414 @@
+Below is a full, end-to-end “Vision Spec” document for Treasure Coast AI — what it is, how it works, how it should feel, what users can do, and the guardrails that make it premium + safe + sellable.
+
+---
+
+# TREASURE COAST AI — VISION SPEC (Full Operating Document)
+
+## 1) The Big Promise
+
+Treasure Coast AI is a **premium, universal, multi-tenant chatbot SaaS** for local businesses.
+
+A business owner’s experience should feel like:
+
+* **“This thing is making me money.”**
+* **“It feels like the smartest assistant I’ve ever seen.”**
+* **“I don’t have to think about it.”**
+* **“I can see leads, bookings, and what customers want.”**
+
+Your experience as the agency owner should feel like:
+
+* **“I can onboard a business fast.”**
+* **“I enter basic business info.”**
+* **“AI does the heavy lifting (drafts, structure, suggestions).”**
+* **“I approve — nothing goes live without review.”**
+* **“Every client is isolated, secure, and scalable.”**
+
+This is built to be **a must-have**: once a business sees it, they understand the value immediately.
+
+---
+
+## 2) Product Identity and Positioning
+
+### Core Positioning
+
+* Not “a chatbot.”
+* A **Business Growth Assistant**:
+
+  * captures leads,
+  * routes bookings,
+  * answers accurately from verified business data,
+  * shows business owners proof it’s working.
+
+### Universal Core, Templates Provide the Magic
+
+* **No single industry baked into the core platform.**
+* The core is universal: organizations, bots, KB, services, hours, booking flow, analytics, leads.
+* Each industry is powered by:
+
+  * **templates** (starter KB / FAQs / intent tuning),
+  * **AI suggestions** (drafts),
+  * ongoing improvement from better templates + structured onboarding.
+
+---
+
+## 3) The “Premium Agency-Built” Standard
+
+When someone lands on the site or sees the dashboard, it must look like:
+
+* **Multi-million-dollar agency work**
+* clean and modern,
+* perfect typography & spacing,
+* polished empty states,
+* responsive and fast,
+* micro-interactions that feel expensive (subtle, not gimmicky),
+* consistent UI components across marketing + app + widget.
+
+“Cheap SaaS vibes” is failure.
+
+---
+
+## 4) The Two Main User Types
+
+### A) Agency (You)
+
+Roles:
+
+* **AGENCY_OWNER** (full control)
+* **AGENCY_ADMIN** (almost full control)
+
+Agency responsibilities:
+
+* create organizations and bots
+* invite client users
+* configure brand, services, hours, contact info
+* create/approve KB content
+* optionally use AI to generate drafts, then approve
+
+Agency should be able to set up a new client in minutes.
+
+### B) Client (Business Owner / Staff)
+
+Role:
+
+* **CLIENT**
+
+Client experience:
+
+* logs in, sees dashboards (proof of value)
+* views leads, analytics, conversations/topics
+* can edit only lightweight business settings **if** enabled (allowClientEdits)
+* never sees agency-level secrets
+* never has the power to break anything critical
+
+---
+
+## 5) Non-Negotiable Rules (Guardrails)
+
+### Truth Mode (No Hallucinations)
+
+* The assistant must answer **only from verified sources**:
+
+  * published KB entries
+  * business settings (hours, services, contact, policies)
+* If it doesn’t know, it says so clearly and does one of:
+
+  * offers to capture lead,
+  * offers booking flow,
+  * asks for the missing detail and suggests adding it to settings/KB.
+
+### Deterministic Booking Flow (Always the same flow)
+
+When booking intent is detected:
+
+1. Service selection
+2. Name
+3. Phone
+4. Email
+5. Confirmation + correct booking link
+
+No random AI freelancing.
+
+### Security + Isolation
+
+* Tenants are **strictly isolated**.
+* RBAC is enforced everywhere.
+* No cross-org leaks (ever).
+* Production cannot have dev bypass.
+
+---
+
+## 6) Customer Journey (How It Works in Real Life)
+
+### Step 1: Prospect sees marketing site
+
+* premium landing page
+* simple explanation: “AI that answers, books, and captures leads”
+* demo widget they can try
+* request demo CTA
+
+### Step 2: You onboard business
+
+You either:
+
+* create org + bot manually (fast), or
+* use onboarding wizard to enter business info (still fast)
+
+### Step 3: Business embeds widget on their website
+
+* they paste a script snippet
+* widget loads on allowed domains only
+* chat starts capturing leads/booking
+
+### Step 4: Business logs in and sees value
+
+They open dashboard and immediately see:
+
+* leads (with HOT/WARM/COLD)
+* booking funnel performance
+* clicks
+* top topics customers ask
+* “revenue influenced” / value indicators (where possible)
+* activity timeline
+
+They can manage leads and follow up.
+
+---
+
+## 7) What the Business Owner Must See (Client Dashboard)
+
+The dashboard must answer:
+
+* “Is this bringing me customers?”
+* “What are people asking?”
+* “Who should I call right now?”
+* “What service is converting best?”
+
+### Must-have dashboard modules
+
+1. **Analytics Overview**
+
+   * unique conversations
+   * funnel:
+
+     * service selected
+     * lead created
+     * booking link shown
+     * booking link clicked
+   * conversion rate
+   * trends by day (7/30/90)
+   * clicks by service
+   * top topics
+
+2. **Lead Inbox**
+
+   * filters (date, status, temperature, service, search)
+   * lead detail drawer:
+
+     * contact info (tap/click call/email)
+     * service selected
+     * score + reasons
+     * notes
+     * status update buttons
+     * captured answers
+
+3. **Settings (Lightweight, safe edits)**
+
+   * services (name, price, booking/payment URLs)
+   * business hours
+   * contact info
+   * only editable if allowClientEdits=true (otherwise read-only + locked banner)
+
+4. **Proof Layer**
+
+   * timeline / last 24h activity
+   * highlight hot leads
+   * “money proof” language throughout (value focus)
+
+---
+
+## 8) What the Public Website Chat Widget Must Do
+
+The widget is the product. It must feel:
+
+* fast
+* stable
+* premium
+* smart
+* safe
+
+### Core widget requirements
+
+* embeddable via bot public key
+* domain allowlist enforcement
+* conversation persistence
+* booking UI directives:
+
+  * service buttons
+  * booking link button with click tracking
+* Truth Mode answers
+* lead capture system
+* graceful fallbacks and error handling
+
+---
+
+## 9) Agency Workflow (The “Money Loop”)
+
+The agency workflow must be:
+
+* fast
+* repeatable
+* scalable
+
+### Core agency workflow loop
+
+1. Create Organization
+2. Invite Client user(s)
+3. Create Bot (choose template)
+4. Fill business settings:
+
+   * services
+   * hours
+   * contact info
+5. AI generates drafts:
+
+   * about text
+   * FAQs
+   * suggested KB entries
+6. You review + approve
+7. Publish bot
+8. Provide embed snippet
+9. Client sees leads + analytics
+10. You sell next client
+
+This loop must become “boring” (easy, repeatable, reliable).
+
+---
+
+## 10) Templates and AI Improvement (How the Platform Gets Smarter)
+
+### What “getting better and better” means (realistic, scalable)
+
+Not “AI magically learns from everything” in a risky way.
+
+Instead:
+
+* You improve:
+
+  * templates
+  * structured onboarding
+  * better draft prompts
+  * better KB seed packs
+  * better scoring rules / conversion guidance
+
+AI improvements happen through:
+
+* stronger template libraries
+* better data structure
+* better prompts
+* more complete business info
+* optional website import → draft KB → review
+
+**Everything that impacts answers must still be verified/published.**
+
+---
+
+## 11) Operational Rules
+
+### Roles and Permissions
+
+* Owner/Admin:
+
+  * edit everything
+  * see secret tokens (domain verification)
+  * manage members/invites
+* Client:
+
+  * view analytics/leads/settings
+  * edit only if allowClientEdits enabled
+
+### Publishing Model
+
+* Draft vs Published KB
+* AI outputs are **always Draft**
+* Only Published content is used by Truth Mode answers
+
+### Logs and Audit Friendliness
+
+* important actions create DataEvents:
+
+  * booking milestones
+  * lead creation
+  * link clicks
+  * major settings changes (optional but preferred)
+
+---
+
+## 12) Quality Standard (How We Decide “It’s Done”)
+
+The platform is sellable when:
+
+1. Marketing site looks premium and converts.
+2. Agency can onboard a business in minutes.
+3. Widget is grounded, deterministic booking works, leads captured cleanly.
+4. Client dashboard proves value clearly.
+5. Tenant isolation + RBAC is proven.
+6. Full quality gates pass reliably:
+
+   * prisma generate
+   * migrate status
+   * typecheck
+   * unit tests
+   * e2e smoke/security/visual/full
+   * build
+
+---
+
+## 13) The “Must-Have” Additions That Increase Sales Power
+
+These features increase perceived value and close rate:
+
+* Hot lead email notifications (and logs)
+* Revenue influenced / average order value attribution (where possible)
+* Setup progress checklist (“you’re 80% configured”)
+* Demo environment: one click “see it working”
+* Case-study pages by niche (barber/salon/gym/etc.)
+* “Embed in 60 seconds” guide + script snippet copy button
+* Visual polish everywhere: typography, spacing, empty states, toasts, modals
+
+---
+
+## 14) The Hard “No” List (What We Don’t Do)
+
+To keep it safe, credible, and premium:
+
+* No hallucinated answers.
+* No “AI just invents your services/hours/prices.”
+* No auto-publishing AI content without review.
+* No cross-tenant data access, ever.
+* No clients managing dangerous settings by default.
+* No cluttered UI, no cheap templates, no “startup toy” feel.
+
+---
+
+## 15) Final North Star (How It Should Feel)
+
+A business owner’s takeaway after 5 minutes:
+
+* “This is the best website assistant I’ve ever seen.”
+* “It’s getting me leads.”
+* “I can see exactly what it’s doing.”
+* “I want it on my site.”
+
+Your takeaway after onboarding 10 clients:
+
+* “This scales.”
+* “It’s repeatable.”
+* “It’s secure.”
+* “The product sells itself.”
+
+---
+
+If you want, I’ll turn this into **two versions** you can reuse:
+
+1. **Internal Build Spec** (for Replit/Claude: strict, technical, QA-driven)
+2. **Sales / Demo Script Spec** (what to say + show in a live demo so they buy on the spot)
