@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrgContext } from "@/lib/auth/getOrgContext";
 
 export const runtime = "nodejs";
+export const dynamic = 'force-dynamic';
 
 type ActivityEvent = {
   id: string;

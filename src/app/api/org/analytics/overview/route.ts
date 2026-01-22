@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrgContext, isAdmin } from "@/lib/auth/getOrgContext";
 
+export const dynamic = 'force-dynamic';
+
 const MAX_DAYS = 365;
 const DEFAULT_DAYS = 30;
 

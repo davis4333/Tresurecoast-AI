@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { TcaButton } from "@/components/tca/TcaButton";
 
+export const dynamic = 'force-dynamic';
+
 interface NotificationSettings {
   notificationEnabled: boolean;
   notificationEmails: string[];

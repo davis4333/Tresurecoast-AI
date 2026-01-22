@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getOrgContext, isAdmin } from "@/lib/auth/getOrgContext";
 import { z } from "zod";
 
+export const dynamic = 'force-dynamic';
+
 const updateSchema = z.object({
   status: z.enum(["NEW", "CONTACTED", "BOOKED", "CLOSED"]).optional(),
   notes: z.string().max(5000).optional(),

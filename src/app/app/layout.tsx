@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cx } from "@/components/tca/tca";
 import { TcaBadge } from "@/components/tca/TcaBadge";
 import { BrandingCssVars } from "@/components/branding/BrandingCssVars";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 import dynamic from "next/dynamic";
 
 const NAV_ITEMS = [
@@ -120,9 +121,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-[var(--color-background)]">
-      <BrandingCssVars />
-      <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
+    <QueryProvider>
+      <div className="flex min-h-screen bg-[var(--color-background)]">
+        <BrandingCssVars />
+        <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="flex h-16 items-center justify-between border-b border-[var(--color-border)] px-4">
           <Link href="/app" className="text-lg font-extrabold text-[var(--color-brand-primary)]">
             Treasure Coast AI
@@ -169,7 +171,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 p-6">
           {children}
         </main>
+        </div>
       </div>
-    </div>
+    </QueryProvider>
   );
 }
