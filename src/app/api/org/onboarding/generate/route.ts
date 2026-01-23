@@ -195,7 +195,6 @@ export async function POST(request: NextRequest) {
           phone: formData.phone,
           address: formData.address,
           hours: formData.hours,
-          services: formData.services?.split(',').map(s => s.trim()),
           bookingUrl: formData.bookingUrl,
           brandVoice: formData.brandVoice || 'professional',
           primaryGoal: formData.primaryGoal || 'bookings',

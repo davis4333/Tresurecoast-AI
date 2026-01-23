@@ -1,8 +1,15 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openaiClient: OpenAI | null = null;
+
+function getOpenAI(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openaiClient;
+}
 
 export interface BusinessData {
   name: string;
@@ -27,6 +34,7 @@ export async function generateDrafts(
   business: BusinessData
 ): Promise<DraftContent> {
   const prompt = buildPrompt(business);
+  const openai = getOpenAI();
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4-turbo-preview',
@@ -101,6 +109,7 @@ Return ONLY the JSON object, no additional text.
 
 export async function testAIConnection(): Promise<boolean> {
   try {
+    const openai = getOpenAI();
     const completion = await openai.chat.completions.create({
       model: 'gpt-4-turbo-preview',
       messages: [{ role: 'user', content: 'Respond with "OK"' }],
