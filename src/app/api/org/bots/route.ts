@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrgContext, isAdmin } from '@/lib/auth/getOrgContext';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { checkBotLimit } from '@/lib/plans/enforcement';
 
 export const dynamic = 'force-dynamic';
 
@@ -138,6 +139,25 @@ export async function POST(request: NextRequest) {
     }
 
     const { name, workspaceId, greeting, fallbackText } = validation.data;
+
+    // Check plan limits - enforce bot creation limits
+    const limitCheck = await checkBotLimit(ctx.org.id);
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'limit_exceeded',
+          message: `Bot limit reached (${limitCheck.current}/${limitCheck.limit}). Upgrade your plan to create more bots.`,
+          details: {
+            current: limitCheck.current,
+            limit: limitCheck.limit,
+            planTier: limitCheck.planTier,
+            upgradeRequired: true,
+          },
+        },
+        { status: 402 } // Payment Required
+      );
+    }
 
     // Get or create default workspace
     let workspace;
