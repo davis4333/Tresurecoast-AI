@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getOrgContext, isAdmin, getTestUserId } from "@/lib/auth/getOrgContext";
 import { OnboardingFormSchema } from "@/lib/onboarding/schemas";
@@ -8,6 +9,7 @@ import {
   applyTemplateToBlueprint,
   seedTemplateKnowledge,
 } from "@/lib/templates";
+import { generateDrafts } from "@/lib/ai/draftGenerator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -182,9 +184,85 @@ export async function POST(request: NextRequest) {
       templateInput
     );
 
+    // Generate AI drafts (Step S05 - AI Draft Generation)
+    let draftsGenerated = false;
+    try {
+      if (process.env.OPENAI_API_KEY) {
+        const drafts = await generateDrafts({
+          name: formData.businessName,
+          category: formData.category || 'business',
+          websiteUrl: formData.websiteUrl,
+          phone: formData.phone,
+          address: formData.address,
+          hours: formData.hours,
+          services: formData.services?.split(',').map(s => s.trim()),
+          bookingUrl: formData.bookingUrl,
+          brandVoice: formData.brandVoice || 'professional',
+          primaryGoal: formData.primaryGoal || 'bookings',
+        });
+
+        // Store "About Us" draft
+        if (drafts.aboutText) {
+          const contentHash = createHash('sha256').update(drafts.aboutText).digest('hex');
+          await prisma.botKnowledgeSource.create({
+            data: {
+              botId: bot.id,
+              organizationId: ctx.org.id,
+              type: 'PASTE',
+              title: 'About Us (AI Draft)',
+              content: drafts.aboutText,
+              contentHash,
+              status: 'DRAFT',
+            },
+          });
+        }
+
+        // Store FAQ drafts
+        for (const faq of drafts.faqs || []) {
+          const contentHash = createHash('sha256').update(faq.question + faq.answer).digest('hex');
+          await prisma.botKnowledgeSource.create({
+            data: {
+              botId: bot.id,
+              organizationId: ctx.org.id,
+              type: 'PASTE',
+              title: faq.question,
+              content: faq.answer,
+              contentHash,
+              status: 'DRAFT',
+            },
+          });
+        }
+
+        // Store knowledge base entry drafts
+        for (const entry of drafts.kbEntries || []) {
+          const contentHash = createHash('sha256').update(entry.title + entry.content).digest('hex');
+          await prisma.botKnowledgeSource.create({
+            data: {
+              botId: bot.id,
+              organizationId: ctx.org.id,
+              type: 'PASTE',
+              title: entry.title,
+              content: entry.content,
+              contentHash,
+              status: 'DRAFT',
+            },
+          });
+        }
+
+        draftsGenerated = true;
+      }
+    } catch (error) {
+      console.error('[Onboarding] AI draft generation failed:', error);
+      // Continue without drafts (non-blocking)
+    }
+
     return NextResponse.json({
       ok: true,
       botPublicKey: bot.publicKey,
+      draftsGenerated,
+      message: draftsGenerated
+        ? 'Bot created with AI-generated drafts. Review and publish them in the Knowledge Base.'
+        : 'Bot created successfully.',
     });
   } catch (error) {
     console.error("[onboarding/generate] Error:", error);
