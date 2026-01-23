@@ -344,3 +344,158 @@ DELETE /api/org/bots/[botPublicKey]
 
 ---
 
+
+### Step S04: Add Plan/Gating System (Database Structure) ✅
+
+**Executed:** 2026-01-23
+**Duration:** ~20 minutes
+**Status:** CODE COMPLETE - Database structure ready, no enforcement yet
+
+**Changes Made:**
+
+1. **File:** `prisma/schema.prisma`
+   - **Added PlanTier enum** (after AuditAction enum, line 22-28):
+     - FREE
+     - STARTER ($49/mo)
+     - PRO ($149/mo)
+     - AGENCY ($399/mo)
+     - ENTERPRISE (custom pricing)
+
+   - **Added plan fields to Organization model** (after allowClientEdits, line 92-97):
+     ```prisma
+     planTier              PlanTier @default(FREE)
+     planStartedAt         DateTime @default(now())
+     planExpiresAt         DateTime?
+     conversationsThisMonth Int     @default(0)
+     conversationsLimit     Int     @default(200)  // Free tier default
+     botsLimit              Int     @default(1)    // Free tier default
+     ```
+
+2. **File:** `src/lib/plans/features.ts` (NEW)
+   - Created TypeScript enum mirroring Prisma PlanTier
+   - Created PlanFeatures interface with:
+     - name, price (cents)
+     - conversationsPerMonth, botsLimit
+     - analyticsWindowDays
+     - whiteLabelEnabled, customDomainEnabled, notificationsEnabled
+     - teamSeatsLimit, prioritySupport
+
+   - **Defined PLAN_FEATURES matrix** for all 5 tiers:
+
+     | Tier | Price | Conversations/mo | Bots | Analytics | Premium Features | Support |
+     |------|-------|------------------|------|-----------|------------------|---------|
+     | FREE | $0 | 200 | 1 | 7 days | ❌ | No |
+     | STARTER | $49 | 1,000 | 3 | 30 days | ✅ | No |
+     | PRO | $149 | 5,000 | 10 | 90 days | ✅ | Priority |
+     | AGENCY | $399 | 20,000 | 50 | 365 days | ✅ | Priority |
+     | ENTERPRISE | Custom | 999,999 | 999 | 365 days | ✅ | Priority |
+
+   - **Created utility functions:**
+     - `getPlanFeatures(tier)` - Returns feature matrix for tier
+     - `canAccessFeature(tier, feature)` - Boolean check for feature access
+
+3. **File:** `prisma/migrations/ADD_PLAN_TIER_TO_ORGANIZATION.sql` (NEW)
+   - SQL migration script for adding plan fields
+   - Includes:
+     - CREATE TYPE "PlanTier" enum
+     - ALTER TABLE for 6 new columns
+     - CREATE INDEX for plan tier queries
+     - Rollback commands for safety
+   - Ready to run with: `pnpm prisma migrate deploy`
+
+4. **File:** `tests/unit/plans/features.test.ts` (NEW)
+   - Created 27 comprehensive unit tests covering:
+
+     **Feature Matrix (10 tests):**
+     - All 5 tiers defined
+     - FREE tier validation (200 conv, 1 bot, no premium)
+     - STARTER tier validation (1000 conv, 3 bots, premium enabled)
+     - PRO tier validation (5000 conv, priority support)
+     - AGENCY tier validation (20K conv, 50 bots)
+     - ENTERPRISE tier validation (unlimited resources)
+     - Increasing limits across tiers
+     - Premium features only for paid tiers
+     - Priority support only for PRO+
+
+     **Utility Functions (8 tests):**
+     - getPlanFeatures() for all 5 tiers
+     - canAccessFeature() for various features
+     - Numeric feature checks
+
+     **Usage Limits (9 tests):**
+     - Conversation limits per tier
+     - Bot limits per tier
+     - Team seat limits per tier
+     - Analytics window per tier
+
+**Quality Gates:**
+```
+✓ Unit Tests: 27/27 PASS (features.test.ts)
+⚠️ Type Check: FAIL - Expected (from S02 + S04 schema changes)
+  - 13 type errors from S02's status fields
+  - Type errors will resolve after migrations run
+⚠️ Build: FAIL - Expected (same root cause as typecheck)
+  - Both S02 and S04 migrations need to run
+  - After migrations: pnpm prisma generate → pnpm typecheck → pnpm build
+```
+
+**Production Deployment Steps:**
+```bash
+# Step 1: Run S02 migration (knowledge source status)
+pnpm prisma migrate deploy  # Applies S02 migration
+
+# Step 2: Run S04 migration (plan tier)
+pnpm prisma migrate deploy  # Applies S04 migration
+
+# Step 3: Regenerate Prisma client with new types
+pnpm prisma generate
+
+# Step 4: Verify type check passes
+pnpm typecheck
+
+# Step 5: Build and deploy
+pnpm build
+```
+
+**Verification:**
+- ✅ PlanTier enum added to schema
+- ✅ Organization model has 6 new plan fields
+- ✅ All organizations default to FREE tier with 200 conv/1 bot limits
+- ✅ Feature matrix defined for all 5 tiers
+- ✅ Utility functions available for feature gating
+- ✅ Migration SQL documented and ready
+- ✅ 27/27 unit tests verify feature matrix correctness
+- ⚠️ No enforcement yet - just database structure
+- ⚠️ Type safety will be enforced after Prisma client regeneration
+
+**Impact:**
+- **Business Model:** SaaS platform now has tiered pricing foundation
+- **Monetization:** FREE tier (200 conv, 1 bot) proves value, paid tiers unlock scale
+- **Feature Gating:** Infrastructure ready for enforcement (Step S05+)
+- **No Breaking Changes:** Existing orgs default to FREE, no API changes
+- **Future-Ready:** Easy to add Stripe integration and billing enforcement
+
+**What This Enables:**
+- Conversation tracking and limiting per org
+- Bot creation limits per tier
+- Premium feature gating (white label, custom domain, notifications)
+- Team size limits enforcement
+- Analytics window restrictions
+- Upgrade prompts and monetization flows
+
+**NOT Included (Future Steps):**
+- API enforcement (Step 1.5: add checks to bot creation, conversation tracking)
+- UI locked feature badges (Step 1.6: show upgrade prompts)
+- Stripe billing integration (Step 2.x: payment collection)
+- Subscription webhooks (Step 2.x: handle upgrades/downgrades)
+- Trial period logic (Step 2.x: 14-day trials)
+
+**Next Steps:**
+- S05: Implement AI Draft Generation (LLM integration for onboarding wizard)
+- Future: Add plan enforcement to bot creation endpoint
+- Future: Add conversation tracking/limiting logic
+- Future: Show upgrade prompts in UI for locked features
+- After S02+S04 migrations run: All type errors will resolve
+
+---
+

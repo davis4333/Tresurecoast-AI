@@ -19,6 +19,14 @@ enum AuditAction {
   DEMO_RESET
 }
 
+enum PlanTier {
+  FREE
+  STARTER
+  PRO
+  AGENCY
+  ENTERPRISE
+}
+
 enum BotStatus {
   ACTIVE
   PAUSED
@@ -87,6 +95,14 @@ model Organization {
 
   // Step 38 — Client self-service permission
   allowClientEdits Boolean @default(false)
+
+  // Plan & Usage
+  planTier              PlanTier @default(FREE)
+  planStartedAt         DateTime @default(now())
+  planExpiresAt         DateTime?
+  conversationsThisMonth Int     @default(0)
+  conversationsLimit     Int     @default(200)  // Free tier default
+  botsLimit              Int     @default(1)    // Free tier default
 
   // White-label branding fields
   whiteLabelEnabled  Boolean @default(false)
