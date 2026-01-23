@@ -4,9 +4,12 @@ import { z } from 'zod';
 import Stripe from 'stripe';
 import { PlanTier, PLAN_FEATURES } from '@/lib/plans/features';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-12-18.acacia',
-});
+// Initialize Stripe only if API key is available (for build-time compatibility)
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-02-24.acacia',
+    })
+  : null;
 
 const checkoutSchema = z.object({
   planTier: z.enum(['STARTER', 'PRO', 'AGENCY', 'ENTERPRISE']),
@@ -22,6 +25,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { ok: false, error: ctx.error, message: ctx.message },
       { status: ctx.status }
+    );
+  }
+
+  if (!stripe) {
+    return NextResponse.json(
+      { ok: false, error: 'stripe_not_configured', message: 'Stripe is not configured' },
+      { status: 500 }
     );
   }
 
@@ -48,14 +58,6 @@ export async function POST(request: NextRequest) {
     }
 
     const { planTier } = validation.data;
-
-    // Can't downgrade to FREE via checkout
-    if (planTier === 'FREE') {
-      return NextResponse.json(
-        { ok: false, error: 'invalid_plan', message: 'Cannot checkout for FREE plan' },
-        { status: 400 }
-      );
-    }
 
     const planFeatures = PLAN_FEATURES[planTier as PlanTier];
 

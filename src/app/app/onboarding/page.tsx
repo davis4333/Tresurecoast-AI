@@ -93,8 +93,14 @@ export default function OnboardingPage() {
       const data = await res.json();
 
       if (data.ok && data.botPublicKey) {
-        showToast("Bot created successfully!", "success");
-        window.location.href = `/app/bots/${data.botPublicKey}`;
+        // If AI drafts were generated, redirect to KB page for review
+        if (data.draftsGenerated) {
+          showToast("Bot created with AI-generated drafts! Review them in the Knowledge Base.", "success");
+          window.location.href = `/app/kb?reviewDrafts=true`;
+        } else {
+          showToast("Bot created successfully!", "success");
+          window.location.href = `/app/bots/${data.botPublicKey}`;
+        }
       } else {
         setError(data.message || "Failed to generate bot");
       }

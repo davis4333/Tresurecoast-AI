@@ -4,17 +4,27 @@ import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
 import { PlanTier, PLAN_FEATURES } from '@/lib/plans/features';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-12-18.acacia',
-});
+// Initialize Stripe only if API key is available (for build-time compatibility)
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-02-24.acacia',
+    })
+  : null;
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 /**
  * POST /api/billing/webhook
  * Handle Stripe webhook events for subscription changes
  */
 export async function POST(request: NextRequest) {
+  if (!stripe || !webhookSecret) {
+    return NextResponse.json(
+      { ok: false, error: 'stripe_not_configured' },
+      { status: 500 }
+    );
+  }
+
   const body = await request.text();
   const headersList = await headers();
   const signature = headersList.get('stripe-signature');

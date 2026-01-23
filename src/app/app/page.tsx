@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useState } from "react";
 import { TcaCard, TcaCardBody, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaButton } from "@/components/tca/TcaButton";
 import { TcaBadge } from "@/components/tca/TcaBadge";
@@ -5,9 +8,31 @@ import { SetupStatusCard } from "@/components/tca/SetupStatusCard";
 import { RevenueMetricsCard } from "@/components/tca/RevenueMetricsCard";
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
+interface DashboardStats {
+  bots: { total: number; limit: number; usagePercent: number };
+  conversations: { total: number; thisMonth: number; limit: number; usagePercent: number };
+  leads: { total: number; hot: number };
+  plan: { tier: string; shouldUpgrade: boolean; recommendedTier: string | null; upgradeReason: string };
+}
 
 export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const res = await fetch('/api/org/dashboard/stats');
+      const data = await res.json();
+      if (data.ok) {
+        setStats(data.stats);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    }
+  };
   return (
     <div className="space-y-6">
       <div>
@@ -32,7 +57,9 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="card-kpi-leads-value">—</div>
+                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="card-kpi-leads-value">
+                    {stats ? stats.leads.total.toLocaleString() : '—'}
+                  </div>
                   <div className="text-sm font-medium text-[var(--color-text-secondary)]">Total Leads</div>
                 </div>
               </div>
@@ -53,7 +80,9 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="card-kpi-bots-value">—</div>
+                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="card-kpi-bots-value">
+                    {stats ? stats.bots.total.toLocaleString() : '—'}
+                  </div>
                   <div className="text-sm font-medium text-[var(--color-text-secondary)]">Active Bots</div>
                 </div>
               </div>
@@ -74,7 +103,9 @@ export default function DashboardPage() {
                   </svg>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="card-kpi-conversations-value">—</div>
+                  <div className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]" data-testid="card-kpi-conversations-value">
+                    {stats ? stats.conversations.total.toLocaleString() : '—'}
+                  </div>
                   <div className="text-sm font-medium text-[var(--color-text-secondary)]">Conversations</div>
                 </div>
               </div>

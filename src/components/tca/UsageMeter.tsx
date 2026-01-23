@@ -75,7 +75,7 @@ export function UsageMeter({
             Limit reached
           </p>
           <p className="text-xs text-red-600 dark:text-red-300 mt-1">
-            You've hit your {label.toLowerCase()} limit. Upgrade to continue.
+            You&apos;ve hit your {label.toLowerCase()} limit. Upgrade to continue.
           </p>
         </div>
       )}
@@ -86,7 +86,7 @@ export function UsageMeter({
             Approaching limit
           </p>
           <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
-            You're using {usagePercent}% of your {label.toLowerCase()}. Consider upgrading.
+            You&apos;re using {usagePercent}% of your {label.toLowerCase()}. Consider upgrading.
           </p>
         </div>
       )}
