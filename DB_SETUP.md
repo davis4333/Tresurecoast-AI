@@ -116,6 +116,39 @@ CI=true pnpm test  # Fails if DATABASE_URL missing
 pnpm test  # Skips DB tests gracefully if DATABASE_URL missing
 ```
 
+**GitHub Actions CI:**
+
+The project includes a complete CI pipeline (`.github/workflows/ci.yml`) that:
+- Runs PostgreSQL 16 as a service container
+- Automatically configures `DATABASE_URL` for test database
+- Runs migrations with `pnpm prisma migrate deploy`
+- Executes all 722 tests (unit + integration) with exit code verification
+- Runs Playwright E2E tests (smoke + security)
+
+**CI Database Configuration:**
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    env:
+      POSTGRES_USER: tca_test
+      POSTGRES_PASSWORD: tca_test_password
+      POSTGRES_DB: tca_test
+    ports:
+      - 5432:5432
+```
+
+**Wait for Database:**
+
+If you need to wait for PostgreSQL in scripts or CI:
+```bash
+# Using the wait script
+tsx scripts/waitForDb.ts
+
+# Or manually with pg_isready
+pg_isready -h localhost -p 5432 -U tca_test
+```
+
 ## Troubleshooting
 
 ### "Can't reach database server at localhost:5432"

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
 import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } from "@/lib/public/hostPolicy";
+import { checkRateLimit } from "@/lib/public/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,14 @@ export async function GET(
       return NextResponse.json(
         { ok: false, error: "Invalid lead id" },
         { status: 400 }
+      );
+    }
+
+    const rateLimitCheck = await checkRateLimit(request, "lead_detail", botPublicKey);
+    if (!rateLimitCheck.allowed) {
+      return NextResponse.json(
+        { ok: false, error: rateLimitCheck.error || "Rate limit exceeded" },
+        { status: 429 }
       );
     }
 

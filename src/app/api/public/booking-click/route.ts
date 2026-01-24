@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
 import { logBookingLinkClicked } from "@/lib/booking/runtime";
+import { checkRateLimit } from "@/lib/public/rateLimit";
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -12,6 +13,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(
         { ok: false, error: "Invalid botPublicKey" },
         { status: 400 }
+      );
+    }
+
+    const rateLimitCheck = await checkRateLimit(request, "booking_click", botPublicKey);
+    if (!rateLimitCheck.allowed) {
+      return NextResponse.json(
+        { ok: false, error: rateLimitCheck.error || "Rate limit exceeded" },
+        { status: 429 }
       );
     }
 

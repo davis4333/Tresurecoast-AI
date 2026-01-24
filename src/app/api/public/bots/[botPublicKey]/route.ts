@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
+import { checkRateLimit } from "@/lib/public/rateLimit";
 
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: { botPublicKey: string } }
 ) {
   const botPublicKey = params?.botPublicKey;
@@ -13,6 +14,14 @@ export async function GET(
   // Validate key presence + format (must be UUID)
   if (!isValidUUID(botPublicKey)) {
     return NextResponse.json({ ok: false, error: "Invalid bot key" }, { status: 400 });
+  }
+
+  const rateLimitCheck = await checkRateLimit(request, "bot_fetch", botPublicKey);
+  if (!rateLimitCheck.allowed) {
+    return NextResponse.json(
+      { ok: false, error: rateLimitCheck.error || "Rate limit exceeded" },
+      { status: 429 }
+    );
   }
 
   try {

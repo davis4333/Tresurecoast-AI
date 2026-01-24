@@ -2,10 +2,19 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { DemoRequestSchema } from "@/lib/public/demoRequestSchema";
 import { notifyDemoRequest } from "@/lib/notifications/webhooks";
+import { checkRateLimit } from "@/lib/public/rateLimit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const rateLimitCheck = await checkRateLimit(request, "demo_request", "global");
+  if (!rateLimitCheck.allowed) {
+    return NextResponse.json(
+      { error: rateLimitCheck.error || "Rate limit exceeded" },
+      { status: 429 }
+    );
+  }
+
   try {
     const body = await request.json();
     const parsed = DemoRequestSchema.safeParse(body);
