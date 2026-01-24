@@ -26,7 +26,11 @@
     "db:migrate-verify": "tsx scripts/db-migrate-and-verify.ts",
     "deploy:check": "pnpm lint && pnpm typecheck && pnpm test:e2e && pnpm build",
     "postinstall": "prisma generate",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test --project=smoke",
+    "test:e2e:security": "playwright test --project=security",
+    "test:e2e:visual": "playwright test --project=visual",
+    "test:e2e:full": "playwright test --project=chromium"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.8",
