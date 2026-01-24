@@ -6,7 +6,11 @@ import { cx } from "@/components/tca/tca";
 import { TcaBadge } from "@/components/tca/TcaBadge";
 import { BrandingCssVars } from "@/components/branding/BrandingCssVars";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import dynamic from "next/dynamic";
+
+// Force dynamic rendering to prevent SSG of authenticated pages
+export const dynamic = "force-dynamic";
 
 const NAV_ITEMS = [
   { href: "/app", label: "Dashboard", icon: "grid", testId: "nav-dashboard" },
@@ -121,8 +125,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <QueryProvider>
-      <div className="flex min-h-screen bg-[var(--color-background)]">
+    <AuthProvider>
+      <QueryProvider>
+        <div className="flex min-h-screen bg-[var(--color-background)]">
         <BrandingCssVars />
         <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="flex h-16 items-center justify-between border-b border-[var(--color-border)] px-4">
@@ -174,5 +179,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     </QueryProvider>
+    </AuthProvider>
   );
 }
