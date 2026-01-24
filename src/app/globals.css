@@ -402,8 +402,23 @@ body {
   }
 }
 
+@keyframes tca-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .tca-message-enter {
   animation: tca-message-fade-in var(--transition-base) ease-out;
+}
+
+.animate-slide-in-right {
+  animation: tca-slide-in-right 0.3s ease-out;
 }
 
 .tca-message-container-enter {
