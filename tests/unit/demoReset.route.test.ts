@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { prisma } from "@/lib/prisma";
+import { shouldSkipDatabaseTests } from "../helpers/dbReachability";
 
 const TEST_ORG_A_NAME = "DemoReset_Test_OrgA";
 const TEST_ORG_B_NAME = "DemoReset_Test_OrgB";
 
-describe("DemoReset Route Unit Tests", () => {
+describe.skipIf(await shouldSkipDatabaseTests())("DemoReset Route Unit Tests", () => {
   let orgAId: number;
   let orgBId: number;
   let workspaceAId: number;
