@@ -2,15 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import { cx } from "@/components/tca/tca";
 import { TcaBadge } from "@/components/tca/TcaBadge";
 import { BrandingCssVars } from "@/components/branding/BrandingCssVars";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
-import dynamic from "next/dynamic";
-
-// Force dynamic rendering to prevent SSG of authenticated pages
-export const dynamic = "force-dynamic";
 
 const NAV_ITEMS = [
   { href: "/app", label: "Dashboard", icon: "grid", testId: "nav-dashboard" },
