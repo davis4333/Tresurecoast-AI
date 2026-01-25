@@ -12,6 +12,12 @@
 **Time to Production**: 2-3 hours (after staging validated)
 **Dependencies**: PostgreSQL, Clerk, Stripe, Resend, Upstash Redis
 
+**Important Documentation**:
+- 📋 **This Document**: Deployment procedures
+- 💾 **[Backup & Restore Runbook](./docs/BACKUP_RESTORE_RUNBOOK.md)**: Database backup/recovery procedures
+- 🔐 **[Security Audit](./CODEX_SECURITY_AUDIT.md)**: Security verification
+- ✅ **[Quality Gates](./CODEX_GATE_SCORECARD.md)**: Pre-deployment verification
+
 ---
 
 ## PREREQUISITES
