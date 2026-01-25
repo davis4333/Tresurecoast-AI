@@ -8,6 +8,7 @@ import { TcaBadge } from "@/components/tca/TcaBadge";
 import { BrandingCssVars } from "@/components/branding/BrandingCssVars";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { ToastProvider } from "@/components/tca/TcaToast";
 
 const NAV_ITEMS = [
   { href: "/app", label: "Dashboard", icon: "grid", testId: "nav-dashboard" },
@@ -124,8 +125,9 @@ export function AppLayoutClient({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <QueryProvider>
-        <div className="flex min-h-screen bg-[var(--color-background)]">
-        <BrandingCssVars />
+        <ToastProvider>
+          <div className="flex min-h-screen bg-[var(--color-background)]">
+          <BrandingCssVars />
         <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="flex h-16 items-center justify-between border-b border-[var(--color-border)] px-4">
           <Link href="/app" className="text-lg font-extrabold text-[var(--color-brand-primary)]">
@@ -175,6 +177,7 @@ export function AppLayoutClient({ children }: { children: React.ReactNode }) {
         </main>
         </div>
       </div>
+        </ToastProvider>
     </QueryProvider>
     </AuthProvider>
   );

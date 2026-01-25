@@ -3,6 +3,7 @@
 import { X, Check } from 'lucide-react';
 import { PLAN_FEATURES, PlanTier } from '@/lib/plans/features';
 import { useState } from 'react';
+import { useToast } from './TcaToast';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export function UpgradeModal({
   const [selectedTier, setSelectedTier] = useState<PlanTier | null>(
     recommendedTier || null
   );
+  const { showToast } = useToast();
 
   if (!isOpen) return null;
 
@@ -41,12 +43,12 @@ export function UpgradeModal({
         // Redirect to Stripe checkout
         window.location.href = data.checkoutUrl;
       } else {
-        alert('Failed to create checkout session. Please try again.');
+        showToast('error', 'Failed to create checkout session. Please try again.');
         setLoading(false);
       }
     } catch (error) {
       console.error('Upgrade error:', error);
-      alert('An error occurred. Please try again.');
+      showToast('error', 'An error occurred. Please try again.');
       setLoading(false);
     }
   };
