@@ -49,22 +49,47 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // IDEMPOTENCY CHECK: Prevent duplicate webhook processing
+    // Note: We check audit logs for duplicate event IDs in summaries
+    const existingWebhook = await prisma.auditLog.findFirst({
+      where: {
+        summary: {
+          contains: `webhook_event:${event.id}`,
+        },
+      },
+    });
+
+    if (existingWebhook) {
+      console.log(`[billing/webhook] Duplicate event ${event.id}, skipping`, {
+        eventId: event.id,
+        eventType: event.type,
+        processedAt: existingWebhook.createdAt,
+      });
+      return NextResponse.json({ ok: true, alreadyProcessed: true });
+    }
+
+    console.log(`[billing/webhook] Processing event`, {
+      eventId: event.id,
+      eventType: event.type,
+    });
+
+    // PROCESS EVENT
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        await handleCheckoutCompleted(session);
+        await handleCheckoutCompleted(session, event.id);
         break;
       }
 
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
-        await handleSubscriptionUpdated(subscription);
+        await handleSubscriptionUpdated(subscription, event.id);
         break;
       }
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
-        await handleSubscriptionDeleted(subscription);
+        await handleSubscriptionDeleted(subscription, event.id);
         break;
       }
 
@@ -81,12 +106,25 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        console.log(`[billing/webhook] Unhandled event type: ${event.type}`);
+        console.log(`[billing/webhook] Unhandled event type: ${event.type}`, {
+          eventId: event.id,
+          eventType: event.type,
+        });
     }
+
+    console.log(`[billing/webhook] Event processed successfully`, {
+      eventId: event.id,
+      eventType: event.type,
+    });
 
     return NextResponse.json({ ok: true, received: true });
   } catch (error) {
-    console.error('[billing/webhook] Error processing event:', error);
+    console.error('[billing/webhook] Error processing event:', {
+      eventId: event.id,
+      eventType: event.type,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
       { ok: false, error: 'processing_error' },
       { status: 500 }
@@ -94,20 +132,31 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session, webhookEventId: string) {
   const organizationId = session.metadata?.organizationId;
   const planTier = session.metadata?.planTier as PlanTier;
 
   if (!organizationId || !planTier) {
-    console.error('[billing/webhook] Missing metadata in checkout session');
+    console.error('[billing/webhook] Missing metadata in checkout session', {
+      sessionId: session.id,
+      hasOrgId: !!organizationId,
+      hasPlanTier: !!planTier,
+    });
     return;
   }
 
   const planFeatures = PLAN_FEATURES[planTier];
+  const orgId = parseInt(organizationId);
+
+  console.log('[billing/webhook] Upgrading organization', {
+    organizationId: orgId,
+    planTier,
+    sessionId: session.id,
+  });
 
   // Update organization with new plan
   await prisma.organization.update({
-    where: { id: parseInt(organizationId) },
+    where: { id: orgId },
     data: {
       planTier: planTier,
       planStartedAt: new Date(),
@@ -118,48 +167,83 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     },
   });
 
-  console.log(
-    `[billing/webhook] Organization ${organizationId} upgraded to ${planTier}`
-  );
+  // Create audit log for idempotency tracking
+  await prisma.auditLog.create({
+    data: {
+      organizationId: orgId,
+      action: 'BOT_UPDATED', // Reusing existing action
+      summary: `Plan upgraded to ${planTier} via webhook_event:${webhookEventId} session:${session.id}`,
+      actorId: null,
+    },
+  });
+
+  console.log('[billing/webhook] Organization upgraded successfully', {
+    organizationId: orgId,
+    planTier,
+    sessionId: session.id,
+  });
 }
 
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription, webhookEventId: string) {
   // Handle subscription renewal, plan changes, etc.
   const organizationId = subscription.metadata?.organizationId;
 
   if (!organizationId) {
-    console.error('[billing/webhook] Missing organizationId in subscription metadata');
+    console.error('[billing/webhook] Missing organizationId in subscription metadata', {
+      subscriptionId: subscription.id,
+    });
     return;
   }
 
-  // Update plan expiration date
+  const orgId = parseInt(organizationId);
   const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
 
+  // Update plan expiration date
   await prisma.organization.update({
-    where: { id: parseInt(organizationId) },
+    where: { id: orgId },
     data: {
       planExpiresAt: currentPeriodEnd,
     },
   });
 
-  console.log(
-    `[billing/webhook] Subscription updated for organization ${organizationId}`
-  );
+  // Create audit log for idempotency tracking
+  await prisma.auditLog.create({
+    data: {
+      organizationId: orgId,
+      action: 'BOT_UPDATED', // Reusing existing action
+      summary: `Subscription updated via webhook_event:${webhookEventId} subscription:${subscription.id}`,
+      actorId: null,
+    },
+  });
+
+  console.log('[billing/webhook] Subscription updated', {
+    organizationId,
+    subscriptionId: subscription.id,
+    newExpiryDate: currentPeriodEnd.toISOString(),
+  });
 }
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription, webhookEventId: string) {
   // Downgrade to FREE when subscription is canceled
   const organizationId = subscription.metadata?.organizationId;
 
   if (!organizationId) {
-    console.error('[billing/webhook] Missing organizationId in subscription metadata');
+    console.error('[billing/webhook] Missing organizationId in subscription metadata', {
+      subscriptionId: subscription.id,
+    });
     return;
   }
 
+  const orgId = parseInt(organizationId);
   const freeFeatures = PLAN_FEATURES[PlanTier.FREE];
 
+  console.log('[billing/webhook] Downgrading organization to FREE', {
+    organizationId,
+    subscriptionId: subscription.id,
+  });
+
   await prisma.organization.update({
-    where: { id: parseInt(organizationId) },
+    where: { id: orgId },
     data: {
       planTier: PlanTier.FREE,
       planExpiresAt: null,
@@ -169,17 +253,37 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     },
   });
 
-  console.log(
-    `[billing/webhook] Organization ${organizationId} downgraded to FREE (subscription canceled)`
-  );
+  // Create audit log for idempotency tracking
+  await prisma.auditLog.create({
+    data: {
+      organizationId: orgId,
+      action: 'BOT_UPDATED', // Reusing existing action
+      summary: `Subscription canceled, downgraded to FREE via webhook_event:${webhookEventId} subscription:${subscription.id}`,
+      actorId: null,
+    },
+  });
+
+  console.log('[billing/webhook] Organization downgraded to FREE', {
+    organizationId,
+    subscriptionId: subscription.id,
+  });
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-  console.log(`[billing/webhook] Payment succeeded for invoice ${invoice.id}`);
+  console.log('[billing/webhook] Payment succeeded', {
+    invoiceId: invoice.id,
+    amount: invoice.amount_paid,
+    customerId: invoice.customer,
+  });
   // Could send a receipt email here
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  console.error(`[billing/webhook] Payment failed for invoice ${invoice.id}`);
+  console.error('[billing/webhook] Payment failed', {
+    invoiceId: invoice.id,
+    amount: invoice.amount_due,
+    customerId: invoice.customer,
+    attemptCount: invoice.attempt_count,
+  });
   // Could send a payment failure email here
 }
