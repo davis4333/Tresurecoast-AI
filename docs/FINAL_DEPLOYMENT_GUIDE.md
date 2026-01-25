@@ -19,12 +19,12 @@ This guide provides the complete deployment checklist for taking Treasure Coast 
 | PR #3 | ✅ Complete | `5b49d0d` | Structured Logging Foundation - Pino logger setup |
 | PR #6 | ✅ Complete | `8f8c877` | Backup/Restore Runbook - Comprehensive data safety procedures |
 | PR #4 | ✅ Complete | `9d63dd5` | UI Polish - TcaEmptyState component applied to bots/leads |
+| PR #5 | ✅ Complete | `284ae2f` | Sentry Integration - Error tracking and performance monitoring |
 
 ### ⏸️ Pending PRs
 
 | PR | Status | Estimated | Description |
 |----|--------|-----------|-------------|
-| PR #5 | Not Started | 2 hours | Sentry Integration - Error tracking and performance monitoring |
 | PR #3 (Migration) | Partial | 4 hours | Complete console.log → logger migration (foundation done) |
 
 ## Deployment Phases
@@ -232,20 +232,7 @@ vercel logs --prod | grep "alreadyProcessed"
 
 After production is stable for 24 hours, implement remaining improvements:
 
-#### 3.1 PR #5: Sentry Integration
-
-**Estimated**: 2 hours
-
-**Tasks**:
-1. Install `@sentry/nextjs`
-2. Configure `sentry.client.config.ts` and `sentry.server.config.ts`
-3. Add error boundaries to critical components
-4. Test error reporting in staging
-5. Deploy to production
-
-**Reference**: See `CODEX_DEPLOYMENT_PLAYBOOK.md` for Sentry configuration
-
-#### 3.2 PR #3: Complete Logging Migration
+#### 3.1 PR #3: Complete Logging Migration
 
 **Estimated**: 4 hours
 
@@ -259,7 +246,7 @@ After production is stable for 24 hours, implement remaining improvements:
 
 **Reference**: See `docs/LOGGING_MIGRATION.md` for migration guide
 
-#### 3.3 Additional Improvements
+#### 3.2 Additional Improvements
 
 - [ ] Add analytics dashboard for admin
 - [ ] Implement email notifications for high-value leads
@@ -405,9 +392,9 @@ pnpm check-env  # (if script exists)
 - ✅ Structured logging foundation (Pino)
 - ✅ Comprehensive backup/restore procedures
 - ✅ UI consistency (TcaEmptyState component)
+- ✅ Sentry error tracking and performance monitoring
 
 **Pending**:
-- ⏸️ Sentry error tracking
 - ⏸️ Complete logging migration (26 API routes)
 
 **Fixes**:
