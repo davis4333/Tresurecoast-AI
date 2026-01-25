@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
 import { logBookingLinkClicked } from "@/lib/booking/runtime";
+import { checkRateLimit } from "@/lib/public/rateLimit";
+import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } from "@/lib/public/hostPolicy";
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -15,6 +17,61 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const rateLimitCheck = await checkRateLimit(request, "booking_click", botPublicKey);
+    if (!rateLimitCheck.allowed) {
+      return NextResponse.json(
+        { ok: false, error: rateLimitCheck.error || "Rate limit exceeded" },
+        { status: 429 }
+      );
+    }
+
+    // Fetch bot to get allowlist and organization for security checks
+    const bot = await prisma.bot.findUnique({
+      where: { publicKey: botPublicKey },
+      select: {
+        id: true,
+        organizationId: true,
+        allowlist: { select: { domain: true } },
+      },
+    });
+
+    if (!bot) {
+      return NextResponse.json(
+        { ok: false, error: "Bot not found" },
+        { status: 404 }
+      );
+    }
+
+    // Host allowlist check
+    const allowlistDomains = bot.allowlist
+      .map((a) => a.domain)
+      .filter((d): d is string => typeof d === "string" && d.trim().length > 0);
+
+    const origin = request.headers.get("origin");
+    const originHost = getOriginHost(request);
+    const host = getRequestHost(request);
+
+    if (!isHostAllowed(allowlistDomains, originHost ?? origin, host)) {
+      console.warn("[booking-click] Blocked request from unauthorized domain", {
+        botPublicKey,
+        origin,
+        host,
+      });
+      return NextResponse.json(
+        { ok: false, error: "Forbidden" },
+        { status: 403 }
+      );
+    }
+
+    // Tenant binding check
+    const bind = await enforceTenantBinding({ req: request, botOrgId: bot.organizationId });
+    if (!bind.ok) {
+      return NextResponse.json(
+        { ok: false, error: bind.error, message: bind.message },
+        { status: bind.status }
+      );
+    }
+
     if (typeof conversationPublicId !== "string" || !isValidUUID(conversationPublicId)) {
       return NextResponse.json(
         { ok: false, error: "Invalid conversationPublicId" },
@@ -22,14 +79,16 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const conversation = await prisma.conversation.findUnique({
-      where: { publicId: conversationPublicId },
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        publicId: conversationPublicId,
+        botId: bot.id,
+      },
       select: {
         id: true,
         botId: true,
         bot: {
           select: {
-            publicKey: true,
             organizationId: true,
             workspaceId: true,
           },
@@ -37,7 +96,7 @@ export async function PATCH(request: NextRequest) {
       },
     });
 
-    if (!conversation || conversation.bot.publicKey !== botPublicKey) {
+    if (!conversation) {
       return NextResponse.json(
         { ok: false, error: "Conversation not found" },
         { status: 404 }

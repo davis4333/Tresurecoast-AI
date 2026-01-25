@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,28 +6,18 @@ export const metadata: Metadata = {
   description: "Capture leads while you sleep."
 };
 
-function shouldUseClerk(): boolean {
-  if (process.env.DEV_BYPASS_AUTH === "true" && process.env.NODE_ENV !== "production") {
-    return false;
-  }
-  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
-  return pk.startsWith("pk_");
-}
-
+/**
+ * Root layout - minimal HTML shell.
+ *
+ * ClerkProvider is NOT here to avoid build-time validation issues.
+ * Authenticated routes use ClerkProvider in their own layout (/app/app/layout.tsx).
+ * Public routes use their own layout (/(public)/layout.tsx).
+ */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const useClerk = shouldUseClerk();
-  const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
-
   return (
     <html lang="en">
       <body className="bg-background text-foreground antialiased">
-        {useClerk ? (
-          <ClerkProvider publishableKey={clerkPubKey}>
-            {children}
-          </ClerkProvider>
-        ) : (
-          children
-        )}
+        {children}
       </body>
     </html>
   );

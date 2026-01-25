@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getOrgContext } from "@/lib/auth/getOrgContext";
 import { z } from "zod";
 
+export const dynamic = 'force-dynamic';
+
 const MAX_EXPORT_LEADS = 5000;
 
 const querySchema = z.object({

@@ -1,0 +1,63 @@
+# Sentry Source Map Upload Ignore File
+# Files and directories that should not be uploaded to Sentry
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+tests/
+__tests__/
+
+# Build artifacts
+.next/
+out/
+dist/
+build/
+
+# Misc
+.DS_Store
+*.log
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Git
+.git/
+.gitignore
+
+# Docs
+docs/
+*.md
+README.md
+
+# Config files
+*.config.js
+*.config.ts
+*.config.mjs
+!next.config.mjs
+
+# Prisma
+prisma/
+
+# Public assets
+public/

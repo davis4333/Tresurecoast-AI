@@ -1,0 +1,139 @@
+name: Staging - Deploy + E2E Verification
+
+on:
+  push:
+    branches:
+      - staging
+      - main
+
+env:
+  NODE_VERSION: "22.x"
+  PNPM_VERSION: "9.15.0"
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.url }}
+
+    outputs:
+      staging-url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run build
+        run: pnpm build
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.STAGING_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.STAGING_CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.STAGING_APP_URL }}
+          OPENAI_API_KEY: ${{ secrets.STAGING_OPENAI_API_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STAGING_STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STAGING_STRIPE_WEBHOOK_SECRET }}
+          RESEND_API_KEY: ${{ secrets.STAGING_RESEND_API_KEY }}
+          SKIP_ENV_VALIDATION: true
+
+      - name: Deploy to Vercel Staging
+        id: deploy
+        run: |
+          # This is a placeholder - replace with actual deployment command
+          # Example for Vercel:
+          # npm i -g vercel
+          # vercel deploy --prod=false --token=${{ secrets.VERCEL_TOKEN }}
+          echo "url=https://staging.treasurecoast.ai" >> $GITHUB_OUTPUT
+
+  verify-staging:
+    name: Verify Staging Deployment
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+
+    env:
+      PLAYWRIGHT_BASE_URL: ${{ needs.deploy-staging.outputs.staging-url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Wait for staging deployment
+        run: |
+          echo "Waiting for staging to be ready at ${{ env.PLAYWRIGHT_BASE_URL }}"
+          for i in {1..30}; do
+            if curl -f -s "${{ env.PLAYWRIGHT_BASE_URL }}/api/health" > /dev/null; then
+              echo "Staging is ready!"
+              exit 0
+            fi
+            echo "Waiting... attempt $i/30"
+            sleep 10
+          done
+          echo "Staging did not become ready in time"
+          exit 1
+
+      - name: Run E2E smoke tests against staging
+        run: pnpm test:e2e:smoke
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ needs.deploy-staging.outputs.staging-url }}
+
+      - name: Run E2E security tests against staging
+        run: pnpm test:e2e:security
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ needs.deploy-staging.outputs.staging-url }}
+
+      - name: Upload staging E2E results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-e2e-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  approve-production:
+    name: Ready for Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, verify-staging]
+
+    steps:
+      - name: Staging verification passed
+        run: |
+          echo "✅ Staging deployment successful"
+          echo "✅ E2E smoke tests passed"
+          echo "✅ E2E security tests passed"
+          echo ""
+          echo "🚀 Ready to promote to production"

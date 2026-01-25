@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
 import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } from "@/lib/public/hostPolicy";
+import { checkRateLimit } from "@/lib/public/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,15 @@ export async function GET(req: Request) {
     );
   }
 
-  try {
+  const rateLimitCheck = await checkRateLimit(req, "widget_config", botPublicKey);
+  if (!rateLimitCheck.allowed) {
+    return NextResponse.json(
+      { ok: false, error: rateLimitCheck.error || "Rate limit exceeded" },
+      { status: 429 }
+    );
+  }
+
+  try{
     const bot = await prisma.bot.findUnique({
       where: { publicKey: botPublicKey },
       select: {

@@ -15,6 +15,7 @@ type KnowledgeSource = {
   title: string;
   type: string;
   content?: string;
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   createdAt: string;
   updatedAt?: string;
 };
@@ -243,6 +244,31 @@ export default function KnowledgeBasePage() {
     }
   };
 
+  const handleTogglePublish = async (sourceId: number, currentStatus: string | undefined) => {
+    if (!selectedBotKey) return;
+
+    const newStatus = currentStatus === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED';
+
+    try {
+      const res = await fetch(`/api/org/bots/${selectedBotKey}/knowledge`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceId, status: newStatus }),
+      });
+
+      const data = await res.json();
+
+      if (data.ok) {
+        showSuccess(`Knowledge source ${newStatus === 'PUBLISHED' ? 'published' : 'unpublished'}`);
+        fetchSources();
+      } else {
+        setError(data.message || 'Failed to update status');
+      }
+    } catch {
+      setError('Failed to update status');
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", {
@@ -399,6 +425,20 @@ export default function KnowledgeBasePage() {
                         >
                           {source.type}
                         </span>
+                        {source.status && (
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              source.status === 'PUBLISHED'
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                                : source.status === 'DRAFT'
+                                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                                : 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300'
+                            }`}
+                            data-testid={`badge-status-${source.id}`}
+                          >
+                            {source.status}
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-[var(--color-text-muted)]">
                         Added {formatDate(source.createdAt)}
@@ -406,6 +446,28 @@ export default function KnowledgeBasePage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {/* Publish/Unpublish button */}
+                      {source.status === 'DRAFT' && (
+                        <button
+                          onClick={() => handleTogglePublish(source.id, source.status)}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
+                          data-testid={`button-publish-${source.id}`}
+                          aria-label="Publish source"
+                        >
+                          Publish
+                        </button>
+                      )}
+                      {source.status === 'PUBLISHED' && (
+                        <button
+                          onClick={() => handleTogglePublish(source.id, source.status)}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white transition-colors"
+                          data-testid={`button-unpublish-${source.id}`}
+                          aria-label="Unpublish source"
+                        >
+                          Unpublish
+                        </button>
+                      )}
+
                       <button
                         onClick={() => openEditModal(source)}
                         className="p-2 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"

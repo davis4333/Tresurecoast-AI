@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { seedTemplateKnowledge } from "@/lib/templates/seedKnowledge";
+import { shouldSkipDatabaseTests } from "../helpers/dbReachability";
 
 const TEST_ORG_NAME = "SeedKnowledge_Integration_Test_Org";
 
-describe("seedTemplateKnowledge DB Integration", () => {
+describe.skipIf(await shouldSkipDatabaseTests())("seedTemplateKnowledge DB Integration", () => {
   let orgId: number;
   let workspaceId: number;
   let botAId: number;

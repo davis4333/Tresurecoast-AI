@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getOrgContext } from "@/lib/auth/getOrgContext";
 import { z } from "zod";
 
+export const dynamic = 'force-dynamic';
+
 const PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
 

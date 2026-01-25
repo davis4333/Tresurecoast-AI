@@ -177,6 +177,86 @@ export function buildHotLeadEmail(lead: {
   };
 }
 
+export function buildPaymentReceiptEmail(params: {
+  organizationName: string;
+  planName: string;
+  amount: number;
+  invoiceUrl?: string;
+  receiptUrl?: string;
+}): EmailPayload {
+  const { organizationName, planName, amount, invoiceUrl, receiptUrl } = params;
+  const formattedAmount = `$${(amount / 100).toFixed(2)}`;
+
+  return {
+    to: "",
+    subject: `Payment Receipt - ${planName} Plan`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Receipt</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <tr>
+      <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 12px 12px 0 0; padding: 32px; text-align: center;">
+        <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Payment Successful</h1>
+        <p style="margin: 8px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">Thank you for your payment!</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #ffffff; padding: 32px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+          <tr>
+            <td style="padding-bottom: 24px;">
+              <h2 style="margin: 0 0 16px; color: #1f2937; font-size: 20px;">Payment Details</h2>
+              <table role="presentation" cellspacing="0" cellpadding="0" width="100%">
+                <tr>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Organization:</td>
+                  <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right;">${escapeHtml(organizationName)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Plan:</td>
+                  <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right;">${escapeHtml(planName)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px; border-top: 1px solid #e5e7eb; padding-top: 12px; font-weight: 600;">Amount Paid:</td>
+                  <td style="padding: 8px 0; color: #1f2937; font-size: 18px; font-weight: 700; text-align: right; border-top: 1px solid #e5e7eb; padding-top: 12px;">${formattedAmount}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          ${invoiceUrl || receiptUrl ? `
+          <tr>
+            <td style="padding-bottom: 24px;">
+              ${invoiceUrl ? `<a href="${invoiceUrl}" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600; margin-right: 8px;">View Invoice</a>` : ""}
+              ${receiptUrl ? `<a href="${receiptUrl}" style="display: inline-block; background-color: #f3f4f6; color: #374151; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;">Download Receipt</a>` : ""}
+            </td>
+          </tr>
+          ` : ""}
+          <tr>
+            <td style="padding-top: 24px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px;">
+              <p style="margin: 0 0 8px;">If you have any questions about this payment, please contact our support team.</p>
+              <p style="margin: 0;">Thank you for being a Treasure Coast AI customer!</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 24px; text-align: center; color: #9ca3af; font-size: 12px;">
+        <p style="margin: 0;">Sent by Treasure Coast AI</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim(),
+  };
+}
+
 export function buildBookingClickEmail(lead: {
   name: string | null;
   email: string | null;

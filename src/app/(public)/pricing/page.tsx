@@ -59,7 +59,7 @@ export default function PricingPage() {
             <TcaCardHeader>
               <div className="tca-h4 mb-2">Starter</div>
               <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-extrabold">$99</span>
+                <span className="text-4xl font-extrabold">$49</span>
                 <span className="text-sm text-[var(--color-text-secondary)]">/month</span>
               </div>
               <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
@@ -90,7 +90,7 @@ export default function PricingPage() {
               <TcaBadge className="absolute right-4 top-4">Most Popular</TcaBadge>
               <div className="tca-h4 mb-2">Professional</div>
               <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-extrabold text-[var(--color-brand-primary)]">$249</span>
+                <span className="text-4xl font-extrabold text-[var(--color-brand-primary)]">$149</span>
                 <span className="text-sm text-[var(--color-text-secondary)]">/month</span>
               </div>
               <p className="mt-2 text-sm text-[var(--color-text-secondary)]">

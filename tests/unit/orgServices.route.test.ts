@@ -6,6 +6,7 @@ import {
   OrganizationServiceCreateSchema,
   OrganizationServiceUpdateSchema,
 } from "@/lib/validators/orgServices";
+import { shouldSkipDatabaseTests } from "../helpers/dbReachability";
 
 const TEST_ORG_A_NAME = "OrgServices_Test_OrgA";
 const TEST_ORG_B_NAME = "OrgServices_Test_OrgB";
@@ -109,7 +110,7 @@ describe("OrganizationService Validators", () => {
   });
 });
 
-describe("OrganizationService DB Integration", () => {
+describe.skipIf(await shouldSkipDatabaseTests())("OrganizationService DB Integration", () => {
   let orgAId: number;
   let orgBId: number;
   let userOwner: string;

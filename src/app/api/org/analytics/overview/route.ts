@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrgContext, isAdmin } from "@/lib/auth/getOrgContext";
 
+export const dynamic = 'force-dynamic';
+
 const MAX_DAYS = 365;
 const DEFAULT_DAYS = 30;
 
@@ -174,9 +176,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Calculate conversion rate: (linkClicked / serviceSelected) × 100
-  const conversionRate = funnel.serviceSelected > 0 
-    ? Math.round((funnel.linkClicked / funnel.serviceSelected) * 10000) / 100 
+  // Calculate conversion rate: (linkClicked / leadCreated) × 100
+  const conversionRate = funnel.leadCreated > 0
+    ? Math.round((funnel.linkClicked / funnel.leadCreated) * 10000) / 100
     : 0;
 
   return NextResponse.json({

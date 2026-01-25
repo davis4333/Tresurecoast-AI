@@ -8,6 +8,7 @@ import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } fr
 import { retrieve, formatCitedAnswer } from "@/lib/truthMode/retrieve";
 import { processBookingFlow } from "@/lib/booking/runtime";
 import { BookingFlowState, ResponseDirectiveType } from "@/lib/booking/types";
+import { checkConversationLimit, incrementConversationCount } from "@/lib/plans/enforcement";
 
 export const runtime = "nodejs";
 
@@ -141,6 +142,32 @@ export async function POST(req: Request) {
     }
 
     if (!conversation) {
+      // Check plan limits before creating new conversation
+      const limitCheck = await checkConversationLimit(bot.organizationId);
+      if (!limitCheck.allowed) {
+        // Return a friendly message to the end user (not an error)
+        const upgradeMessage = `This chatbot has reached its monthly conversation limit (${limitCheck.limit} conversations). Please contact the business owner to upgrade their plan.`;
+
+        return NextResponse.json({
+          ok: true, // Still return ok:true so widget doesn't show error
+          conversationPublicId: null,
+          reply: upgradeMessage,
+          assistant: { content: upgradeMessage },
+          intent: "LIMIT_EXCEEDED",
+          confidence: 1.0,
+          sourcedFrom: ["plan_limit"],
+          requiresLeadCapture: false,
+          leadCaptureRequested: false,
+          missingFields: [],
+          topic: "PLAN_LIMIT",
+          suggestedActions: [],
+          externalRedirectUrl: null,
+          usedKnowledgeBase: false,
+          knowledgeSources: [],
+          planLimitExceeded: true,
+        });
+      }
+
       conversation = await prisma.conversation.create({
         data: {
           organizationId: bot.organizationId,
@@ -149,6 +176,9 @@ export async function POST(req: Request) {
         },
         select: { id: true, publicId: true },
       });
+
+      // Increment conversation counter for the month
+      await incrementConversationCount(bot.organizationId);
     }
 
     await prisma.message.create({

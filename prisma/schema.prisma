@@ -19,6 +19,14 @@ enum AuditAction {
   DEMO_RESET
 }
 
+enum PlanTier {
+  FREE
+  STARTER
+  PRO
+  AGENCY
+  ENTERPRISE
+}
+
 enum BotStatus {
   ACTIVE
   PAUSED
@@ -87,6 +95,14 @@ model Organization {
 
   // Step 38 — Client self-service permission
   allowClientEdits Boolean @default(false)
+
+  // Plan & Usage
+  planTier              PlanTier @default(FREE)
+  planStartedAt         DateTime @default(now())
+  planExpiresAt         DateTime?
+  conversationsThisMonth Int     @default(0)
+  conversationsLimit     Int     @default(200)  // Free tier default
+  botsLimit              Int     @default(1)    // Free tier default
 
   // White-label branding fields
   whiteLabelEnabled  Boolean @default(false)
@@ -375,6 +391,12 @@ model OrganizationInvite {
   @@index([token])
 }
 
+enum KnowledgeSourceStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model BotKnowledgeSource {
   id             Int      @id @default(autoincrement())
   botId          Int
@@ -385,6 +407,10 @@ model BotKnowledgeSource {
   content     String
   contentHash String
 
+  status      KnowledgeSourceStatus @default(DRAFT)
+  publishedAt DateTime?
+  publishedBy String?  // Clerk user ID who published
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -394,6 +420,7 @@ model BotKnowledgeSource {
   @@unique([botId, contentHash])
   @@index([botId])
   @@index([organizationId])
+  @@index([status])
 }
 
 model BusinessProfile {

@@ -4,7 +4,14 @@ const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const LIMITS = {
   chat: { max: 30, window: 60 },
   leads: { max: 10, window: 60 },
-  leads_status: { max: 20, window: 60 }
+  leads_status: { max: 20, window: 60 },
+  demo_request: { max: 5, window: 60 },
+  booking_click: { max: 20, window: 60 },
+  bot_fetch: { max: 60, window: 60 },
+  widget_config: { max: 60, window: 60 },
+  messages_fetch: { max: 30, window: 60 },
+  lead_detail: { max: 30, window: 60 },
+  leads_recent: { max: 30, window: 60 }
 } as const;
 
 type Endpoint = keyof typeof LIMITS;

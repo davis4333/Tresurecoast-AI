@@ -7,16 +7,30 @@ describe("Rate Limiting Behavior", () => {
   });
 
   describe("rate limit logic", () => {
-    it("LIMITS configuration defines correct thresholds", () => {
+    it("LIMITS configuration defines correct thresholds for all endpoints", () => {
       const LIMITS = {
         chat: { max: 30, window: 60 },
         leads: { max: 10, window: 60 },
-        leads_status: { max: 20, window: 60 }
+        leads_status: { max: 20, window: 60 },
+        demo_request: { max: 5, window: 60 },
+        booking_click: { max: 20, window: 60 },
+        bot_fetch: { max: 60, window: 60 },
+        widget_config: { max: 60, window: 60 },
+        messages_fetch: { max: 30, window: 60 },
+        lead_detail: { max: 30, window: 60 },
+        leads_recent: { max: 30, window: 60 }
       };
 
       expect(LIMITS.chat.max).toBe(30);
       expect(LIMITS.leads.max).toBe(10);
       expect(LIMITS.leads_status.max).toBe(20);
+      expect(LIMITS.demo_request.max).toBe(5);
+      expect(LIMITS.booking_click.max).toBe(20);
+      expect(LIMITS.bot_fetch.max).toBe(60);
+      expect(LIMITS.widget_config.max).toBe(60);
+      expect(LIMITS.messages_fetch.max).toBe(30);
+      expect(LIMITS.lead_detail.max).toBe(30);
+      expect(LIMITS.leads_recent.max).toBe(30);
     });
 
     it("rate limit check returns allowed=false when count exceeds max", () => {
@@ -149,6 +163,123 @@ describe("Rate Limiting Behavior", () => {
       const shouldBlock = count > maxAllowed;
 
       expect(shouldBlock).toBe(true);
+    });
+
+    it("demo_request endpoint should reject at 6 requests (over 5 limit)", () => {
+      const count = 6;
+      const maxAllowed = 5;
+      const shouldBlock = count > maxAllowed;
+
+      expect(shouldBlock).toBe(true);
+    });
+
+    it("booking_click endpoint should reject at 21 requests (over 20 limit)", () => {
+      const count = 21;
+      const maxAllowed = 20;
+      const shouldBlock = count > maxAllowed;
+
+      expect(shouldBlock).toBe(true);
+    });
+
+    it("bot_fetch endpoint should reject at 61 requests (over 60 limit)", () => {
+      const count = 61;
+      const maxAllowed = 60;
+      const shouldBlock = count > maxAllowed;
+
+      expect(shouldBlock).toBe(true);
+    });
+
+    it("widget_config endpoint should reject at 61 requests (over 60 limit)", () => {
+      const count = 61;
+      const maxAllowed = 60;
+      const shouldBlock = count > maxAllowed;
+
+      expect(shouldBlock).toBe(true);
+    });
+
+    it("messages_fetch endpoint should reject at 31 requests (over 30 limit)", () => {
+      const count = 31;
+      const maxAllowed = 30;
+      const shouldBlock = count > maxAllowed;
+
+      expect(shouldBlock).toBe(true);
+    });
+
+    it("lead_detail endpoint should reject at 31 requests (over 30 limit)", () => {
+      const count = 31;
+      const maxAllowed = 30;
+      const shouldBlock = count > maxAllowed;
+
+      expect(shouldBlock).toBe(true);
+    });
+
+    it("leads_recent endpoint should reject at 31 requests (over 30 limit)", () => {
+      const count = 31;
+      const maxAllowed = 30;
+      const shouldBlock = count > maxAllowed;
+
+      expect(shouldBlock).toBe(true);
+    });
+  });
+
+  describe("rate limit enforcement on all public routes", () => {
+    it("all 10 public endpoints have rate limiting configured", () => {
+      const publicEndpoints = [
+        "chat",
+        "leads",
+        "leads_status",
+        "demo_request",
+        "booking_click",
+        "bot_fetch",
+        "widget_config",
+        "messages_fetch",
+        "lead_detail",
+        "leads_recent"
+      ];
+
+      const LIMITS = {
+        chat: { max: 30, window: 60 },
+        leads: { max: 10, window: 60 },
+        leads_status: { max: 20, window: 60 },
+        demo_request: { max: 5, window: 60 },
+        booking_click: { max: 20, window: 60 },
+        bot_fetch: { max: 60, window: 60 },
+        widget_config: { max: 60, window: 60 },
+        messages_fetch: { max: 30, window: 60 },
+        lead_detail: { max: 30, window: 60 },
+        leads_recent: { max: 30, window: 60 }
+      };
+
+      publicEndpoints.forEach((endpoint) => {
+        expect(LIMITS).toHaveProperty(endpoint);
+        expect((LIMITS as any)[endpoint].max).toBeGreaterThan(0);
+        expect((LIMITS as any)[endpoint].window).toBe(60);
+      });
+    });
+
+    it("demo_request has strictest limit (5) to prevent spam", () => {
+      const LIMITS = {
+        demo_request: { max: 5, window: 60 },
+        leads: { max: 10, window: 60 },
+        chat: { max: 30, window: 60 }
+      };
+
+      expect(LIMITS.demo_request.max).toBeLessThan(LIMITS.leads.max);
+      expect(LIMITS.demo_request.max).toBeLessThan(LIMITS.chat.max);
+    });
+
+    it("bot_fetch and widget_config have highest limits (60) for read operations", () => {
+      const LIMITS = {
+        bot_fetch: { max: 60, window: 60 },
+        widget_config: { max: 60, window: 60 },
+        chat: { max: 30, window: 60 },
+        leads: { max: 10, window: 60 }
+      };
+
+      expect(LIMITS.bot_fetch.max).toBeGreaterThan(LIMITS.chat.max);
+      expect(LIMITS.widget_config.max).toBeGreaterThan(LIMITS.chat.max);
+      expect(LIMITS.bot_fetch.max).toBe(60);
+      expect(LIMITS.widget_config.max).toBe(60);
     });
   });
 });

@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
 import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } from "@/lib/public/hostPolicy";
+import { checkRateLimit } from "@/lib/public/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,14 @@ export async function GET(req: Request) {
     return NextResponse.json(
       { ok: false, error: "Invalid bot key" },
       { status: 400 }
+    );
+  }
+
+  const rateLimitCheck = await checkRateLimit(req, "leads_recent", botPublicKey);
+  if (!rateLimitCheck.allowed) {
+    return NextResponse.json(
+      { ok: false, error: rateLimitCheck.error || "Rate limit exceeded" },
+      { status: 429 }
     );
   }
 

@@ -4,8 +4,9 @@ import { useState, useCallback, useEffect } from "react";
 import { TcaCard, TcaCardBody, TcaCardHeader } from "@/components/tca/TcaCard";
 import { TcaButton } from "@/components/tca/TcaButton";
 import { TcaBadge } from "@/components/tca/TcaBadge";
+import { TcaEmptyState } from "@/components/tca/TcaEmptyState";
 import { LeadDetailDrawer } from "./LeadDetailDrawer";
-import { Download } from "lucide-react";
+import { Download, Inbox } from "lucide-react";
 
 interface Lead {
   leadPublicId: string;
@@ -304,25 +305,15 @@ export default function LeadsPage() {
           </TcaCardBody>
         </TcaCard>
       ) : leads.length === 0 ? (
-        <TcaCard>
-          <TcaCardBody>
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-surface-hover)]">
-                <svg className="h-8 w-8 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]" data-testid="empty-state">
-                No Leads Found
-              </h3>
-              <p className="mt-2 max-w-sm text-sm text-[var(--color-text-secondary)]">
-                {searchQuery || statusFilter || tempFilter
-                  ? "Try adjusting your filters to see more leads."
-                  : "Leads will appear here when visitors submit their contact information through your chatbot."}
-              </p>
-            </div>
-          </TcaCardBody>
-        </TcaCard>
+        <TcaEmptyState
+          icon={<Inbox className="h-12 w-12" />}
+          title="No Leads Found"
+          description={
+            searchQuery || statusFilter || tempFilter
+              ? "Try adjusting your filters to see more leads."
+              : "Leads will appear here when visitors submit their contact information through your chatbot."
+          }
+        />
       ) : (
         <TcaCard>
           <TcaCardBody className="p-0">
