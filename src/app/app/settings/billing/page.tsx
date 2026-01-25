@@ -21,6 +21,7 @@ export default function BillingPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -37,6 +38,27 @@ export default function BillingPage() {
       console.error('Failed to fetch stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    setPortalLoading(true);
+    try {
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+      });
+      const data = await res.json();
+
+      if (data.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.message || 'Failed to open billing portal');
+      }
+    } catch (error) {
+      console.error('Failed to open billing portal:', error);
+      alert('Failed to open billing portal. Please try again.');
+    } finally {
+      setPortalLoading(false);
     }
   };
 
@@ -82,14 +104,25 @@ export default function BillingPage() {
                   : 'Free forever'}
               </p>
             </div>
-            {stats.plan.tier !== PlanTier.ENTERPRISE && (
-              <button
-                onClick={() => setShowUpgradeModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded transition-colors"
-              >
-                {stats.plan.tier === PlanTier.FREE ? 'Upgrade' : 'Change Plan'}
-              </button>
-            )}
+            <div className="flex gap-3">
+              {stats.plan.tier !== PlanTier.FREE && (
+                <button
+                  onClick={handleManageBilling}
+                  disabled={portalLoading}
+                  className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-6 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {portalLoading ? 'Loading...' : 'Manage Billing'}
+                </button>
+              )}
+              {stats.plan.tier !== PlanTier.ENTERPRISE && (
+                <button
+                  onClick={() => setShowUpgradeModal(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded transition-colors"
+                >
+                  {stats.plan.tier === PlanTier.FREE ? 'Upgrade' : 'Change Plan'}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">

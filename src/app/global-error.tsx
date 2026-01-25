@@ -40,7 +40,7 @@ export default function GlobalError({
               Something went wrong!
             </h1>
             <p className="mb-6 text-[var(--color-text-secondary)]">
-              We've been notified and will look into it. Please try again.
+              We&apos;ve been notified and will look into it. Please try again.
             </p>
             {error.digest && (
               <p className="mb-4 text-xs text-[var(--color-text-muted)]">

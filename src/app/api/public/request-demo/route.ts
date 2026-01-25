@@ -15,6 +15,32 @@ export async function POST(request: Request) {
     );
   }
 
+  // Origin validation to prevent abuse from unauthorized domains
+  const origin = request.headers.get('origin');
+  const referer = request.headers.get('referer');
+
+  const allowedOrigins = [
+    'https://treasurecoast.ai',
+    'https://www.treasurecoast.ai',
+    'http://localhost:3000',
+    'http://localhost:3001',
+  ];
+
+  const isAllowed = allowedOrigins.some(allowed =>
+    origin?.startsWith(allowed) || referer?.includes(allowed)
+  );
+
+  if (!isAllowed && process.env.NODE_ENV === 'production') {
+    console.warn('[request-demo] Blocked request from unauthorized origin', {
+      origin,
+      referer,
+    });
+    return NextResponse.json(
+      { error: 'Forbidden' },
+      { status: 403 }
+    );
+  }
+
   try {
     const body = await request.json();
     const parsed = DemoRequestSchema.safeParse(body);

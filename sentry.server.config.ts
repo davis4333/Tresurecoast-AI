@@ -36,7 +36,7 @@ Sentry.init({
       }
 
       // Remove query params that might contain sensitive data
-      if (event.request.query_string) {
+      if (event.request.query_string && typeof event.request.query_string === 'string') {
         const sanitized = event.request.query_string
           .replace(/token=[^&]*/gi, "token=REDACTED")
           .replace(/key=[^&]*/gi, "key=REDACTED")

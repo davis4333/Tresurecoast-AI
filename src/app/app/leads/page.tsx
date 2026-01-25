@@ -313,7 +313,6 @@ export default function LeadsPage() {
               ? "Try adjusting your filters to see more leads."
               : "Leads will appear here when visitors submit their contact information through your chatbot."
           }
-          dataTestId="empty-state"
         />
       ) : (
         <TcaCard>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidUUID } from "@/lib/public/uuid";
 import { checkRateLimit } from "@/lib/public/rateLimit";
+import { isHostAllowed, getRequestHost, getOriginHost, enforceTenantBinding } from "@/lib/public/hostPolicy";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,7 @@ export async function GET(
         status: true,
         greeting: true,
         fallbackText: true,
+        organizationId: true,
         organization: {
           select: {
             publicId: true,
@@ -67,6 +69,36 @@ export async function GET(
 
     if (bot.status !== "ACTIVE") {
       return NextResponse.json({ ok: false, error: "Bot not active" }, { status: 404 });
+    }
+
+    // Host allowlist check
+    const allowlistDomains = bot.allowlist
+      .map((a) => a.domain)
+      .filter((d): d is string => typeof d === "string" && d.trim().length > 0);
+
+    const origin = request.headers.get("origin");
+    const originHost = getOriginHost(request);
+    const host = getRequestHost(request);
+
+    if (!isHostAllowed(allowlistDomains, originHost ?? origin, host)) {
+      console.warn("[bot-fetch] Blocked request from unauthorized domain", {
+        botPublicKey,
+        origin,
+        host,
+      });
+      return NextResponse.json(
+        { ok: false, error: "Forbidden" },
+        { status: 403 }
+      );
+    }
+
+    // Tenant binding check
+    const bind = await enforceTenantBinding({ req: request, botOrgId: bot.organizationId });
+    if (!bind.ok) {
+      return NextResponse.json(
+        { ok: false, error: bind.error, message: bind.message },
+        { status: bind.status }
+      );
     }
 
     return NextResponse.json({

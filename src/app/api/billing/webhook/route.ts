@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
 import { PlanTier, PLAN_FEATURES } from '@/lib/plans/features';
+import { buildPaymentReceiptEmail } from '@/lib/notifications/email';
 
 // Initialize Stripe only if API key is available (for build-time compatibility)
 const stripe = process.env.STRIPE_SECRET_KEY
@@ -275,7 +276,83 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     amount: invoice.amount_paid,
     customerId: invoice.customer,
   });
-  // Could send a receipt email here
+
+  try {
+    // Get subscription to find organizationId
+    if (!invoice.subscription || typeof invoice.subscription !== 'string') {
+      console.log('[billing/webhook] No subscription ID in invoice, skipping receipt email');
+      return;
+    }
+
+    if (!stripe) {
+      console.log('[billing/webhook] Stripe not configured, skipping receipt email');
+      return;
+    }
+
+    const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+    const organizationId = subscription.metadata?.organizationId;
+
+    if (!organizationId) {
+      console.log('[billing/webhook] No organizationId in subscription metadata, skipping receipt email');
+      return;
+    }
+
+    // Get organization details
+    const org = await prisma.organization.findUnique({
+      where: { id: parseInt(organizationId) },
+      select: {
+        name: true,
+        planTier: true,
+        notificationEnabled: true,
+        notificationEmails: true,
+      },
+    });
+
+    if (!org || !org.notificationEnabled || org.notificationEmails.length === 0) {
+      console.log('[billing/webhook] Organization has no notification emails configured');
+      return;
+    }
+
+    // Build and send receipt email
+    const planFeatures = PLAN_FEATURES[org.planTier];
+    const emailPayload = buildPaymentReceiptEmail({
+      organizationName: org.name,
+      planName: planFeatures.name,
+      amount: invoice.amount_paid,
+      invoiceUrl: invoice.hosted_invoice_url || undefined,
+      receiptUrl: invoice.invoice_pdf || undefined,
+    });
+
+    // Send to all notification emails
+    for (const email of org.notificationEmails) {
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: process.env.NOTIFICATION_FROM_EMAIL || 'noreply@treasurecoast.ai',
+            to: email,
+            subject: emailPayload.subject,
+            html: emailPayload.html,
+          }),
+        });
+
+        if (response.ok) {
+          console.log(`[billing/webhook] Sent payment receipt to ${email}`);
+        } else {
+          console.error(`[billing/webhook] Failed to send receipt to ${email}:`, await response.text());
+        }
+      } catch (error) {
+        console.error(`[billing/webhook] Error sending receipt to ${email}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('[billing/webhook] Error sending payment receipt:', error);
+    // Don't throw - we don't want to fail the webhook if email fails
+  }
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {

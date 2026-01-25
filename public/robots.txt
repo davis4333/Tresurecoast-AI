@@ -1,0 +1,15 @@
+# Treasure Coast AI - Robots.txt
+User-agent: *
+Allow: /
+
+# Disallow authenticated areas
+Disallow: /app/
+Disallow: /api/
+
+# Allow public pages
+Allow: /
+Allow: /terms
+Allow: /privacy
+
+# Sitemap
+Sitemap: https://treasurecoast.ai/sitemap.xml
