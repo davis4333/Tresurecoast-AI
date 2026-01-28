@@ -17,6 +17,12 @@ enum AuditAction {
   ROUTE_LINK_UPDATED
   DOMAIN_ALLOWLIST_UPDATED
   DEMO_RESET
+  BOOKING_CREATED
+  BOOKING_UPDATED
+  BOOKING_CANCELLED
+  SUBSCRIPTION_CREATED
+  SUBSCRIPTION_UPDATED
+  SUBSCRIPTION_CANCELLED
 }
 
 enum BotStatus {
@@ -51,6 +57,9 @@ enum DataEventType {
   BOOKING_LEAD_CREATED
   BOOKING_LINK_SHOWN
   BOOKING_LINK_CLICKED
+  BOOKING_CREATED
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
 }
 
 enum LeadTemperature {
@@ -63,6 +72,10 @@ enum NotificationType {
   HOT_LEAD
   BOOKING_LINK_CLICK
   LEAD_STATUS_CHANGE
+  NEW_BOOKING
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  BOOKING_REMINDER
 }
 
 enum NotificationChannel {
@@ -73,6 +86,22 @@ enum NotificationStatus {
   SENT
   FAILED
   PENDING
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  TRIALING
+  PAUSED
 }
 
 model Organization {
@@ -94,6 +123,7 @@ model Organization {
   brandLogoUrl       String?
   brandPrimaryColor  String  @default("#6366f1")
   showPoweredBy      Boolean @default(true)
+  widgetPosition     String  @default("bottom-right") // bottom-right | bottom-left
   customDomain       String? @unique
 
   // Step 26 — Custom domain DNS verification
@@ -125,6 +155,8 @@ model Organization {
   services          OrganizationService[]
   hours             OrganizationHours[]
   notificationLogs  NotificationLog[]
+  bookings          Booking[]
+  subscription      Subscription?
 
   @@index([createdAt])
 }
@@ -167,6 +199,7 @@ model Bot {
   hours           Json?
   services        Json?
 
+  deletedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -183,6 +216,7 @@ model Bot {
   @@index([organizationId])
   @@index([workspaceId])
   @@index([status])
+  @@index([deletedAt])
 }
 
 model BotLink {
@@ -272,6 +306,7 @@ model Lead {
   temperature  LeadTemperature @default(COLD)
   scoreReasons Json?
 
+  deletedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -292,6 +327,7 @@ model Lead {
   @@index([organizationId, createdAt])
   @@index([serviceId, createdAt])
   @@index([temperature])
+  @@index([deletedAt])
 }
 
 model AuditLog {
@@ -440,7 +476,9 @@ model OrganizationService {
   id             Int      @id @default(autoincrement())
   organizationId Int
   name           String
+  description    String?
   priceCents     Int?
+  durationMinutes Int     @default(30)
   bookingUrl     String?
   paymentUrl     String?
   displayOrder   Int      @default(0)
@@ -450,6 +488,7 @@ model OrganizationService {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   leads        Lead[]
+  bookings     Booking[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -492,4 +531,130 @@ model NotificationLog {
   @@index([leadId])
   @@index([createdAt])
   @@index([status])
+}
+
+// ============================================
+// BOOKING SYSTEM
+// ============================================
+
+model Booking {
+  id             Int           @id @default(autoincrement())
+  publicId       String        @unique @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+  organizationId Int
+  serviceId      Int?
+  leadId         Int?
+  conversationId Int?
+
+  // Booking details
+  status         BookingStatus @default(PENDING)
+  scheduledAt    DateTime      // The appointment date/time
+  endAt          DateTime?     // Calculated from scheduledAt + service duration
+
+  // Customer info (may or may not have a Lead)
+  customerName   String
+  customerEmail  String?
+  customerPhone  String?
+
+  // Notes and metadata
+  notes          String?
+  staffNotes     String?
+  cancelReason   String?
+
+  // Reminders
+  reminderSentAt DateTime?
+
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  service        OrganizationService? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([serviceId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([organizationId, scheduledAt])
+  @@index([customerEmail])
+  @@index([deletedAt])
+}
+
+// ============================================
+// BILLING / STRIPE
+// ============================================
+
+model Plan {
+  id              Int      @id @default(autoincrement())
+  publicId        String   @unique @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+
+  name            String   // "Starter", "Pro", "Enterprise"
+  description     String?
+
+  // Stripe IDs
+  stripePriceId   String   @unique
+  stripeProductId String
+
+  // Pricing
+  priceCents      Int      // Monthly price in cents
+  interval        String   @default("month") // "month" | "year"
+
+  // Feature limits
+  maxBots         Int      @default(1)
+  maxLeadsPerMonth Int     @default(100)
+  maxConversationsPerMonth Int @default(500)
+
+  // Feature flags
+  customBranding  Boolean  @default(false)
+  customDomain    Boolean  @default(false)
+  apiAccess       Boolean  @default(false)
+  prioritySupport Boolean  @default(false)
+
+  isActive        Boolean  @default(true)
+  displayOrder    Int      @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subscriptions   Subscription[]
+
+  @@index([isActive])
+  @@index([stripePriceId])
+}
+
+model Subscription {
+  id                   Int                @id @default(autoincrement())
+  publicId             String             @unique @db.Uuid @default(dbgenerated("gen_random_uuid()"))
+  organizationId       Int                @unique
+  planId               Int
+
+  // Stripe IDs
+  stripeCustomerId     String
+  stripeSubscriptionId String             @unique
+
+  status               SubscriptionStatus @default(TRIALING)
+
+  // Billing cycle
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+  cancelledAt          DateTime?
+
+  // Trial
+  trialStart           DateTime?
+  trialEnd             DateTime?
+
+  // Usage tracking (reset each period)
+  leadsUsedThisPeriod  Int                @default(0)
+  conversationsUsedThisPeriod Int         @default(0)
+
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  organization         Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan                 Plan               @relation(fields: [planId], references: [id])
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([status])
+  @@index([currentPeriodEnd])
 }

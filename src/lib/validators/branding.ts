@@ -9,6 +9,7 @@ export const BrandingSchema = z.object({
   brandLogoUrl: z.string().url().nullable().or(z.literal("")),
   brandPrimaryColor: z.string().regex(hexColorRegex, "Must be a valid hex color (#RRGGBB)"),
   showPoweredBy: z.boolean(),
+  widgetPosition: z.enum(["bottom-right", "bottom-left"]).optional().default("bottom-right"),
   customDomain: z.string().regex(domainRegex, "Must be a valid domain (e.g., example.com)").nullable().or(z.literal("")),
 });
 

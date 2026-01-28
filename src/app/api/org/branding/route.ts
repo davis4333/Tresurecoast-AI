@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
         brandLogoUrl: true,
         brandPrimaryColor: true,
         showPoweredBy: true,
+        widgetPosition: true,
         customDomain: true,
       },
     });
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest) {
         brandLogoUrl: org.brandLogoUrl,
         brandPrimaryColor: org.brandPrimaryColor,
         showPoweredBy: org.showPoweredBy,
+        widgetPosition: org.widgetPosition,
         customDomain: org.customDomain,
       },
     });
@@ -72,6 +74,7 @@ export async function PUT(req: NextRequest) {
       brandLogoUrl: validated.brandLogoUrl || null,
       brandPrimaryColor: validated.brandPrimaryColor,
       showPoweredBy: validated.showPoweredBy,
+      widgetPosition: validated.widgetPosition || "bottom-right",
       customDomain: validated.customDomain || null,
     };
 
@@ -94,6 +97,7 @@ export async function PUT(req: NextRequest) {
         brandLogoUrl: true,
         brandPrimaryColor: true,
         showPoweredBy: true,
+        widgetPosition: true,
         customDomain: true,
       },
     });

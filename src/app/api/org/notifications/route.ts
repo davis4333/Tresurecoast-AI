@@ -4,6 +4,8 @@ import { getOrgContext, isAdmin } from "@/lib/auth/getOrgContext";
 import { z } from "zod";
 import { isValidEmail } from "@/lib/notifications/email";
 
+export const dynamic = "force-dynamic";
+
 const updateSchema = z.object({
   notificationEnabled: z.boolean().optional(),
   notificationEmails: z.array(z.string()).optional(),

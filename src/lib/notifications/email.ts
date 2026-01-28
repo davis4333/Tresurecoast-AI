@@ -295,6 +295,152 @@ export async function sendNotification(params: {
   }
 }
 
+export function buildBookingConfirmationEmail(booking: {
+  customerName: string;
+  customerEmail: string;
+  serviceName: string | null;
+  scheduledAt: Date;
+  businessName: string;
+  businessPhone?: string | null;
+  businessAddress?: string | null;
+}, appUrl: string): EmailPayload {
+  const formattedDate = booking.scheduledAt.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const formattedTime = booking.scheduledAt.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  return {
+    to: booking.customerEmail,
+    subject: `Booking Confirmed: ${booking.serviceName || "Your Appointment"} at ${escapeHtml(booking.businessName)}`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Confirmation</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <tr>
+      <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px 12px 0 0; padding: 32px; text-align: center;">
+        <div style="width: 60px; height: 60px; margin: 0 auto 16px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 28px;">&#x2713;</span>
+        </div>
+        <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Booking Confirmed!</h1>
+        <p style="margin: 8px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">Your appointment has been scheduled</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #ffffff; padding: 32px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+          <tr>
+            <td style="padding-bottom: 24px;">
+              <h2 style="margin: 0 0 8px; color: #1f2937; font-size: 18px;">Hi ${escapeHtml(booking.customerName)},</h2>
+              <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Thank you for booking with ${escapeHtml(booking.businessName)}. Here are your appointment details:
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px; background-color: #f9fafb; border-radius: 8px; margin-bottom: 24px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                ${booking.serviceName ? `
+                <tr>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 100px; vertical-align: top;">Service:</td>
+                  <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">${escapeHtml(booking.serviceName)}</td>
+                </tr>
+                ` : ""}
+                <tr>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px; vertical-align: top;">Date:</td>
+                  <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">${formattedDate}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px; vertical-align: top;">Time:</td>
+                  <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600;">${formattedTime}</td>
+                </tr>
+                ${booking.businessAddress ? `
+                <tr>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px; vertical-align: top;">Location:</td>
+                  <td style="padding: 8px 0; color: #1f2937; font-size: 14px;">${escapeHtml(booking.businessAddress)}</td>
+                </tr>
+                ` : ""}
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-top: 24px;">
+              <p style="margin: 0 0 16px; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Need to make changes? ${booking.businessPhone ? `Contact us at <a href="tel:${escapeHtml(booking.businessPhone)}" style="color: #10b981; text-decoration: none;">${escapeHtml(booking.businessPhone)}</a>` : "Please contact us directly."}
+              </p>
+              <p style="margin: 0; color: #6b7280; font-size: 14px;">
+                We look forward to seeing you!
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 24px; text-align: center; color: #9ca3af; font-size: 12px;">
+        <p style="margin: 0;">${escapeHtml(booking.businessName)}</p>
+        <p style="margin: 4px 0 0;">Powered by Treasure Coast AI</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim(),
+  };
+}
+
+export async function sendBookingConfirmation(params: {
+  booking: {
+    customerName: string;
+    customerEmail: string;
+    serviceName: string | null;
+    scheduledAt: Date;
+  };
+  business: {
+    name: string;
+    phone?: string | null;
+    address?: string | null;
+  };
+  appUrl: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const { booking, business, appUrl } = params;
+
+  if (!booking.customerEmail) {
+    return { success: false, error: "No customer email provided" };
+  }
+
+  const emailPayload = buildBookingConfirmationEmail(
+    {
+      ...booking,
+      businessName: business.name,
+      businessPhone: business.phone,
+      businessAddress: business.address,
+    },
+    appUrl
+  );
+
+  const result = await sendEmailWithRetry(emailPayload);
+
+  if (result.success) {
+    console.log(`[NOTIFICATION] Sent booking confirmation to ${booking.customerEmail}`);
+  } else {
+    console.error(`[NOTIFICATION] Failed to send booking confirmation: ${result.error}`);
+  }
+
+  return result;
+}
+
 export function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email) && email.length <= 254;

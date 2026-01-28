@@ -591,3 +591,24 @@ body {
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
+
+/* Typing indicator animation */
+@keyframes tca-typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background-color: var(--color-text-muted);
+  border-radius: 50%;
+  animation: tca-typing-bounce 1.4s infinite ease-in-out;
+}

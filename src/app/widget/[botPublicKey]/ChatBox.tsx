@@ -373,6 +373,16 @@ export function ChatBox({ botPublicKey }: ChatBoxProps) {
               </div>
             </div>
           ))}
+          {/* Typing Indicator */}
+          {isSending && (
+            <div className="flex justify-start tca-message-enter">
+              <div className="tca-bubble-assistant flex items-center gap-1 px-4 py-3">
+                <span className="typing-dot" style={{ animationDelay: "0ms" }} />
+                <span className="typing-dot" style={{ animationDelay: "150ms" }} />
+                <span className="typing-dot" style={{ animationDelay: "300ms" }} />
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
       )}

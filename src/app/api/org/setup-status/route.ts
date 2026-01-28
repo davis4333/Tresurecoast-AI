@@ -3,6 +3,8 @@ import { getOrgContext } from "@/lib/auth/getOrgContext";
 import { prisma } from "@/lib/prisma";
 import { evaluateSetup, SetupInput } from "@/lib/setup/setupChecker";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const ctx = await getOrgContext({ request });
   if (!ctx.ok) {

@@ -10,6 +10,7 @@ type BrandingData = {
   brandPrimaryColor: string;
   showPoweredBy: boolean;
   customDomain: string | null;
+  widgetPosition: "bottom-right" | "bottom-left";
 };
 
 export default function BrandingSettingsPage() {
@@ -23,6 +24,7 @@ export default function BrandingSettingsPage() {
   const [brandLogoUrl, setBrandLogoUrl] = useState("");
   const [brandPrimaryColor, setBrandPrimaryColor] = useState("#6366f1");
   const [showPoweredBy, setShowPoweredBy] = useState(true);
+  const [widgetPosition, setWidgetPosition] = useState<"bottom-right" | "bottom-left">("bottom-right");
 
   useEffect(() => {
     async function fetchBranding() {
@@ -36,6 +38,7 @@ export default function BrandingSettingsPage() {
           setBrandLogoUrl(b.brandLogoUrl || "");
           setBrandPrimaryColor(b.brandPrimaryColor || "#6366f1");
           setShowPoweredBy(b.showPoweredBy);
+          setWidgetPosition(b.widgetPosition || "bottom-right");
         }
       } catch {
         setError("Failed to load branding settings");
@@ -61,6 +64,7 @@ export default function BrandingSettingsPage() {
           brandLogoUrl: brandLogoUrl || null,
           brandPrimaryColor,
           showPoweredBy,
+          widgetPosition,
         }),
       });
 
@@ -227,6 +231,51 @@ export default function BrandingSettingsPage() {
                 }`}
               />
             </button>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+              Widget Position
+            </label>
+            <p className="text-xs text-[var(--color-text-muted)] mb-3">
+              Choose where the chat widget appears on your website
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setWidgetPosition("bottom-right")}
+                className={`flex-1 rounded-lg border p-4 text-center transition-colors ${
+                  widgetPosition === "bottom-right"
+                    ? "border-[var(--color-brand-primary)] bg-[var(--color-brand-primary)]/10"
+                    : "border-[var(--color-border)] hover:border-[var(--color-text-muted)]"
+                }`}
+              >
+                <div className="relative h-16 w-full rounded bg-[var(--color-surface-hover)] mb-2">
+                  <div
+                    className="absolute bottom-1 right-1 h-4 w-4 rounded"
+                    style={{ backgroundColor: brandPrimaryColor }}
+                  />
+                </div>
+                <span className="text-sm text-[var(--color-text-primary)]">Bottom Right</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setWidgetPosition("bottom-left")}
+                className={`flex-1 rounded-lg border p-4 text-center transition-colors ${
+                  widgetPosition === "bottom-left"
+                    ? "border-[var(--color-brand-primary)] bg-[var(--color-brand-primary)]/10"
+                    : "border-[var(--color-border)] hover:border-[var(--color-text-muted)]"
+                }`}
+              >
+                <div className="relative h-16 w-full rounded bg-[var(--color-surface-hover)] mb-2">
+                  <div
+                    className="absolute bottom-1 left-1 h-4 w-4 rounded"
+                    style={{ backgroundColor: brandPrimaryColor }}
+                  />
+                </div>
+                <span className="text-sm text-[var(--color-text-primary)]">Bottom Left</span>
+              </button>
+            </div>
           </div>
 
         </div>

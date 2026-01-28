@@ -180,7 +180,7 @@ export default function LandingPage() {
                     <Quote className="h-6 w-6" />
                   </div>
                   <p className="mb-6 flex-1 text-sm italic text-[var(--color-text-secondary)]" data-testid={`text-quote-${index}`}>
-                    "{testimonial.quote}"
+                    &ldquo;{testimonial.quote}&rdquo;
                   </p>
                   <div className="mt-auto" data-testid={`section-author-${index}`}>
                     <p className="font-semibold" data-testid={`text-author-${index}`}>{testimonial.author}</p>
